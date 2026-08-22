@@ -41,7 +41,4 @@ While one could argure I should just use a desktop framework, one of my primary 
 
 I think Tauri and [Ghostty](https://github.com/ghostty-org/ghostty) are going to be two wonderful references for this project. Tauri for obvious reasons: being a webview based desktop framework. And Ghostty because it is designed as a Zig core with GUI consumers. Per the [Ghostty docs](https://ghostty.org/docs/about#libghostty):
 
-```txt
-The Ghostty GUI applications are consumers of libghostty. The macOS app is written in Swift, uses AppKit and SwiftUI, and links against the libghostty C API. The Linux app is written in Zig, uses the GTK4 C API, and also links against libghostty.
-```
-
+> The Ghostty GUI applications are consumers of libghostty. The macOS app is written in Swift, uses AppKit and SwiftUI, and links against the libghostty C API. The Linux app is written in Zig, uses the GTK4 C API, and also links against libghostty.
