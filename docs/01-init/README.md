@@ -23,7 +23,25 @@ I think v1.0 of this project should be able to do the following:
 - Open files that were not changed
 - Annoate/comment on a line/range/file
 - Export the review to the clipboard
+- Vim bindings
 
 There is plenty more I could think of, but I am not the biggest fan of projects never reaching v1.0, so I will stop here.
 
 ## Tech Stack
+
+There is a diffs library, [Diffs by The Pierre Computer Co.](https://diffs.com/), that looks promising. The same company also has a [file tree library](https://trees.software/). The frontend will almost certainly revolve around these two libraries.
+
+Being as how these are javascript libraries, we will need to serve the UI either in a browser tab or in webview via a desktop application. I would like to design this in such a way that both could work.
+
+Some of the most popular desktop frameworks ([Electron](https://www.electronjs.org/), [Tauri](https://v2.tauri.app/), etc) work by having a web UI process and a native process that communicate via IPC. I have been liking Zig lately, so will likely skip using these frameworks but use the same architecutre just with a Zig native process. 
+
+There are webview libraries ([webview](https://github.com/webview/webview), [webui](https://github.com/webui-dev/webui)), but again I think I am going to skip these. We can use FFI and spin up the window/webview with the native platform APIs, and serve it in the browser as a fallback. My primary machine is a Mac Mini, and also have a ThinkPad running Linux (Pop!_OS) that is my couch/travel computer. Those will be the primary platforms I have in mind for MVP.
+
+While one could argure I should just use a desktop framework, one of my primary objectives with my open-source projects is to learn. Making some of these design decisions is the fun part! Not to mention the more granular control of using the native APIs.
+
+I think Tauri and [Ghostty](https://github.com/ghostty-org/ghostty) are going to be two wonderful references for this project. Tauri for obvious reasons: being a webview based desktop framework. And Ghostty because it is designed as a Zig core with GUI consumers. Per the [Ghostty docs](https://ghostty.org/docs/about#libghostty):
+
+```txt
+The Ghostty GUI applications are consumers of libghostty. The macOS app is written in Swift, uses AppKit and SwiftUI, and links against the libghostty C API. The Linux app is written in Zig, uses the GTK4 C API, and also links against libghostty.
+```
+
