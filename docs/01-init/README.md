@@ -13,3 +13,17 @@ There are also some things about the aforementioned workflow where I find myself
 For starters, while I live in the terminal, I find myself wanting a more rich GUI for diffs. Idk what it is - maybe I haven't refined my themes/fonts enough, but the diffs in the terminal just don't hit the same for me. I often find myself opening up GitHub for diffs. I even have a function in my `.zshrc` called [compare](https://github.com/HayesBarber/dotfiles/blob/main/zshrc/.zshrc#L133) that opens the diff in GitHub.
 
 Secondly, diffs are obvisouly centered around files that _changed_. What if I am framing changes I intend to make? What if there is a file I ancipated should change, but didn't? What if I am simply exploring a code base and asking questions? This is to say that I believe there are use cases for commenting/annotating a code base when there is no diff.
+
+## MVP
+
+I think v1.0 of this project should be able to do the following:
+
+- Review uncommitted changes
+- Review range of commits
+- Open files that were not changed
+- Annoate/comment on a line/range/file
+- Export the review to the clipboard
+
+There is plenty more I could think of, but I am not the biggest fan of project never reaching v1.0, so I will stop here.
+
+## Tech Stack
