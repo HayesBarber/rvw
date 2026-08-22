@@ -24,6 +24,6 @@ I think v1.0 of this project should be able to do the following:
 - Annoate/comment on a line/range/file
 - Export the review to the clipboard
 
-There is plenty more I could think of, but I am not the biggest fan of project never reaching v1.0, so I will stop here.
+There is plenty more I could think of, but I am not the biggest fan of projects never reaching v1.0, so I will stop here.
 
 ## Tech Stack
