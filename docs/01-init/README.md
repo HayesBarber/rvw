@@ -56,6 +56,7 @@ I am thinking something roughly like this:
 ├── frontend/      ->  React frontend
 ├── platform/
 │   └── macos/     ->  Swift/AppKit/WebKit
-└── build.zig      ->  Builds based on platform
+├── build.zig
+└── build.zig.zon
 ```
 
