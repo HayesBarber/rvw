@@ -1,0 +1,114 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #202124;
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 960px;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: auto;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.review-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  width: 100%;
+  min-width: 960px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid #d9d9d9;
+}
+
+.pane:last-child {
+  border-right: 0;
+}
+
+.pane-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  height: 44px;
+  padding: 12px;
+  overflow: hidden;
+  border-bottom: 1px solid #d9d9d9;
+  white-space: nowrap;
+}
+
+.pane-header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pane-header span,
+.comment-target {
+  color: #666666;
+  font-size: 0.75rem;
+}
+
+.pane-body {
+  height: calc(100vh - 44px);
+  min-height: 0;
+  overflow: auto;
+}
+
+.file-tree {
+  min-height: 100%;
+}
+
+.diff-scroll {
+  height: 100%;
+  overflow: auto;
+}
+
+.pane-status,
+.fatal-error {
+  margin: 0;
+  padding: 16px;
+  color: #666666;
+}
+
+.comments {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.comment {
+  padding: 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+}
+
+.comment p {
+  margin: 0;
+}
+
+.comment p + p {
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
