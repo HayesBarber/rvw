@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const core_module = @import("../app/core.zig");
 const json_protocol = @import("../app/json_protocol.zig");
 const model = @import("../app/model.zig");
@@ -20,27 +19,22 @@ pub const Adapter = struct {
     dispatcher: core_module.Dispatcher,
 
     pub fn route(self: Adapter, method: std.http.Method, target: []const u8) !Response {
-        if (method != .GET) return self.failure(.method_not_allowed, .malformed_request);
+        return switch (method) {
+            .GET => switch (parseRoute(target)) {
+                .review_overview => self.dispatch(.get_review_overview),
+                .file_review => |file| self.routeFileReview(file),
+                .malformed => self.failure(.bad_request, .malformed_request),
+                .not_found => self.failure(.not_found, .unknown_file),
+            },
+            else => self.failure(.method_not_allowed, .malformed_request),
+        };
+    }
 
-        if (std.mem.eql(u8, target, "/api/reviews/active")) {
-            return self.dispatch(.get_review_overview);
-        }
-
-        const prefix = "/api/reviews/";
-        if (!std.mem.startsWith(u8, target, prefix)) return self.failure(.not_found, .unknown_file);
-        const rest = target[prefix.len..];
-        const marker = "/files?";
-        const marker_index = std.mem.indexOf(u8, rest, marker) orelse
-            return self.failure(.not_found, .unknown_file);
-        const encoded_review_id = rest[0..marker_index];
-        const query = rest[marker_index + marker.len ..];
-        if (!std.mem.startsWith(u8, query, "path=") or query.len == "path=".len)
-            return self.failure(.bad_request, .malformed_request);
-
-        const review_id = decode(self.allocator, encoded_review_id) catch
+    fn routeFileReview(self: Adapter, file: Route.FileReview) !Response {
+        const review_id = percentDecode(self.allocator, file.encoded_review_id) catch
             return self.failure(.bad_request, .malformed_request);
         defer self.allocator.free(review_id);
-        const path = decode(self.allocator, query["path=".len..]) catch
+        const path = percentDecode(self.allocator, file.encoded_path) catch
             return self.failure(.bad_request, .malformed_request);
         defer self.allocator.free(path);
 
@@ -65,20 +59,44 @@ pub const Adapter = struct {
     }
 };
 
+const Route = union(enum) {
+    review_overview,
+    file_review: FileReview,
+    malformed,
+    not_found,
+
+    const FileReview = struct {
+        encoded_review_id: []const u8,
+        encoded_path: []const u8,
+    };
+};
+
+fn parseRoute(target: []const u8) Route {
+    if (std.mem.eql(u8, target, "/api/reviews/active")) return .review_overview;
+
+    const prefix = "/api/reviews/";
+    if (!std.mem.startsWith(u8, target, prefix)) return .not_found;
+    const rest = target[prefix.len..];
+    const marker = "/files?";
+    const marker_index = std.mem.indexOf(u8, rest, marker) orelse return .not_found;
+    const query = rest[marker_index + marker.len ..];
+    if (!std.mem.startsWith(u8, query, "path=") or query.len == "path=".len) return .malformed;
+
+    return .{ .file_review = .{
+        .encoded_review_id = rest[0..marker_index],
+        .encoded_path = query["path=".len..],
+    } };
+}
+
 pub fn serve(allocator: Allocator, io: std.Io, dispatcher: core_module.Dispatcher, address: std.Io.net.IpAddress) !void {
     var listener = try address.listen(io, .{ .reuse_address = true });
     defer listener.deinit(io);
-    var signals = SignalGuard.install(listener.socket.handle);
-    defer signals.deinit();
     var connections: std.Io.Group = .init;
     defer connections.cancel(io);
 
     std.log.info("rvw listening on http://{f}", .{address});
     while (true) {
-        const stream = listener.accept(io) catch |err| switch (err) {
-            error.SocketNotListening => return,
-            else => if (signal_stopping.load(.acquire)) return else return err,
-        };
+        const stream = try listener.accept(io);
         connections.async(io, serveConnection, .{ allocator, io, dispatcher, stream });
     }
 }
@@ -120,46 +138,9 @@ const json_headers = &[_]std.http.Header{
     .{ .name = "cache-control", .value = "no-store" },
 };
 
-var signal_socket = std.atomic.Value(i32).init(-1);
-var signal_stopping = std.atomic.Value(bool).init(false);
-
-const SignalGuard = if (builtin.os.tag == .linux or builtin.os.tag == .macos) struct {
-    old_int: std.posix.Sigaction,
-    old_term: std.posix.Sigaction,
-
-    fn install(socket: std.Io.net.Socket.Handle) @This() {
-        signal_stopping.store(false, .release);
-        signal_socket.store(@intCast(socket), .release);
-        const action: std.posix.Sigaction = .{
-            .handler = .{ .handler = handleSignal },
-            .mask = std.posix.sigemptyset(),
-            .flags = 0,
-        };
-        var guard: @This() = undefined;
-        std.posix.sigaction(.INT, &action, &guard.old_int);
-        std.posix.sigaction(.TERM, &action, &guard.old_term);
-        return guard;
-    }
-
-    fn deinit(self: *@This()) void {
-        signal_socket.store(-1, .release);
-        std.posix.sigaction(.INT, &self.old_int, null);
-        std.posix.sigaction(.TERM, &self.old_term, null);
-    }
-
-    fn handleSignal(_: std.posix.SIG) callconv(.c) void {
-        signal_stopping.store(true, .release);
-        const socket = signal_socket.load(.acquire);
-        if (socket >= 0) _ = std.posix.system.shutdown(socket, std.posix.SHUT.RDWR);
-    }
-} else struct {
-    fn install(_: std.Io.net.Socket.Handle) @This() {
-        return .{};
-    }
-    fn deinit(_: *@This()) void {}
-};
-
-fn decode(allocator: Allocator, encoded: []const u8) ![]u8 {
+/// Decodes percent escapes in URI components such as `a%20b.zig`. The router
+/// uses it for the review id path segment and the `path` query value.
+fn percentDecode(allocator: Allocator, encoded: []const u8) ![]u8 {
     const result = try allocator.alloc(u8, encoded.len);
     errdefer allocator.free(result);
     var source: usize = 0;

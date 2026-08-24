@@ -42,6 +42,8 @@ pub export fn rvw_core_dispatch(
 
 pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void {
     if (buffer.ptr == null or buffer.len == 0) return;
+    // The C ABI carries pointer and length separately. Zig allocators free the
+    // slice returned by alloc, so reconstruct that same slice here.
     allocator.free(buffer.ptr[0..buffer.len]);
 }
 

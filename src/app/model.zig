@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const FileStatus = enum {
     modified,
     added,
@@ -35,29 +37,31 @@ pub const CommentTarget = union(enum) {
         endLine: usize,
     },
 
-    pub fn jsonStringify(self: CommentTarget, jws: anytype) !void {
-        try jws.beginObject();
+    /// Uses the API's `{ "kind": ... }` tagged-object shape instead of
+    /// std.json's default representation for tagged unions.
+    pub fn jsonStringify(self: CommentTarget, writer: *std.json.Stringify) !void {
+        try writer.beginObject();
         switch (self) {
             .file => |target| {
-                try jws.objectField("kind");
-                try jws.write("file");
-                try jws.objectField("path");
-                try jws.write(target.path);
+                try writer.objectField("kind");
+                try writer.write("file");
+                try writer.objectField("path");
+                try writer.write(target.path);
             },
             .line => |target| {
-                try jws.objectField("kind");
-                try jws.write("line");
-                try jws.objectField("path");
-                try jws.write(target.path);
-                try jws.objectField("side");
-                try jws.write(target.side);
-                try jws.objectField("startLine");
-                try jws.write(target.startLine);
-                try jws.objectField("endLine");
-                try jws.write(target.endLine);
+                try writer.objectField("kind");
+                try writer.write("line");
+                try writer.objectField("path");
+                try writer.write(target.path);
+                try writer.objectField("side");
+                try writer.write(target.side);
+                try writer.objectField("startLine");
+                try writer.write(target.startLine);
+                try writer.objectField("endLine");
+                try writer.write(target.endLine);
             },
         }
-        try jws.endObject();
+        try writer.endObject();
     }
 };
 
@@ -79,17 +83,18 @@ pub const FileContents = struct {
     contents: []const u8,
     lang: ?[]const u8 = null,
 
-    pub fn jsonStringify(self: FileContents, jws: anytype) !void {
-        try jws.beginObject();
-        try jws.objectField("name");
-        try jws.write(self.name);
-        try jws.objectField("contents");
-        try jws.write(self.contents);
+    /// Keeps the optional `lang` field out of the JSON contract when unknown.
+    pub fn jsonStringify(self: FileContents, writer: *std.json.Stringify) !void {
+        try writer.beginObject();
+        try writer.objectField("name");
+        try writer.write(self.name);
+        try writer.objectField("contents");
+        try writer.write(self.contents);
         if (self.lang) |lang| {
-            try jws.objectField("lang");
-            try jws.write(lang);
+            try writer.objectField("lang");
+            try writer.write(lang);
         }
-        try jws.endObject();
+        try writer.endObject();
     }
 };
 
@@ -100,25 +105,27 @@ pub const FileContent = union(enum) {
     },
     file: struct { file: FileContents },
 
-    pub fn jsonStringify(self: FileContent, jws: anytype) !void {
-        try jws.beginObject();
+    /// Uses the API's `{ "kind": ... }` tagged-object shape instead of
+    /// std.json's default representation for tagged unions.
+    pub fn jsonStringify(self: FileContent, writer: *std.json.Stringify) !void {
+        try writer.beginObject();
         switch (self) {
             .diff => |content| {
-                try jws.objectField("kind");
-                try jws.write("diff");
-                try jws.objectField("oldFile");
-                try jws.write(content.oldFile);
-                try jws.objectField("newFile");
-                try jws.write(content.newFile);
+                try writer.objectField("kind");
+                try writer.write("diff");
+                try writer.objectField("oldFile");
+                try writer.write(content.oldFile);
+                try writer.objectField("newFile");
+                try writer.write(content.newFile);
             },
             .file => |content| {
-                try jws.objectField("kind");
-                try jws.write("file");
-                try jws.objectField("file");
-                try jws.write(content.file);
+                try writer.objectField("kind");
+                try writer.write("file");
+                try writer.objectField("file");
+                try writer.write(content.file);
             },
         }
-        try jws.endObject();
+        try writer.endObject();
     }
 };
 
@@ -177,7 +184,6 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
 }
 
 test "file content JSON omits an absent language" {
-    const std = @import("std");
     const json = try std.json.Stringify.valueAlloc(std.testing.allocator, FileContents{
         .name = "main.zig",
         .contents = "",

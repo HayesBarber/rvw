@@ -5,7 +5,7 @@ pub const core = @import("app/core.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
 pub const http = @import("platform/http.zig");
 
-test {
+test "all public modules are test roots" {
     _ = model;
     _ = provider;
     _ = fixture_provider;
