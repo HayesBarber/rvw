@@ -118,6 +118,7 @@ fn serveConnection(allocator: Allocator, io: std.Io, dispatcher: core_module.Dis
                 return;
             },
         };
+        std.log.info("{t} {s}", .{ request.head.method, request.head.target });
         const response = adapter.route(request.head.method, request.head.target) catch {
             request.respond("{\"error\":{\"code\":\"internal_error\",\"message\":\"Internal error\"}}", .{
                 .status = .internal_server_error,
