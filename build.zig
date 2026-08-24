@@ -38,6 +38,12 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run.addArgs(args);
     b.step("run", "Run the HTTP service").dependOn(&run.step);
 
+    const dev = b.addSystemCommand(&.{"node"});
+    dev.addFileArg(b.path("scripts/dev.mjs"));
+    dev.addArtifactArg(exe);
+    dev.setCwd(b.path("."));
+    b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
+
     const core_tests = b.addTest(.{ .root_module = rvw });
     const run_core_tests = b.addRunArtifact(core_tests);
     const cabi_tests = b.addTest(.{ .root_module = library.root_module });
