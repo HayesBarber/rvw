@@ -14,3 +14,11 @@ For starters, since we are still serving the UI from a browser, we will focus on
 - HTTP dispatcher implementation
 - C ABI dispatcher implementation (probs unused for now)
 
+## Post Implementation
+
+The Zig core has been stubbed out, and the frontend now talks to it over HTTP.
+
+All data is still fake, but things are now taking some shape.
+
+The next two priorities are for CLI and MacOS scaffolding.
+
