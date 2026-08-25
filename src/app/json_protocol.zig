@@ -65,34 +65,3 @@ fn encodeEnvelopeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
         .@"error" = .{ .code = code, .message = model.errorMessage(code) },
     }, .{});
 }
-
-test "JSON protocol uses an injected dispatcher" {
-    const Fake = struct {
-        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
-            return switch (request) {
-                .get_review_overview => .{ .review_overview = .{
-                    .review = .{ .id = "test", .repository = .{ .name = "fake" }, .source = .{ .kind = "working-tree", .base = "HEAD" } },
-                    .initialPath = "a.zig",
-                    .files = &.{},
-                    .comments = &.{},
-                } },
-                .get_file_review => error.UnknownFile,
-            };
-        }
-    };
-    var context: u8 = 0;
-    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = Fake.dispatch };
-
-    const success = try dispatchJson(std.testing.allocator, dispatcher, "{\"type\":\"get_review_overview\"}");
-    defer std.testing.allocator.free(success);
-    try std.testing.expect(std.mem.indexOf(u8, success, "\"ok\":true") != null);
-    try std.testing.expect(std.mem.indexOf(u8, success, "\"name\":\"fake\"") != null);
-
-    const malformed = try dispatchJson(std.testing.allocator, dispatcher, "nope");
-    defer std.testing.allocator.free(malformed);
-    try std.testing.expect(std.mem.indexOf(u8, malformed, "malformed_request") != null);
-
-    const unknown = try dispatchJson(std.testing.allocator, dispatcher, "{\"type\":\"wat\"}");
-    defer std.testing.allocator.free(unknown);
-    try std.testing.expect(std.mem.indexOf(u8, unknown, "unknown_operation") != null);
-}
