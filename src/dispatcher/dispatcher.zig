@@ -1,4 +1,4 @@
-const model = @import("model.zig");
+const model = @import("../app/model.zig");
 
 pub const Dispatcher = struct {
     context: *anyopaque,
