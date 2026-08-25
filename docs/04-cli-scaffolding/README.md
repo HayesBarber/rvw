@@ -14,5 +14,29 @@ If `dir` is not provided it will default to `.`. `-r` will be for a commit range
 
 ## Starup Procedure
 
+The entrypoint will need to do a few things:
 
+- Parse args and exit accordingly
+- Check if core process is running
+  - Yes? Launch UI
+  - No? Launch core (fork/exec) and wait for it to startup before launching UI
+  - How to tell if the core is running? Pre-defined UNIX socket and TCP port?
+- Launch UI
+  - MacOS
+    - Start app binary that uses native window
+    - Swift will talk to core process over Unix socket
+  - Linux
+    - Launch browser tab
+    - Browser will talk to core process via HTTP
+    - Core will serve the UI
+  - We will need the frontend to be able to discover what communication mechanism it should use
+    - If JS bridge APIs exist on the window object -> use them, otherwise use TCP
+    - May want to consider a session token since the core would be listening on a TCP port
+  - It is ok to launch multiple UIs for different directories/sessions
+
+## Packaging
+
+On MacOS, I guess there will be two executables? The CLI and the GUI. The CLI binary could live in the resources folder of the app bundle and be symlinked to the user's `$PATH`.
+
+On Linux this can just be one binary until we introduce a native window in which case it may align with the MacOS structure. I am still not sure if the MVP will include a native Linux window, and we can remove the HTTP adapter.
 
