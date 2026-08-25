@@ -3,10 +3,16 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const httpz = b.dependency("httpz", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("httpz");
 
     const rvw = b.addModule("rvw", .{
         .root_source_file = b.path("src/rvw.zig"),
         .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "httpz", .module = httpz }},
     });
 
     const exe = b.addExecutable(.{
