@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
         .name = "rvw",
         .linkage = .static,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/platform/cabi.zig"),
+            .root_source_file = b.path("src/dispatcher/cabi.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{.{ .name = "rvw", .module = rvw }},

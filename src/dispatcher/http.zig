@@ -1,5 +1,5 @@
 const std = @import("std");
-const core_module = @import("../app/core.zig");
+const dispatcher_module = @import("../app/dispatcher.zig");
 const json_protocol = @import("../app/json_protocol.zig");
 const model = @import("../app/model.zig");
 
@@ -16,7 +16,7 @@ pub const Response = struct {
 
 pub const Adapter = struct {
     allocator: Allocator,
-    dispatcher: core_module.Dispatcher,
+    dispatcher: dispatcher_module.Dispatcher,
 
     pub fn route(self: Adapter, method: std.http.Method, target: []const u8) !Response {
         return switch (method) {
@@ -88,7 +88,7 @@ fn parseRoute(target: []const u8) Route {
     } };
 }
 
-pub fn serve(allocator: Allocator, io: std.Io, dispatcher: core_module.Dispatcher, address: std.Io.net.IpAddress) !void {
+pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dispatcher, address: std.Io.net.IpAddress) !void {
     var listener = try address.listen(io, .{ .reuse_address = true });
     defer listener.deinit(io);
     var connections: std.Io.Group = .init;
@@ -101,7 +101,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: core_module.Dispatche
     }
 }
 
-fn serveConnection(allocator: Allocator, io: std.Io, dispatcher: core_module.Dispatcher, stream: std.Io.net.Stream) void {
+fn serveConnection(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dispatcher, stream: std.Io.net.Stream) void {
     defer stream.close(io);
     var recv_buffer: [16 * 1024]u8 = undefined;
     var send_buffer: [16 * 1024]u8 = undefined;

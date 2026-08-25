@@ -1,18 +1,10 @@
 const std = @import("std");
+const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
 const provider_module = @import("provider.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
-
-pub const Dispatcher = struct {
-    context: *anyopaque,
-    dispatchFn: *const fn (*anyopaque, model.Request) anyerror!model.Response,
-
-    pub fn dispatch(self: Dispatcher, request: model.Request) !model.Response {
-        return self.dispatchFn(self.context, request);
-    }
-};
 
 pub const Core = struct {
     allocator: Allocator,
@@ -52,7 +44,7 @@ pub const Core = struct {
         };
     }
 
-    pub fn dispatcher(self: *Core) Dispatcher {
+    pub fn dispatcher(self: *Core) dispatcher_module.Dispatcher {
         return .{ .context = self, .dispatchFn = dispatchOpaque };
     }
 

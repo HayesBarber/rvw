@@ -1,5 +1,5 @@
 const std = @import("std");
-const core_module = @import("core.zig");
+const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
 
 const Allocator = std.mem.Allocator;
@@ -17,7 +17,7 @@ pub fn encodeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
     }, .{});
 }
 
-pub fn dispatchJson(allocator: Allocator, dispatcher: core_module.Dispatcher, input: []const u8) ![]u8 {
+pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatcher, input: []const u8) ![]u8 {
     var parsed = std.json.parseFromSlice(std.json.Value, allocator, input, .{}) catch {
         return encodeEnvelopeError(allocator, .malformed_request);
     };
@@ -81,7 +81,7 @@ test "JSON protocol uses an injected dispatcher" {
         }
     };
     var context: u8 = 0;
-    const dispatcher: core_module.Dispatcher = .{ .context = &context, .dispatchFn = Fake.dispatch };
+    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = Fake.dispatch };
 
     const success = try dispatchJson(std.testing.allocator, dispatcher, "{\"type\":\"get_review_overview\"}");
     defer std.testing.allocator.free(success);
