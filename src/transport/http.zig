@@ -1,6 +1,6 @@
 const std = @import("std");
 const httpz = @import("httpz");
-const dispatcher_module = @import("dispatcher.zig");
+const dispatcher_module = @import("../app/dispatcher.zig");
 const json_protocol = @import("../app/json_protocol.zig");
 const model = @import("../app/model.zig");
 

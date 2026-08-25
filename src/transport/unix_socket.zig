@@ -1,5 +1,5 @@
 const std = @import("std");
-const dispatcher_module = @import("dispatcher.zig");
+const dispatcher_module = @import("../app/dispatcher.zig");
 const json_protocol = @import("../app/json_protocol.zig");
 
 const Allocator = std.mem.Allocator;
@@ -96,7 +96,7 @@ fn dispatchFrame(
     try writer.flush();
 }
 
-test "lock file prevents a second dispatcher and is released on close" {
+test "lock file prevents a second Unix socket server and is released on close" {
     const io = std.testing.io;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();

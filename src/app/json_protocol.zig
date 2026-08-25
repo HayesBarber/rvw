@@ -1,5 +1,5 @@
 const std = @import("std");
-const dispatcher_module = @import("../dispatcher/dispatcher.zig");
+const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
 
 const Allocator = std.mem.Allocator;

@@ -42,7 +42,8 @@ On Linux this can just be one binary until we introduce a native window in which
 
 ## Post Implementation
 
-I ended up not changeing the CLI for now. I think it is too early and there are still some decisions to be flushed out. For example, I am not sure if the core will run detached for MVP, and may instead be in-process via C-ABI. Additionally, I am not sure if I want the HTTP/Browser dispatcher.
+I ended up not changeing the CLI for now. I think it is too early and there are still some decisions to be flushed out. For example, I am not sure if the core will run detached for MVP, and may instead be in-process via C-ABI. Additionally, I am not sure if I want the HTTP/Browser transport.
 
-For now, I created a UNIX socket dispatcher that obtains a lock file so we can detect if the core is running (detached). I also swapped the HTTP dispatcher to use [http.zig](https://github.com/karlseguin/http.zig) to make things a bit cleaner/more concise (especially if HTTP is going to be removed anyways).
+For now, I created a UNIX socket transport that obtains a lock file so we can detect if the core is running (detached). I also swapped the HTTP transport to use [http.zig](https://github.com/karlseguin/http.zig) to make things a bit cleaner/more concise (especially if HTTP is going to be removed anyways).
 
+There was also some file structure changes to make things more clear (e.g. dispatcher interface vs transport vs bindings).
