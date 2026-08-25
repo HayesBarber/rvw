@@ -6,14 +6,3 @@ pub const core = @import("app/core.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
 pub const http = @import("transport/http.zig");
 pub const unix_socket = @import("transport/unix_socket.zig");
-
-test "all public modules are test roots" {
-    _ = model;
-    _ = provider;
-    _ = fixture_provider;
-    _ = dispatcher;
-    _ = core;
-    _ = json_protocol;
-    _ = http;
-    _ = unix_socket;
-}

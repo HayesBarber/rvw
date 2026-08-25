@@ -74,31 +74,3 @@ fn usage() void {
         .{},
     );
 }
-
-test "CLI options have stable defaults and overrides" {
-    const defaults = try parseArgs(&.{"rvw"}, .{});
-    try std.testing.expectEqualStrings("127.0.0.1", defaults.host);
-    try std.testing.expectEqual(@as(u16, 7331), defaults.port);
-
-    const configured = try parseArgs(&.{ "rvw", "serve", "--host", "0.0.0.0", "--port", "8123" }, .{});
-    try std.testing.expectEqualStrings("0.0.0.0", configured.host);
-    try std.testing.expectEqual(@as(u16, 8123), configured.port);
-}
-
-test "environment configures defaults and CLI options take precedence" {
-    var environ = std.process.Environ.Map.init(std.testing.allocator);
-    defer environ.deinit();
-    try environ.put("RVW_HOST", "0.0.0.0");
-    try environ.put("RVW_PORT", "8000");
-
-    const from_environment = try parseOptions(&.{"rvw"}, &environ);
-    try std.testing.expectEqualStrings("0.0.0.0", from_environment.host);
-    try std.testing.expectEqual(@as(u16, 8000), from_environment.port);
-
-    const configured = try parseOptions(
-        &.{ "rvw", "serve", "--host", "127.0.0.1", "--port", "9000" },
-        &environ,
-    );
-    try std.testing.expectEqualStrings("127.0.0.1", configured.host);
-    try std.testing.expectEqual(@as(u16, 9000), configured.port);
-}

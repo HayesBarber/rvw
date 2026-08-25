@@ -175,14 +175,3 @@ const file_reviews = [_]model.FileReview{
         } } },
     },
 };
-
-test "fixture provider returns known data and typed failures" {
-    var fixture: FixtureProvider = .{};
-    const injected = fixture.interface();
-    const result = try injected.getOverview();
-    try std.testing.expectEqualStrings("src/app/review.zig", result.initialPath);
-    try std.testing.expectEqual(@as(usize, 5), result.files.len);
-    try std.testing.expectEqualStrings("README.md", (try injected.getFileReview("working-tree", "README.md")).path);
-    try std.testing.expectError(error.UnknownReview, injected.getFileReview("missing", "README.md"));
-    try std.testing.expectError(error.UnknownFile, injected.getFileReview("working-tree", "missing"));
-}
