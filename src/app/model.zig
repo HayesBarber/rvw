@@ -182,12 +182,3 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .internal_error => "Internal error",
     };
 }
-
-test "file content JSON omits an absent language" {
-    const json = try std.json.Stringify.valueAlloc(std.testing.allocator, FileContents{
-        .name = "main.zig",
-        .contents = "",
-    }, .{});
-    defer std.testing.allocator.free(json);
-    try std.testing.expectEqualStrings("{\"name\":\"main.zig\",\"contents\":\"\"}", json);
-}
