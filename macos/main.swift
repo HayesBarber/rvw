@@ -27,12 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "rvw"
         window.contentView = webView
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
         window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
