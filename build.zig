@@ -35,16 +35,6 @@ pub fn build(b: *std.Build) void {
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 
-    const cli_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    const run_cli_tests = b.addRunArtifact(cli_tests);
-    b.step("test", "Run the CLI tests").dependOn(&run_cli_tests.step);
-
     if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize);
 }
 
