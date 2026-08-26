@@ -35,7 +35,6 @@ const Handler = struct {
             const code = model.errorCode(err);
             const status: std.http.Status = switch (code) {
                 .unknown_review, .unknown_file => .not_found,
-                .shutting_down => .service_unavailable,
                 else => .internal_server_error,
             };
             return self.failure(res, status, code);

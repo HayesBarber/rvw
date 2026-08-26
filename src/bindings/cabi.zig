@@ -19,11 +19,6 @@ pub export fn rvw_core_create() callconv(.c) ?*RvwCore {
     handle.threaded = .init(allocator, .{});
     handle.fixture = .{};
     handle.core = rvw.core.Core.init(allocator, handle.threaded.io(), handle.fixture.interface());
-    handle.core.start() catch {
-        handle.threaded.deinit();
-        allocator.destroy(handle);
-        return null;
-    };
     return handle;
 }
 
@@ -49,7 +44,6 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
-    core.core.deinit();
     core.threaded.deinit();
     allocator.destroy(core);
 }
