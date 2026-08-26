@@ -25,9 +25,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const run = b.addRunArtifact(server);
-    if (b.args) |args| run.addArgs(args);
-    b.step("serve", "Run the HTTP service").dependOn(&run.step);
+    const serve = b.addRunArtifact(server);
+    if (b.args) |args| serve.addArgs(args);
+    b.step("serve", "Run the HTTP service").dependOn(&serve.step);
 
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
