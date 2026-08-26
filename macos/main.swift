@@ -4,15 +4,55 @@ import Foundation
 import RvwCore
 import WebKit
 
-guard CommandLine.arguments.contains("--rvw-cli-launch") else {
+private let launchMarker = "--rvw-cli-launch"
+
+struct LaunchConfiguration {
+    let directory: URL
+    let range: String?
+
+    init?(arguments: [String]) {
+        guard let markerIndex = arguments.firstIndex(of: launchMarker) else { return nil }
+        var index = arguments.index(after: markerIndex)
+
+        guard index < arguments.endIndex, arguments[index] == "--directory" else { return nil }
+        index = arguments.index(after: index)
+        guard index < arguments.endIndex, !arguments[index].isEmpty else { return nil }
+        directory = URL(fileURLWithPath: arguments[index], isDirectory: true)
+        index = arguments.index(after: index)
+
+        if index < arguments.endIndex {
+            guard arguments[index] == "--range" else { return nil }
+            index = arguments.index(after: index)
+            guard index < arguments.endIndex, !arguments[index].isEmpty else { return nil }
+            range = arguments[index]
+            index = arguments.index(after: index)
+        } else {
+            range = nil
+        }
+
+        guard index == arguments.endIndex else { return nil }
+    }
+}
+
+guard CommandLine.arguments.contains(launchMarker) else {
     exit(EXIT_SUCCESS)
+}
+guard let launchConfiguration = LaunchConfiguration(arguments: CommandLine.arguments) else {
+    fputs("rvw received invalid launch arguments\n", stderr)
+    exit(EXIT_FAILURE)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
+    private let launchConfiguration: LaunchConfiguration
     private var window: NSWindow?
     private var core: OpaquePointer?
     private var bridge: NativeBridge?
     private var assets: AssetHandler?
+
+    init(launchConfiguration: LaunchConfiguration) {
+        self.launchConfiguration = launchConfiguration
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let core = rvw_core_create() else { fatalError("Unable to start rvw") }
@@ -176,7 +216,7 @@ final class AssetHandler: NSObject, WKURLSchemeHandler {
 }
 
 let application = NSApplication.shared
-let delegate = AppDelegate()
+let delegate = AppDelegate(launchConfiguration: launchConfiguration)
 
 application.setActivationPolicy(.regular)
 application.delegate = delegate
