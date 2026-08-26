@@ -151,7 +151,6 @@ pub const Response = union(enum) {
 pub const AppError = error{
     UnknownReview,
     UnknownFile,
-    ShuttingDown,
 };
 
 pub const ErrorCode = enum {
@@ -159,7 +158,6 @@ pub const ErrorCode = enum {
     unknown_operation,
     unknown_review,
     unknown_file,
-    shutting_down,
     internal_error,
 };
 
@@ -167,7 +165,6 @@ pub fn errorCode(err: anyerror) ErrorCode {
     return switch (err) {
         error.UnknownReview => .unknown_review,
         error.UnknownFile => .unknown_file,
-        error.ShuttingDown => .shutting_down,
         else => .internal_error,
     };
 }
@@ -178,7 +175,6 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .unknown_operation => "Unknown operation",
         .unknown_review => "Unknown review",
         .unknown_file => "Unknown file",
-        .shutting_down => "Core is shutting down",
         .internal_error => "Internal error",
     };
 }

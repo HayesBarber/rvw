@@ -25,8 +25,6 @@ pub fn main(init: std.process.Init) !void {
 
     var fixture: rvw.fixture_provider.FixtureProvider = .{};
     var core = rvw.core.Core.init(init.gpa, init.io, fixture.interface());
-    try core.start();
-    defer core.deinit();
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
 }

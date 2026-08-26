@@ -7,11 +7,11 @@ pub const FixtureProvider = struct {
         return .{ .context = self, .vtable = &vtable };
     }
 
-    fn getOverview(_: *anyopaque) !model.ReviewOverview {
+    fn getOverview(_: *anyopaque, _: std.Io) !model.ReviewOverview {
         return overview;
     }
 
-    fn getFileReview(_: *anyopaque, review_id: []const u8, path: []const u8) !model.FileReview {
+    fn getFileReview(_: *anyopaque, _: std.Io, review_id: []const u8, path: []const u8) !model.FileReview {
         if (!std.mem.eql(u8, review_id, "working-tree")) return error.UnknownReview;
         for (file_reviews) |review| {
             if (std.mem.eql(u8, review.path, path)) return review;
