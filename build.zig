@@ -26,19 +26,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    const library = b.addLibrary(.{
-        .name = "rvw",
-        .linkage = .static,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/bindings/cabi.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{.{ .name = "rvw", .module = rvw }},
-        }),
-    });
-    b.installArtifact(library);
-    library.installHeader(b.path("include/rvw.h"), "rvw.h");
-
     const run = b.addRunArtifact(exe);
     run.step.dependOn(b.getInstallStep());
     if (b.args) |args| run.addArgs(args);
@@ -66,16 +53,10 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         .os_tag = .macos,
         .os_version_min = .{ .semver = .{ .major = 14, .minor = 0, .patch = 0 } },
     });
-    const httpz = b.dependency("httpz", .{
-        .target = target,
-        .optimize = optimize,
-    }).module("httpz");
-
     const rvw = b.createModule(.{
-        .root_source_file = b.path("src/rvw.zig"),
+        .root_source_file = b.path("src/rvw_core.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "httpz", .module = httpz }},
     });
     const library = b.addLibrary(.{
         .name = "rvw_macos",
