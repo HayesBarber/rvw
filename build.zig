@@ -26,8 +26,40 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
+    const run = b.addRunArtifact(exe);
+    run.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run.addArgs(args);
+    b.step("serve", "Run the HTTP service").dependOn(&run.step);
+
+    const dev = b.addSystemCommand(&.{"node"});
+    dev.addFileArg(b.path("scripts/dev.mjs"));
+    dev.addArtifactArg(exe);
+    dev.setCwd(b.path("."));
+    b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
+
+    if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize);
+}
+
+fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
+    const host = b.graph.host;
+    const swift_target = switch (host.result.cpu.arch) {
+        .aarch64 => "arm64-apple-macosx14.0",
+        .x86_64 => "x86_64-apple-macosx14.0",
+        else => @panic("The macOS app supports Apple Silicon and Intel Macs"),
+    };
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = host.result.cpu.arch,
+        .cpu_model = .native,
+        .os_tag = .macos,
+        .os_version_min = .{ .semver = .{ .major = 14, .minor = 0, .patch = 0 } },
+    });
+    const rvw = b.createModule(.{
+        .root_source_file = b.path("src/rvw_core.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const library = b.addLibrary(.{
-        .name = "rvw",
+        .name = "rvw_macos",
         .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/bindings/cabi.zig"),
@@ -36,17 +68,44 @@ pub fn build(b: *std.Build) void {
             .imports = &.{.{ .name = "rvw", .module = rvw }},
         }),
     });
-    b.installArtifact(library);
-    library.installHeader(b.path("include/rvw.h"), "rvw.h");
 
-    const run = b.addRunArtifact(exe);
-    run.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run.addArgs(args);
-    b.step("run", "Run the HTTP service").dependOn(&run.step);
+    const frontend = b.addSystemCommand(&.{ "npm", "--prefix", "frontend", "run", "build" });
+    const swift = b.addSystemCommand(&.{
+        "xcrun",      "swiftc",
+        "-target",    swift_target,
+        "-I",         "include",
+        "-framework", "AppKit",
+        "-framework", "WebKit",
+    });
+    swift.addFileArg(b.path("macos/main.swift"));
+    swift.step.dependOn(&library.step);
+    swift.addFileArg(library.getEmittedBin());
+    swift.addArg("-o");
+    const executable = swift.addOutputFileArg("Rvw");
 
-    const dev = b.addSystemCommand(&.{"node"});
-    dev.addFileArg(b.path("scripts/dev.mjs"));
-    dev.addArtifactArg(exe);
-    dev.setCwd(b.path("."));
-    b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
+    const install_executable = b.addInstallFileWithDir(
+        executable,
+        .prefix,
+        "Rvw.app/Contents/MacOS/Rvw",
+    );
+    const install_plist = b.addInstallFileWithDir(
+        b.path("macos/Info.plist"),
+        .prefix,
+        "Rvw.app/Contents/Info.plist",
+    );
+    const install_frontend = b.addInstallDirectory(.{
+        .source_dir = b.path("frontend/dist"),
+        .install_dir = .prefix,
+        .install_subdir = "Rvw.app/Contents/Resources/web",
+    });
+    install_frontend.step.dependOn(&frontend.step);
+
+    b.getInstallStep().dependOn(&install_executable.step);
+    b.getInstallStep().dependOn(&install_plist.step);
+    b.getInstallStep().dependOn(&install_frontend.step);
+
+    const open = b.addSystemCommand(&.{ "open", "-n" });
+    open.addArg(b.getInstallPath(.prefix, "Rvw.app"));
+    open.step.dependOn(b.getInstallStep());
+    b.step("run", "Build and launch the macOS app").dependOn(&open.step);
 }

@@ -1,0 +1,4 @@
+module RvwCore {
+    header "rvw.h"
+    export *
+}
