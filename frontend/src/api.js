@@ -44,7 +44,10 @@
  * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents }} content
  */
 
-async function getJson(url) {
+async function getJson(url, nativeRequest) {
+  const native = window.webkit?.messageHandlers?.native
+  if (native) return native.postMessage(nativeRequest)
+
   const response = await fetch(url, {
     headers: { Accept: 'application/json' },
   })
@@ -68,7 +71,7 @@ async function getJson(url) {
  * @returns {Promise<ReviewOverview>}
  */
 export async function getReviewOverview() {
-  return getJson('/api/reviews/active')
+  return getJson('/api/reviews/active', { type: 'get_review_overview' })
 }
 
 /**
@@ -80,5 +83,6 @@ export async function getReviewOverview() {
 export async function getFileReview(reviewId, path) {
   return getJson(
     `/api/reviews/${encodeURIComponent(reviewId)}/files?path=${encodeURIComponent(path)}`,
+    { type: 'get_file_review', reviewId, path },
   )
 }
