@@ -71,13 +71,13 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
 
     const frontend = b.addSystemCommand(&.{ "npm", "--prefix", "frontend", "run", "build" });
     const swift = b.addSystemCommand(&.{
-        "xcrun",            "swiftc",
-        "-target",          swift_target,
-        "-I",               "include",
-        "-framework",       "AppKit",
-        "-framework",       "WebKit",
-        "macos/main.swift",
+        "xcrun",      "swiftc",
+        "-target",    swift_target,
+        "-I",         "include",
+        "-framework", "AppKit",
+        "-framework", "WebKit",
     });
+    swift.addFileArg(b.path("macos/main.swift"));
     swift.step.dependOn(&library.step);
     swift.addFileArg(library.getEmittedBin());
     swift.addArg("-o");
