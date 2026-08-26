@@ -1,7 +1,12 @@
 import AppKit
+import Darwin
 import Foundation
 import RvwCore
 import WebKit
+
+guard CommandLine.arguments.contains("--rvw-cli-launch") else {
+    exit(EXIT_SUCCESS)
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate {
     private var window: NSWindow?

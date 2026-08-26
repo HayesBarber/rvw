@@ -15,25 +15,23 @@ pub fn build(b: *std.Build) void {
         .imports = &.{.{ .name = "httpz", .module = httpz }},
     });
 
-    const exe = b.addExecutable(.{
-        .name = "rvw",
+    const server = b.addExecutable(.{
+        .name = "rvw-server",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+            .root_source_file = b.path("src/dev_server.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{.{ .name = "rvw", .module = rvw }},
         }),
     });
-    b.installArtifact(exe);
 
-    const run = b.addRunArtifact(exe);
-    run.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run.addArgs(args);
-    b.step("serve", "Run the HTTP service").dependOn(&run.step);
+    const serve = b.addRunArtifact(server);
+    if (b.args) |args| serve.addArgs(args);
+    b.step("serve", "Run the HTTP service").dependOn(&serve.step);
 
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
-    dev.addArtifactArg(exe);
+    dev.addArtifactArg(server);
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 
@@ -68,6 +66,14 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
             .imports = &.{.{ .name = "rvw", .module = rvw }},
         }),
     });
+    const cli = b.addExecutable(.{
+        .name = "rvw",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
 
     const frontend = b.addSystemCommand(&.{ "npm", "--prefix", "frontend", "run", "build" });
     const swift = b.addSystemCommand(&.{
@@ -88,6 +94,11 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         .prefix,
         "Rvw.app/Contents/MacOS/Rvw",
     );
+    const install_cli = b.addInstallFileWithDir(
+        cli.getEmittedBin(),
+        .prefix,
+        "Rvw.app/Contents/MacOS/rvw",
+    );
     const install_plist = b.addInstallFileWithDir(
         b.path("macos/Info.plist"),
         .prefix,
@@ -101,11 +112,14 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     install_frontend.step.dependOn(&frontend.step);
 
     b.getInstallStep().dependOn(&install_executable.step);
+    b.getInstallStep().dependOn(&install_cli.step);
     b.getInstallStep().dependOn(&install_plist.step);
     b.getInstallStep().dependOn(&install_frontend.step);
 
-    const open = b.addSystemCommand(&.{ "open", "-n" });
-    open.addArg(b.getInstallPath(.prefix, "Rvw.app"));
-    open.step.dependOn(b.getInstallStep());
-    b.step("run", "Build and launch the macOS app").dependOn(&open.step);
+    const run = b.addSystemCommand(&.{b.getInstallPath(
+        .prefix,
+        "Rvw.app/Contents/MacOS/rvw",
+    )});
+    run.step.dependOn(b.getInstallStep());
+    b.step("run", "Build and launch the macOS app").dependOn(&run.step);
 }
