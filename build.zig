@@ -97,7 +97,9 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
     const install_cli = b.addInstallFileWithDir(
         cli.getEmittedBin(),
         .prefix,
-        "Rvw.app/Contents/MacOS/rvw",
+        // macOS installations normally use a case-insensitive filesystem, so
+        // "rvw" would overwrite the bundle executable named "Rvw".
+        "Rvw.app/Contents/MacOS/rvw-cli",
     );
     const install_plist = b.addInstallFileWithDir(
         b.path("macos/Info.plist"),
@@ -118,8 +120,9 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
 
     const run = b.addSystemCommand(&.{b.getInstallPath(
         .prefix,
-        "Rvw.app/Contents/MacOS/rvw",
+        "Rvw.app/Contents/MacOS/rvw-cli",
     )});
+    if (b.args) |args| run.addArgs(args);
     run.step.dependOn(b.getInstallStep());
     b.step("run", "Build and launch the macOS app").dependOn(&run.step);
 }
