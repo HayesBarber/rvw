@@ -32,6 +32,7 @@ pub fn build(b: *std.Build) void {
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
     dev.addArtifactArg(server);
+    if (b.args) |args| dev.addArgs(args);
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 

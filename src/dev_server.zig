@@ -4,6 +4,7 @@ const rvw = @import("rvw");
 const Options = struct {
     host: []const u8 = "127.0.0.1",
     port: u16 = 7331,
+    directory: ?[]const u8 = null,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -14,10 +15,25 @@ pub fn main(init: std.process.Init) !void {
             error.InvalidPort => "port must be an integer from 0 through 65535",
             error.UnknownArgument => "unknown command-line argument",
             error.ExpectedServe => "expected serve command",
+            error.MissingDirectory => "missing required --directory DIR",
+            error.DuplicateDirectory => "--directory may only be provided once",
         }});
         usage();
         return err;
     };
+    const requested_directory = options.directory.?;
+    const validated_directory = rvw.repository.validateRoot(init.io, init.gpa, requested_directory) catch |err| {
+        std.log.err("invalid repository directory '{s}': {s}", .{ requested_directory, switch (err) {
+            error.RepositoryPathMissing => "path does not exist",
+            error.NotDirectory => "path is not a directory",
+            error.NotGitRepository => "path is not a Git worktree",
+            error.NotRepositoryRoot => "path is inside a Git worktree but is not its root",
+            error.GitNotFound => "git is not available on PATH",
+            else => @errorName(err),
+        } });
+        return err;
+    };
+    defer init.gpa.free(validated_directory);
     const address = std.Io.net.IpAddress.parse(options.host, options.port) catch {
         std.log.err("invalid listen host: {s}", .{options.host});
         return error.InvalidHost;
@@ -41,11 +57,8 @@ fn parseOptions(args: []const []const u8, environ: *const std.process.Environ.Ma
 fn parseArgs(args: []const []const u8, defaults: Options) !Options {
     var options = defaults;
     var index: usize = 1;
-    if (index < args.len and std.mem.eql(u8, args[index], "serve")) {
-        index += 1;
-    } else if (index < args.len and !std.mem.startsWith(u8, args[index], "--")) {
-        return error.ExpectedServe;
-    }
+    if (index == args.len or !std.mem.eql(u8, args[index], "serve")) return error.ExpectedServe;
+    index += 1;
 
     while (index < args.len) {
         const argument = args[index];
@@ -58,16 +71,22 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
             if (index == args.len) return error.MissingValue;
             options.port = std.fmt.parseInt(u16, args[index], 10) catch return error.InvalidPort;
             index += 1;
+        } else if (std.mem.eql(u8, argument, "--directory")) {
+            if (index == args.len) return error.MissingValue;
+            if (options.directory != null) return error.DuplicateDirectory;
+            options.directory = args[index];
+            index += 1;
         } else {
             return error.UnknownArgument;
         }
     }
+    if (options.directory == null) return error.MissingDirectory;
     return options;
 }
 
 fn usage() void {
     std.debug.print(
-        "usage: rvw-server serve [--host HOST] [--port PORT]\n" ++
+        "usage: rvw-server serve --directory DIR [--host HOST] [--port PORT]\n" ++
             "       defaults may also be set with RVW_HOST and RVW_PORT\n",
         .{},
     );
