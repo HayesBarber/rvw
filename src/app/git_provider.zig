@@ -15,14 +15,12 @@ const Change = struct {
     status: model.FileStatus,
     additions: ?usize = 0,
     deletions: ?usize = 0,
-    old_mode: u32 = 0,
-    new_mode: u32 = 0,
-    git_binary: bool = false,
+    unavailable: ?model.UnavailableReason = null,
 };
 
-const Snapshot = union(enum) {
-    working_tree: struct { base: []const u8 },
-    commit_range: struct { base: []const u8, head: []const u8 },
+const Snapshot = struct {
+    base: []const u8,
+    head: ?[]const u8 = null,
 };
 
 const Loaded = union(enum) {
@@ -33,7 +31,7 @@ const Loaded = union(enum) {
 pub const GitProvider = struct {
     arena: std.heap.ArenaAllocator,
     overview: model.ReviewOverview,
-    file_reviews: []const model.FileReview,
+    file_contents: []const model.FileContent,
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8) !GitProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
@@ -44,19 +42,19 @@ pub const GitProvider = struct {
         const snapshot = if (range) |value|
             try parseRange(allocator, io, root, value)
         else
-            Snapshot{ .working_tree = .{ .base = try resolveCommit(allocator, io, root, "HEAD") } };
+            Snapshot{ .base = try resolveCommit(allocator, io, root, "HEAD") };
 
         var changes = try trackedChanges(allocator, io, root, snapshot);
-        if (snapshot == .working_tree) try appendUntracked(allocator, io, root, &changes);
+        if (snapshot.head == null) try appendUntracked(allocator, io, root, &changes);
         std.mem.sort(Change, changes.items, {}, lessThanChange);
 
-        const review_id = switch (snapshot) {
-            .working_tree => |details| try std.fmt.allocPrint(allocator, "working-tree:{s}", .{details.base}),
-            .commit_range => |details| try std.fmt.allocPrint(allocator, "{s}..{s}", .{ details.base, details.head }),
-        };
+        const review_id = if (snapshot.head) |head|
+            try std.fmt.allocPrint(allocator, "{s}..{s}", .{ snapshot.base, head })
+        else
+            try std.fmt.allocPrint(allocator, "working-tree:{s}", .{snapshot.base});
 
         var summaries: std.ArrayList(model.FileSummary) = .empty;
-        var file_reviews: std.ArrayList(model.FileReview) = .empty;
+        var file_contents: std.ArrayList(model.FileContent) = .empty;
         for (changes.items) |change| {
             try summaries.append(allocator, .{
                 .path = change.path,
@@ -66,13 +64,13 @@ pub const GitProvider = struct {
                 .deletions = change.deletions,
                 .commentCount = 0,
             });
-            try file_reviews.append(allocator, try buildFileReview(allocator, io, root, snapshot, change));
+            try file_contents.append(allocator, try buildFileContent(allocator, io, root, snapshot, change));
         }
 
-        const source: model.ReviewSource = switch (snapshot) {
-            .working_tree => |details| .{ .working_tree = .{ .base = details.base } },
-            .commit_range => |details| .{ .commit_range = .{ .base = details.base, .head = details.head } },
-        };
+        const source: model.ReviewSource = if (snapshot.head) |head|
+            .{ .commit_range = .{ .base = snapshot.base, .head = head } }
+        else
+            .{ .working_tree = .{ .base = snapshot.base } };
         const overview: model.ReviewOverview = .{
             .review = .{
                 .id = review_id,
@@ -87,7 +85,7 @@ pub const GitProvider = struct {
         return .{
             .arena = arena,
             .overview = overview,
-            .file_reviews = try file_reviews.toOwnedSlice(allocator),
+            .file_contents = try file_contents.toOwnedSlice(allocator),
         };
     }
 
@@ -108,8 +106,13 @@ pub const GitProvider = struct {
     fn getFileReview(context: *anyopaque, _: Io, review_id: []const u8, path: []const u8) !model.FileReview {
         const self: *GitProvider = @ptrCast(@alignCast(context));
         if (!std.mem.eql(u8, review_id, self.overview.review.id)) return error.UnknownReview;
-        for (self.file_reviews) |review| {
-            if (std.mem.eql(u8, review.path, path)) return review;
+        for (self.overview.files, self.file_contents) |file, content| {
+            if (std.mem.eql(u8, file.path, path)) return .{
+                .path = file.path,
+                .previousPath = file.previousPath,
+                .status = file.status,
+                .content = content,
+            };
         }
         return error.UnknownFile;
     }
@@ -144,102 +147,83 @@ fn parseRange(allocator: Allocator, io: Io, root: []const u8, value: []const u8)
 
     const base = try resolveCommit(allocator, io, root, value[0..separator]);
     const head = try resolveCommit(allocator, io, root, value[separator + 2 ..]);
-    return .{ .commit_range = .{ .base = base, .head = head } };
+    return .{ .base = base, .head = head };
 }
 
 fn resolveCommit(allocator: Allocator, io: Io, root: []const u8, revision: []const u8) ![]const u8 {
     const commit = try std.fmt.allocPrint(allocator, "{s}^{{commit}}", .{revision});
-    const result = std.process.run(allocator, io, .{
-        .argv = &.{ "git", "-C", root, "rev-parse", "--verify", "--end-of-options", commit },
-        .stdout_limit = .limited(4096),
-        .stderr_limit = .limited(4096),
-    }) catch |err| switch (err) {
-        error.FileNotFound => return error.GitNotFound,
-        else => |unexpected| return unexpected,
+    const output = runGit(allocator, io, &.{ "git", "-C", root, "rev-parse", "--verify", "--end-of-options", commit }, 4096) catch |err| switch (err) {
+        error.GitCommandFailed, error.GitOutputTooLarge => return error.InvalidRevision,
+        else => return err,
     };
-    if (!exitedSuccessfully(result.term)) return error.InvalidRevision;
-    const oid = std.mem.trim(u8, result.stdout, " \t\r\n");
+    const oid = std.mem.trim(u8, output, " \t\r\n");
     if (oid.len == 0 or !std.unicode.utf8ValidateSlice(oid)) return error.InvalidRevision;
     return oid;
 }
 
 fn trackedChanges(allocator: Allocator, io: Io, root: []const u8, snapshot: Snapshot) !std.ArrayList(Change) {
-    const raw = switch (snapshot) {
-        .working_tree => |details| try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "-z", "--find-renames=50%", details.base, "--" }, maximum_metadata_size),
-        .commit_range => |details| try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "-z", "--find-renames=50%", details.base, details.head, "--" }, maximum_metadata_size),
-    };
-    const changes = try parseRawChanges(allocator, raw);
+    const output = if (snapshot.head) |head|
+        try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, maximum_metadata_size * 2)
+    else
+        try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, maximum_metadata_size * 2);
+    return parseChanges(allocator, output);
+}
 
-    const numstat = switch (snapshot) {
-        .working_tree => |details| try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--numstat", "-z", "--find-renames=50%", details.base, "--" }, maximum_metadata_size),
-        .commit_range => |details| try runGit(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--numstat", "-z", "--find-renames=50%", details.base, details.head, "--" }, maximum_metadata_size),
-    };
-    try applyNumstat(changes.items, numstat);
+fn parseChanges(allocator: Allocator, output: []const u8) !std.ArrayList(Change) {
+    var changes: std.ArrayList(Change) = .empty;
+    var cursor: usize = 0;
+    while (cursor < output.len and output[cursor] == ':') {
+        try changes.append(allocator, try parseRawChange(output, &cursor));
+    }
+    for (changes.items) |*change| {
+        try applyNumstat(change, output, &cursor);
+    }
+    if (cursor != output.len) return error.MalformedGitOutput;
     return changes;
 }
 
-fn parseRawChanges(allocator: Allocator, output: []const u8) !std.ArrayList(Change) {
-    var changes: std.ArrayList(Change) = .empty;
-    var cursor: usize = 0;
-    while (cursor < output.len) {
-        const metadata = try nextZ(output, &cursor);
-        if (metadata.len == 0 or metadata[0] != ':') return error.MalformedGitOutput;
-        var fields = std.mem.tokenizeScalar(u8, metadata[1..], ' ');
-        const old_mode = std.fmt.parseInt(u32, fields.next() orelse return error.MalformedGitOutput, 8) catch return error.MalformedGitOutput;
-        const new_mode = std.fmt.parseInt(u32, fields.next() orelse return error.MalformedGitOutput, 8) catch return error.MalformedGitOutput;
-        _ = fields.next() orelse return error.MalformedGitOutput;
-        _ = fields.next() orelse return error.MalformedGitOutput;
-        const status_value = fields.next() orelse return error.MalformedGitOutput;
-        if (fields.next() != null or status_value.len == 0) return error.MalformedGitOutput;
+fn parseRawChange(output: []const u8, cursor: *usize) !Change {
+    const metadata = try nextZ(output, cursor);
+    var fields = std.mem.tokenizeScalar(u8, metadata[1..], ' ');
+    const old_mode = std.fmt.parseInt(u32, fields.next() orelse return error.MalformedGitOutput, 8) catch return error.MalformedGitOutput;
+    const new_mode = std.fmt.parseInt(u32, fields.next() orelse return error.MalformedGitOutput, 8) catch return error.MalformedGitOutput;
+    _ = fields.next() orelse return error.MalformedGitOutput;
+    _ = fields.next() orelse return error.MalformedGitOutput;
+    const status_value = fields.next() orelse return error.MalformedGitOutput;
+    if (fields.next() != null or status_value.len == 0) return error.MalformedGitOutput;
 
-        const first_path = try validPath(try nextZ(output, &cursor));
-        const status_code = status_value[0];
-        const previous_path: ?[]const u8 = if (status_code == 'R') first_path else null;
-        const path = if (status_code == 'R') try validPath(try nextZ(output, &cursor)) else first_path;
-        const status: model.FileStatus = switch (status_code) {
+    const first_path = try validPath(try nextZ(output, cursor));
+    const status_code = status_value[0];
+    const previous_path: ?[]const u8 = if (status_code == 'R') first_path else null;
+    const path = if (status_code == 'R') try validPath(try nextZ(output, cursor)) else first_path;
+    return .{
+        .path = path,
+        .previous_path = previous_path,
+        .status = switch (status_code) {
             'A' => .added,
             'D' => .deleted,
             'R' => .renamed,
             else => .modified,
-        };
-        try changes.append(allocator, .{
-            .path = path,
-            .previous_path = previous_path,
-            .status = status,
-            .old_mode = old_mode,
-            .new_mode = new_mode,
-        });
-    }
-    return changes;
+        },
+        .unavailable = unavailableMode(old_mode) orelse unavailableMode(new_mode),
+    };
 }
 
-fn applyNumstat(changes: []Change, output: []const u8) !void {
-    var cursor: usize = 0;
-    while (cursor < output.len) {
-        const record = try nextZ(output, &cursor);
-        const first_tab = std.mem.indexOfScalar(u8, record, '\t') orelse return error.MalformedGitOutput;
-        const second_relative = std.mem.indexOfScalar(u8, record[first_tab + 1 ..], '\t') orelse return error.MalformedGitOutput;
-        const second_tab = first_tab + 1 + second_relative;
-        const additions = try parseCount(record[0..first_tab]);
-        const deletions = try parseCount(record[first_tab + 1 .. second_tab]);
-        const inline_path = record[second_tab + 1 ..];
-        const previous_path: ?[]const u8 = if (inline_path.len == 0) try validPath(try nextZ(output, &cursor)) else null;
-        const path = if (inline_path.len == 0) try validPath(try nextZ(output, &cursor)) else try validPath(inline_path);
-
-        var matched = false;
-        for (changes) |*change| {
-            if (!std.mem.eql(u8, change.path, path)) continue;
-            if (previous_path) |previous| {
-                if (change.previous_path == null or !std.mem.eql(u8, change.previous_path.?, previous)) continue;
-            }
-            change.additions = additions;
-            change.deletions = deletions;
-            change.git_binary = additions == null or deletions == null;
-            matched = true;
-            break;
-        }
-        if (!matched) return error.MalformedGitOutput;
+fn applyNumstat(change: *Change, output: []const u8, cursor: *usize) !void {
+    const record = try nextZ(output, cursor);
+    const first_tab = std.mem.indexOfScalar(u8, record, '\t') orelse return error.MalformedGitOutput;
+    const second_relative = std.mem.indexOfScalar(u8, record[first_tab + 1 ..], '\t') orelse return error.MalformedGitOutput;
+    const second_tab = first_tab + 1 + second_relative;
+    const inline_path = record[second_tab + 1 ..];
+    const previous_path: ?[]const u8 = if (inline_path.len == 0) try validPath(try nextZ(output, cursor)) else null;
+    const path = if (inline_path.len == 0) try validPath(try nextZ(output, cursor)) else try validPath(inline_path);
+    if (!std.mem.eql(u8, change.path, path)) return error.MalformedGitOutput;
+    if (previous_path) |previous| {
+        if (change.previous_path == null or !std.mem.eql(u8, change.previous_path.?, previous)) return error.MalformedGitOutput;
     }
+    change.additions = try parseCount(record[0..first_tab]);
+    change.deletions = try parseCount(record[first_tab + 1 .. second_tab]);
+    if ((change.additions == null or change.deletions == null) and change.unavailable == null) change.unavailable = .binary;
 }
 
 fn appendUntracked(allocator: Allocator, io: Io, root: []const u8, changes: *std.ArrayList(Change)) !void {
@@ -257,17 +241,17 @@ fn appendUntracked(allocator: Allocator, io: Io, root: []const u8, changes: *std
                 additions = lineCount(contents);
             }
         }
-        const new_mode: u32 = switch (stat.kind) {
-            .file => 0o100644,
-            .sym_link => 0o120000,
-            else => 1,
+        const unavailable_reason: ?model.UnavailableReason = switch (stat.kind) {
+            .file => null,
+            .sym_link => .symlink,
+            else => .binary,
         };
         var replaced_deletion = false;
         for (changes.items) |*change| {
             if (change.status != .deleted or !std.mem.eql(u8, change.path, path)) continue;
             change.status = .modified;
             change.additions = additions;
-            change.new_mode = new_mode;
+            change.unavailable = change.unavailable orelse unavailable_reason;
             replaced_deletion = true;
             break;
         }
@@ -277,70 +261,49 @@ fn appendUntracked(allocator: Allocator, io: Io, root: []const u8, changes: *std
             .status = .added,
             .additions = additions,
             .deletions = if (additions == null) null else 0,
-            .new_mode = new_mode,
+            .unavailable = unavailable_reason,
         });
     }
 }
 
-fn buildFileReview(allocator: Allocator, io: Io, root: []const u8, snapshot: Snapshot, change: Change) !model.FileReview {
-    const mode_reason = unavailableMode(change.old_mode) orelse unavailableMode(change.new_mode);
-    if (mode_reason) |reason| return unavailableReview(change, reason);
-    if (change.git_binary) return unavailableReview(change, .binary);
+fn buildFileContent(allocator: Allocator, io: Io, root: []const u8, snapshot: Snapshot, change: Change) !model.FileContent {
+    if (change.unavailable) |reason| return unavailable(reason);
 
-    const old: ?Loaded = if (change.status == .added)
-        null
-    else switch (snapshot) {
-        .working_tree => |details| try loadBlob(allocator, io, root, details.base, change.previous_path orelse change.path),
-        .commit_range => |details| try loadBlob(allocator, io, root, details.base, change.previous_path orelse change.path),
-    };
+    const old: ?Loaded = if (change.status == .added) null else try loadFile(allocator, io, root, snapshot.base, change.previous_path orelse change.path);
     const new: ?Loaded = if (change.status == .deleted)
         null
-    else switch (snapshot) {
-        .working_tree => try loadWorkingFile(allocator, io, root, change.path),
-        .commit_range => |details| try loadBlob(allocator, io, root, details.head, change.path),
-    };
+    else
+        try loadFile(allocator, io, root, snapshot.head, change.path);
 
     if (old) |loaded| switch (loaded) {
-        .unavailable => |reason| return unavailableReview(change, reason),
+        .unavailable => |reason| return unavailable(reason),
         .contents => {},
     };
     if (new) |loaded| switch (loaded) {
-        .unavailable => |reason| return unavailableReview(change, reason),
+        .unavailable => |reason| return unavailable(reason),
         .contents => {},
     };
 
-    return .{
-        .path = change.path,
-        .previousPath = change.previous_path,
-        .status = change.status,
-        .content = .{ .diff = .{
-            .oldFile = if (old) |loaded| loaded.contents else null,
-            .newFile = if (new) |loaded| loaded.contents else null,
-        } },
-    };
+    return .{ .diff = .{
+        .oldFile = if (old) |loaded| loaded.contents else null,
+        .newFile = if (new) |loaded| loaded.contents else null,
+    } };
 }
 
-fn loadBlob(allocator: Allocator, io: Io, root: []const u8, commit: []const u8, path: []const u8) !Loaded {
-    const object = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ commit, path });
-    const result = std.process.run(allocator, io, .{
-        .argv = &.{ "git", "-C", root, "show", "--no-textconv", object },
-        .stdout_limit = .limited(maximum_text_size + 1),
-        .stderr_limit = .limited(4096),
-    }) catch |err| switch (err) {
-        error.StreamTooLong => return .{ .unavailable = .too_large },
-        error.FileNotFound => return error.GitNotFound,
-        else => |unexpected| return unexpected,
-    };
-    if (!exitedSuccessfully(result.term)) return error.GitCommandFailed;
-    return classifyContents(path, result.stdout);
-}
-
-fn loadWorkingFile(allocator: Allocator, io: Io, root: []const u8, path: []const u8) !Loaded {
-    var directory = try std.Io.Dir.openDirAbsolute(io, root, .{});
-    defer directory.close(io);
-    const contents = directory.readFileAlloc(io, path, allocator, .limited(maximum_text_size + 1)) catch |err| switch (err) {
-        error.StreamTooLong => return .{ .unavailable = .too_large },
-        else => |unexpected| return unexpected,
+fn loadFile(allocator: Allocator, io: Io, root: []const u8, commit: ?[]const u8, path: []const u8) !Loaded {
+    const contents = if (commit) |oid| blk: {
+        const object = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ oid, path });
+        break :blk runGit(allocator, io, &.{ "git", "-C", root, "show", "--no-textconv", object }, maximum_text_size + 1) catch |err| switch (err) {
+            error.GitOutputTooLarge => return .{ .unavailable = .too_large },
+            else => return err,
+        };
+    } else blk: {
+        var directory = try std.Io.Dir.openDirAbsolute(io, root, .{});
+        defer directory.close(io);
+        break :blk directory.readFileAlloc(io, path, allocator, .limited(maximum_text_size + 1)) catch |err| switch (err) {
+            error.StreamTooLong => return .{ .unavailable = .too_large },
+            else => return err,
+        };
     };
     return classifyContents(path, contents);
 }
@@ -351,13 +314,8 @@ fn classifyContents(path: []const u8, contents: []const u8) Loaded {
     return .{ .contents = .{ .name = path, .contents = contents } };
 }
 
-fn unavailableReview(change: Change, reason: model.UnavailableReason) model.FileReview {
-    return .{
-        .path = change.path,
-        .previousPath = change.previous_path,
-        .status = change.status,
-        .content = .{ .unavailable = .{ .reason = reason } },
-    };
+fn unavailable(reason: model.UnavailableReason) model.FileContent {
+    return .{ .unavailable = .{ .reason = reason } };
 }
 
 fn unavailableMode(mode: u32) ?model.UnavailableReason {
@@ -430,7 +388,7 @@ test "working tree snapshot includes tracked untracked and renamed files" {
     try fixture.commit("base");
 
     try fixture.write("modified.txt", "new\nline\n");
-    try fixture.directory.deleteFile(std.testing.io, "deleted.txt");
+    try fixture.temporary.dir.deleteFile(std.testing.io, "deleted.txt");
     try fixture.git(&.{ "mv", "rename-old.txt", "rename-new.txt" });
     try fixture.write("staged.txt", "staged\n");
     try fixture.git(&.{ "add", "staged.txt" });
@@ -442,12 +400,12 @@ test "working tree snapshot includes tracked untracked and renamed files" {
     var git = try GitProvider.init(std.testing.allocator, std.testing.io, fixture.root, null);
     defer git.deinit();
     try std.testing.expectEqual(@as(usize, 6), git.overview.files.len);
-    try expectStatus(git.overview.files, "deleted.txt", .deleted);
-    try expectStatus(git.overview.files, "modified.txt", .modified);
-    try expectStatus(git.overview.files, "rename-new.txt", .renamed);
-    try expectStatus(git.overview.files, "replaced.txt", .modified);
-    try expectStatus(git.overview.files, "staged.txt", .added);
-    try expectStatus(git.overview.files, "untracked.txt", .added);
+    try std.testing.expectEqual(model.FileStatus.deleted, findSummary(git.overview.files, "deleted.txt").status);
+    try std.testing.expectEqual(model.FileStatus.modified, findSummary(git.overview.files, "modified.txt").status);
+    try std.testing.expectEqual(model.FileStatus.renamed, findSummary(git.overview.files, "rename-new.txt").status);
+    try std.testing.expectEqual(model.FileStatus.modified, findSummary(git.overview.files, "replaced.txt").status);
+    try std.testing.expectEqual(model.FileStatus.added, findSummary(git.overview.files, "staged.txt").status);
+    try std.testing.expectEqual(model.FileStatus.added, findSummary(git.overview.files, "untracked.txt").status);
     try std.testing.expectEqualStrings("rename-old.txt", findSummary(git.overview.files, "rename-new.txt").previousPath.?);
     try std.testing.expectEqual(@as(?usize, 2), findSummary(git.overview.files, "modified.txt").additions);
     try std.testing.expectEqual(@as(?usize, 1), findSummary(git.overview.files, "modified.txt").deletions);
@@ -462,17 +420,11 @@ test "commit range resolves endpoints and ignores the dirty worktree" {
     defer fixture.deinit();
     try fixture.write("file.txt", "base\n");
     try fixture.commit("base");
-    const base = try fixture.head(std.testing.allocator);
-    defer std.testing.allocator.free(base);
     try fixture.write("file.txt", "committed\n");
     try fixture.commit("head");
-    const head = try fixture.head(std.testing.allocator);
-    defer std.testing.allocator.free(head);
     try fixture.write("file.txt", "dirty\n");
 
-    const range = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, head });
-    defer std.testing.allocator.free(range);
-    var git = try GitProvider.init(std.testing.allocator, std.testing.io, fixture.root, range);
+    var git = try GitProvider.init(std.testing.allocator, std.testing.io, fixture.root, "HEAD~1..HEAD");
     defer git.deinit();
     try std.testing.expectEqual(@as(usize, 1), git.overview.files.len);
     const review = try git.interface().getFileReview(std.testing.io, git.overview.review.id, "file.txt");
@@ -491,19 +443,22 @@ test "unrenderable working tree files stay visible" {
     var fixture = try TestRepository.init();
     defer fixture.deinit();
     try fixture.write("base.txt", "base\n");
+    try fixture.write("tracked-binary.dat", &.{ 1, 0, 2 });
     try fixture.commit("base");
     try fixture.write("binary.dat", &.{ 1, 0, 2 });
+    try fixture.write("tracked-binary.dat", &.{ 3, 0, 4 });
     try fixture.write("invalid.txt", &.{ 0xc3, 0x28 });
     const oversized = try std.testing.allocator.alloc(u8, maximum_text_size + 1);
     defer std.testing.allocator.free(oversized);
     @memset(oversized, 'x');
     try fixture.write("large.txt", oversized);
-    try fixture.directory.symLink(std.testing.io, "base.txt", "linked.txt", .{});
+    try fixture.temporary.dir.symLink(std.testing.io, "base.txt", "linked.txt", .{});
 
     var git = try GitProvider.init(std.testing.allocator, std.testing.io, fixture.root, null);
     defer git.deinit();
-    try std.testing.expectEqual(@as(usize, 4), git.overview.files.len);
+    try std.testing.expectEqual(@as(usize, 5), git.overview.files.len);
     try expectUnavailable(&git, "binary.dat", .binary);
+    try expectUnavailable(&git, "tracked-binary.dat", .binary);
     try expectUnavailable(&git, "invalid.txt", .invalid_utf8);
     try expectUnavailable(&git, "large.txt", .too_large);
     try expectUnavailable(&git, "linked.txt", .symlink);
@@ -515,7 +470,6 @@ test "Git mode classification recognizes submodules" {
 
 const TestRepository = struct {
     temporary: std.testing.TmpDir,
-    directory: std.Io.Dir,
     root: []u8,
 
     fn init() !TestRepository {
@@ -523,38 +477,24 @@ const TestRepository = struct {
         errdefer temporary.cleanup();
         const root = try temporary.dir.realPathFileAlloc(std.testing.io, ".", std.testing.allocator);
         errdefer std.testing.allocator.free(root);
-        var directory = try std.Io.Dir.openDirAbsolute(std.testing.io, root, .{});
-        errdefer directory.close(std.testing.io);
-        var fixture: TestRepository = .{ .temporary = temporary, .directory = directory, .root = root };
+        var fixture: TestRepository = .{ .temporary = temporary, .root = root };
         try fixture.git(&.{ "init", "--quiet", "--initial-branch=main" });
         return fixture;
     }
 
     fn deinit(self: *TestRepository) void {
-        self.directory.close(std.testing.io);
         std.testing.allocator.free(self.root);
         self.temporary.cleanup();
         self.* = undefined;
     }
 
     fn write(self: *TestRepository, path: []const u8, contents: []const u8) !void {
-        try self.directory.writeFile(std.testing.io, .{ .sub_path = path, .data = contents });
+        try self.temporary.dir.writeFile(std.testing.io, .{ .sub_path = path, .data = contents });
     }
 
     fn commit(self: *TestRepository, message: []const u8) !void {
         try self.git(&.{ "add", "-A" });
         try self.git(&.{ "-c", "user.name=Rvw Test", "-c", "user.email=rvw@example.invalid", "commit", "--quiet", "-m", message });
-    }
-
-    fn head(self: *TestRepository, allocator: Allocator) ![]u8 {
-        var argv: std.ArrayList([]const u8) = .empty;
-        defer argv.deinit(std.testing.allocator);
-        try argv.appendSlice(std.testing.allocator, &.{ "git", "-C", self.root, "rev-parse", "HEAD" });
-        const result = try std.process.run(std.testing.allocator, std.testing.io, .{ .argv = argv.items });
-        defer std.testing.allocator.free(result.stdout);
-        defer std.testing.allocator.free(result.stderr);
-        try std.testing.expect(exitedSuccessfully(result.term));
-        return allocator.dupe(u8, std.mem.trim(u8, result.stdout, " \t\r\n"));
     }
 
     fn git(self: *TestRepository, arguments: []const []const u8) !void {
@@ -575,14 +515,6 @@ const TestRepository = struct {
 fn findSummary(files: []const model.FileSummary, path: []const u8) model.FileSummary {
     for (files) |file| if (std.mem.eql(u8, file.path, path)) return file;
     return undefined;
-}
-
-fn expectStatus(files: []const model.FileSummary, path: []const u8, expected: model.FileStatus) !void {
-    for (files) |file| {
-        if (!std.mem.eql(u8, file.path, path)) continue;
-        return std.testing.expectEqual(expected, file.status);
-    }
-    return error.MissingFile;
 }
 
 fn expectUnavailable(git: *GitProvider, path: []const u8, expected: model.UnavailableReason) !void {
