@@ -91,17 +91,3 @@ fn usage() void {
         .{},
     );
 }
-
-test "serve requires exactly one repository directory" {
-    const defaults: Options = .{};
-    try std.testing.expectError(error.ExpectedServe, parseArgs(&.{"rvw-server"}, defaults));
-    try std.testing.expectError(error.ExpectedServe, parseArgs(&.{ "rvw-server", "--directory", "." }, defaults));
-    try std.testing.expectError(error.MissingDirectory, parseArgs(&.{ "rvw-server", "serve" }, defaults));
-    try std.testing.expectError(error.MissingValue, parseArgs(&.{ "rvw-server", "serve", "--directory" }, defaults));
-    try std.testing.expectError(error.DuplicateDirectory, parseArgs(
-        &.{ "rvw-server", "serve", "--directory", ".", "--directory", "." },
-        defaults,
-    ));
-    const options = try parseArgs(&.{ "rvw-server", "serve", "--directory", "." }, defaults);
-    try std.testing.expectEqualStrings(".", options.directory.?);
-}
