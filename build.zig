@@ -32,8 +32,33 @@ pub fn build(b: *std.Build) void {
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
     dev.addArtifactArg(server);
+    if (b.args) |args| dev.addArgs(args);
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
+
+    const server_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/dev_server.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "rvw", .module = rvw }},
+        }),
+    });
+    const run_server_tests = b.addRunArtifact(server_tests);
+    const repository_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/repository.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_repository_tests = b.addRunArtifact(repository_tests);
+    const repository_script_tests = b.addSystemCommand(&.{ "node", "--test" });
+    repository_script_tests.addFileArg(b.path("scripts/dev-repository.test.mjs"));
+    const test_step = b.step("test", "Run repository and server tests");
+    test_step.dependOn(&run_server_tests.step);
+    test_step.dependOn(&run_repository_tests.step);
+    test_step.dependOn(&repository_script_tests.step);
 
     if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize);
 }

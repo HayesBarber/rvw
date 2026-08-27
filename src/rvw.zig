@@ -6,3 +6,4 @@ pub const core = @import("app/core.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
 pub const http = @import("transport/http.zig");
 pub const unix_socket = @import("transport/unix_socket.zig");
+pub const repository = @import("repository.zig");
