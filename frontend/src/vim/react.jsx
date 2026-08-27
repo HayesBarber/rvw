@@ -6,8 +6,7 @@ import { VimController, VimMode } from './machine.js'
 const emptyBindings = Object.freeze([])
 
 /**
- * Provides Vim state and keyboard capture when mounted. It is intentionally not
- * mounted by the app yet, so this scaffold does not change current behavior.
+ * Provides Vim state and keyboard capture.
  */
 export function VimProvider({
   bindings = emptyBindings,
