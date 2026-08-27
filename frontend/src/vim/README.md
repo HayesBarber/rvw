@@ -13,7 +13,8 @@ KeyboardEvent -> keyboard.js -> VimController -> semantic command -> app adapter
 - `machine.js` owns modes, counts, pending key sequences, bindings, and command
   dispatch. Its transition function is pure.
 - `react.jsx` and `context.js` expose an optional provider and hooks around the
-  controller.
+  controller. State subscriptions drive rendering from durable snapshots;
+  command subscriptions deliver one-shot application actions.
 - `index.js` is the public module surface.
 
 The provider is not mounted yet, and there is intentionally no product keymap.

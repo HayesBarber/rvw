@@ -87,6 +87,8 @@ function isCountKey(state, key) {
 
 /**
  * Pure state transition used by the controller and unit tests.
+ * One input can complete at most one binding, so the result contains one
+ * command or null rather than a command collection.
  *
  * @param {{ mode: string, count: string, pendingKeys: readonly string[] }} state
  * @param {{ type: 'key', key: string } | { type: 'reset' } | { type: 'set_mode', mode: string }} input
@@ -95,7 +97,7 @@ function isCountKey(state, key) {
 export function transitionVimState(state, input, bindings) {
   if (input.type === 'reset') {
     const handled = state.count !== '' || state.pendingKeys.length > 0
-    return { state: handled ? initialState(state.mode) : state, handled, commands: [] }
+    return { state: handled ? initialState(state.mode) : state, handled, command: null }
   }
 
   if (input.type === 'set_mode') {
@@ -104,7 +106,7 @@ export function transitionVimState(state, input, bindings) {
     }
     const handled =
       input.mode !== state.mode || state.count !== '' || state.pendingKeys.length > 0
-    return { state: handled ? initialState(input.mode) : state, handled, commands: [] }
+    return { state: handled ? initialState(input.mode) : state, handled, command: null }
   }
 
   if (input.type !== 'key' || typeof input.key !== 'string' || input.key.length === 0) {
@@ -114,14 +116,14 @@ export function transitionVimState(state, input, bindings) {
   if (input.key === '<Esc>') {
     const handled =
       state.mode !== VimMode.NORMAL || state.count !== '' || state.pendingKeys.length > 0
-    return { state: handled ? initialState(VimMode.NORMAL) : state, handled, commands: [] }
+    return { state: handled ? initialState(VimMode.NORMAL) : state, handled, command: null }
   }
 
   if (isCountKey(state, input.key)) {
     return {
       state: Object.freeze({ ...state, count: `${state.count}${input.key}` }),
       handled: true,
-      commands: [],
+      command: null,
     }
   }
 
@@ -145,7 +147,7 @@ export function transitionVimState(state, input, bindings) {
     return {
       state: initialState(binding.nextMode ?? state.mode),
       handled: true,
-      commands: command ? [command] : [],
+      command,
     }
   }
 
@@ -153,7 +155,7 @@ export function transitionVimState(state, input, bindings) {
     return {
       state: Object.freeze({ ...state, pendingKeys: Object.freeze(keys) }),
       handled: true,
-      commands: [],
+      command: null,
     }
   }
 
@@ -161,7 +163,7 @@ export function transitionVimState(state, input, bindings) {
   return {
     state: hadPendingInput ? initialState(state.mode) : state,
     handled: hadPendingInput,
-    commands: [],
+    command: null,
   }
 }
 
@@ -169,17 +171,19 @@ export class VimController {
   constructor({ bindings = [], initialMode = VimMode.NORMAL } = {}) {
     this.bindings = compileBindings(bindings)
     this.state = createVimState(initialMode)
-    this.stateListeners = new Set()
+    this.stateChangeListeners = new Set()
     this.commandListeners = new Set()
   }
 
   getSnapshot = () => this.state
 
+  /** Notifies consumers to read getSnapshot again after durable state changes. */
   subscribe = (listener) => {
-    this.stateListeners.add(listener)
-    return () => this.stateListeners.delete(listener)
+    this.stateChangeListeners.add(listener)
+    return () => this.stateChangeListeners.delete(listener)
   }
 
+  /** Subscribes to transient semantic commands, which are not controller state. */
   subscribeCommands = (listener) => {
     this.commandListeners.add(listener)
     return () => this.commandListeners.delete(listener)
@@ -194,10 +198,10 @@ export class VimController {
     const result = transitionVimState(this.state, input, this.bindings)
     if (result.state !== this.state) {
       this.state = result.state
-      for (const listener of this.stateListeners) listener()
+      for (const listener of this.stateChangeListeners) listener()
     }
-    for (const command of result.commands) {
-      for (const listener of this.commandListeners) listener(command)
+    if (result.command) {
+      for (const listener of this.commandListeners) listener(result.command)
     }
     return result
   }

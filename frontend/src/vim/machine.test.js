@@ -21,6 +21,7 @@ test('dispatches a semantic command for an exact binding', () => {
   const result = controller.dispatch({ type: 'key', key: 'j' })
 
   assert.equal(result.handled, true)
+  assert.equal(result.command.command, 'cursor.down')
   assert.deepEqual(commands, [
     {
       type: 'command',
@@ -42,8 +43,8 @@ test('waits for multi-key bindings and applies a count', () => {
 
   assert.equal(prefix.handled, true)
   assert.deepEqual(prefix.state.pendingKeys, ['g'])
-  assert.equal(result.commands[0].command, 'cursor.first')
-  assert.equal(result.commands[0].count, 4)
+  assert.equal(result.command.command, 'cursor.first')
+  assert.equal(result.command.count, 4)
   assert.deepEqual(controller.getSnapshot(), {
     mode: VimMode.NORMAL,
     count: '',

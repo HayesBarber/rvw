@@ -78,7 +78,6 @@ export function attachVimKeyboardCapture({
   target,
   dispatch,
   shouldCapture = shouldCaptureKeyboardEvent,
-  stopPropagation = true,
 }) {
   if (!target?.addEventListener || !target?.removeEventListener) {
     throw new TypeError('Vim keyboard capture requires an event target')
@@ -92,7 +91,7 @@ export function attachVimKeyboardCapture({
     const result = dispatch({ type: 'key', key })
     if (!result.handled) return
     event.preventDefault()
-    if (stopPropagation) event.stopPropagation()
+    event.stopPropagation()
   }
 
   target.addEventListener('keydown', onKeyDown, { capture: true })
