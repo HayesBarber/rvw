@@ -61,10 +61,10 @@ try {
   process.exit(1)
 }
 
-console.error(
+console.log(
   `[dev] repository=${prepared.repository} commit=${prepared.baseCommit} seed=${prepared.seed}`,
 )
-console.error(`[dev] worktree=${prepared.path}`)
+console.log(`[dev] worktree=${prepared.path}`)
 
 const cleanupGuardian = spawn(process.execPath, [guardianCommand, prepared.path], {
   cwd: projectRoot,
@@ -136,7 +136,7 @@ async function finishIfStopped() {
       await repository(['cleanup', '--path', prepared.path])
       repositoryCleaned = true
       cancelCleanupGuardian()
-      console.error(`[dev] removed worktree ${prepared.path}`)
+      console.log(`[dev] removed worktree ${prepared.path}`)
     } catch (error) {
       console.error(`[dev] repository cleanup failed: ${error.message}`)
       requestedExitCode = requestedExitCode || 1
@@ -158,7 +158,7 @@ function cleanupAfterSignal() {
   if (result.status === 0) {
     repositoryCleaned = true
     cancelCleanupGuardian()
-    console.error(`[dev] removed worktree ${prepared.path}`)
+    console.log(`[dev] removed worktree ${prepared.path}`)
   } else {
     console.error(`[dev] repository cleanup failed after signal`)
     requestedExitCode = requestedExitCode || 1
