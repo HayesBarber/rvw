@@ -18,6 +18,17 @@ export default function DiffPane({ fileReview, loading, error }) {
     return <PaneStatus>Select a file to view it.</PaneStatus>
   }
 
+  if (fileReview.content.kind === 'unavailable') {
+    const descriptions = {
+      binary: 'Binary file contents cannot be displayed.',
+      'invalid-utf8': 'This file is not valid UTF-8 text.',
+      'too-large': 'This file is larger than the 512 KiB review limit.',
+      symlink: 'Symbolic link changes cannot be displayed.',
+      submodule: 'Submodule changes cannot be displayed.',
+    }
+    return <PaneStatus>{descriptions[fileReview.content.reason]}</PaneStatus>
+  }
+
   return (
     <Virtualizer className="diff-scroll">
       {fileReview.content.kind === 'diff' ? (
@@ -32,4 +43,3 @@ export default function DiffPane({ fileReview, loading, error }) {
     </Virtualizer>
   )
 }
-

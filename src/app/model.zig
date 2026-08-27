@@ -4,14 +4,39 @@ pub const FileStatus = enum {
     modified,
     added,
     deleted,
+    renamed,
     unchanged,
 };
 
 pub const Repository = struct { name: []const u8 };
 
-pub const ReviewSource = struct {
-    kind: []const u8,
-    base: []const u8,
+pub const ReviewSource = union(enum) {
+    working_tree: struct { base: []const u8 },
+    commit_range: struct {
+        base: []const u8,
+        head: []const u8,
+    },
+
+    pub fn jsonStringify(self: ReviewSource, writer: *std.json.Stringify) !void {
+        try writer.beginObject();
+        switch (self) {
+            .working_tree => |source| {
+                try writer.objectField("kind");
+                try writer.write("working-tree");
+                try writer.objectField("base");
+                try writer.write(source.base);
+            },
+            .commit_range => |source| {
+                try writer.objectField("kind");
+                try writer.write("commit-range");
+                try writer.objectField("base");
+                try writer.write(source.base);
+                try writer.objectField("head");
+                try writer.write(source.head);
+            },
+        }
+        try writer.endObject();
+    }
 };
 
 pub const Review = struct {
@@ -22,10 +47,29 @@ pub const Review = struct {
 
 pub const FileSummary = struct {
     path: []const u8,
+    previousPath: ?[]const u8 = null,
     status: FileStatus,
-    additions: usize,
-    deletions: usize,
+    additions: ?usize,
+    deletions: ?usize,
     commentCount: usize,
+};
+
+pub const UnavailableReason = enum {
+    binary,
+    invalid_utf8,
+    too_large,
+    symlink,
+    submodule,
+
+    pub fn jsonStringify(self: UnavailableReason, writer: *std.json.Stringify) !void {
+        try writer.write(switch (self) {
+            .binary => "binary",
+            .invalid_utf8 => "invalid-utf8",
+            .too_large => "too-large",
+            .symlink => "symlink",
+            .submodule => "submodule",
+        });
+    }
 };
 
 pub const CommentTarget = union(enum) {
@@ -73,7 +117,7 @@ pub const ReviewComment = struct {
 
 pub const ReviewOverview = struct {
     review: Review,
-    initialPath: []const u8,
+    initialPath: ?[]const u8,
     files: []const FileSummary,
     comments: []const ReviewComment,
 };
@@ -104,6 +148,7 @@ pub const FileContent = union(enum) {
         newFile: ?FileContents,
     },
     file: struct { file: FileContents },
+    unavailable: struct { reason: UnavailableReason },
 
     /// Uses the API's `{ "kind": ... }` tagged-object shape instead of
     /// std.json's default representation for tagged unions.
@@ -124,6 +169,12 @@ pub const FileContent = union(enum) {
                 try writer.objectField("file");
                 try writer.write(content.file);
             },
+            .unavailable => |content| {
+                try writer.objectField("kind");
+                try writer.write("unavailable");
+                try writer.objectField("reason");
+                try writer.write(content.reason);
+            },
         }
         try writer.endObject();
     }
@@ -131,6 +182,7 @@ pub const FileContent = union(enum) {
 
 pub const FileReview = struct {
     path: []const u8,
+    previousPath: ?[]const u8 = null,
     status: FileStatus,
     content: FileContent,
 };

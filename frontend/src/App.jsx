@@ -66,8 +66,12 @@ export default function App() {
     return <main className="fatal-error">Unable to load review: {overviewError}</main>
   }
 
-  if (!overview || !selectedPath) {
+  if (!overview) {
     return <main className="fatal-error">Loading review…</main>
+  }
+
+  if (!selectedPath) {
+    return <main className="fatal-error">No changes to review.</main>
   }
 
   const fileLoading = fileRequest.path !== selectedPath

@@ -5,6 +5,7 @@ const Options = struct {
     host: []const u8 = "127.0.0.1",
     port: u16 = 7331,
     directory: ?[]const u8 = null,
+    range: ?[]const u8 = null,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -17,30 +18,22 @@ pub fn main(init: std.process.Init) !void {
             error.ExpectedServe => "expected serve command",
             error.MissingDirectory => "missing required --directory DIR",
             error.DuplicateDirectory => "--directory may only be provided once",
+            error.DuplicateRange => "--range may only be provided once",
         }});
         usage();
         return err;
     };
-    const requested_directory = options.directory.?;
-    const validated_directory = rvw.repository.validateRoot(init.io, init.gpa, requested_directory) catch |err| {
-        std.log.err("invalid repository directory '{s}': {s}", .{ requested_directory, switch (err) {
-            error.RepositoryPathMissing => "path does not exist",
-            error.NotDirectory => "path is not a directory",
-            error.NotGitRepository => "path is not a Git worktree",
-            error.NotRepositoryRoot => "path is inside a Git worktree but is not its root",
-            error.GitNotFound => "git is not available on PATH",
-            else => @errorName(err),
-        } });
-        return err;
-    };
-    defer init.gpa.free(validated_directory);
     const address = std.Io.net.IpAddress.parse(options.host, options.port) catch {
         std.log.err("invalid listen host: {s}", .{options.host});
         return error.InvalidHost;
     };
 
-    var fixture: rvw.fixture_provider.FixtureProvider = .{};
-    var core = rvw.core.Core.init(init.gpa, init.io, fixture.interface());
+    var git = rvw.git_provider.GitProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
+        std.log.err("unable to open Git review: {s}", .{rvw.git_provider.errorMessage(err)});
+        return err;
+    };
+    defer git.deinit();
+    var core = rvw.core.Core.init(init.gpa, init.io, git.interface());
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
 }
@@ -76,6 +69,11 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
             if (options.directory != null) return error.DuplicateDirectory;
             options.directory = args[index];
             index += 1;
+        } else if (std.mem.eql(u8, argument, "--range")) {
+            if (index == args.len) return error.MissingValue;
+            if (options.range != null) return error.DuplicateRange;
+            options.range = args[index];
+            index += 1;
         } else {
             return error.UnknownArgument;
         }
@@ -86,7 +84,7 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
 
 fn usage() void {
     std.debug.print(
-        "usage: rvw-server serve --directory DIR [--host HOST] [--port PORT]\n" ++
+        "usage: rvw-server serve --directory DIR [--range A..B] [--host HOST] [--port PORT]\n" ++
             "       defaults may also be set with RVW_HOST and RVW_PORT\n",
         .{},
     );

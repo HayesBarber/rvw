@@ -36,6 +36,16 @@ pub fn build(b: *std.Build) void {
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 
+    const provider_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/rvw_core.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_provider_tests = b.addRunArtifact(provider_tests);
+    b.step("test", "Run Git provider tests").dependOn(&run_provider_tests.step);
+
     if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize);
 }
 

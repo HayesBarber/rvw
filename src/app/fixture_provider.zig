@@ -60,7 +60,7 @@ const overview: model.ReviewOverview = .{
     .review = .{
         .id = "working-tree",
         .repository = .{ .name = "rvw" },
-        .source = .{ .kind = "working-tree", .base = "HEAD" },
+        .source = .{ .working_tree = .{ .base = "HEAD" } },
     },
     .initialPath = "src/app/review.zig",
     .files = &files,
