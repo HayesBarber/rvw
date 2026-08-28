@@ -15,16 +15,6 @@ pub fn build(b: *std.Build) void {
         .imports = &.{.{ .name = "httpz", .module = httpz }},
     });
 
-    const core_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/rvw_core.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    const run_core_tests = b.addRunArtifact(core_tests);
-    b.step("test", "Run the core unit tests").dependOn(&run_core_tests.step);
-
     const server = b.addExecutable(.{
         .name = "rvw-server",
         .root_module = b.createModule(.{
@@ -38,6 +28,17 @@ pub fn build(b: *std.Build) void {
     const serve = b.addRunArtifact(server);
     if (b.args) |args| serve.addArgs(args);
     b.step("serve", "Run the HTTP service").dependOn(&serve.step);
+
+    const tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/rvw.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "httpz", .module = httpz }},
+        }),
+    });
+    const run_tests = b.addRunArtifact(tests);
+    b.step("test", "Run unit tests").dependOn(&run_tests.step);
 
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));

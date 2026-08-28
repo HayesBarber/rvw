@@ -1,4 +1,5 @@
 pub const clipboard = @import("output/clipboard.zig");
+pub const markdown = @import("output/markdown.zig");
 
 pub const Clipboard = clipboard.Clipboard;
 pub const SystemClipboard = clipboard.SystemClipboard;
