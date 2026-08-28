@@ -10,6 +10,7 @@ pub fn encodeResponse(allocator: Allocator, response: model.Response) ![]u8 {
         .file_diff => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
         .comments => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
         .comment => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .copy_comments_result => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
     };
 }
 
@@ -38,6 +39,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         .file_diff => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
         .comments => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
         .comment => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .copy_comments_result => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
 }
 
@@ -57,6 +59,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
         return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
     }
     if (std.mem.eql(u8, operation, "get_comments")) return .get_comments;
+    if (std.mem.eql(u8, operation, "copy_comments_as_markdown")) return .copy_comments_as_markdown;
     if (std.mem.eql(u8, operation, "create_comment")) {
         const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
         const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
@@ -112,4 +115,29 @@ fn encodeEnvelopeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
         .ok = false,
         .@"error" = .{ .code = code, .message = model.errorMessage(code) },
     }, .{});
+}
+
+test "copy comments as Markdown request decodes through the JSON protocol" {
+    var parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"copy_comments_as_markdown\"}",
+        .{},
+    );
+    defer parsed.deinit();
+
+    const request = try decodeRequestValue(parsed.value);
+    switch (request) {
+        .copy_comments_as_markdown => {},
+        else => return error.UnexpectedRequest,
+    }
+}
+
+test "copy comments result encodes the copied comment count" {
+    const encoded = try encodeResponse(std.testing.allocator, .{
+        .copy_comments_result = .{ .commentCount = 2 },
+    });
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expectEqualStrings("{\"commentCount\":2}", encoded);
 }

@@ -111,3 +111,16 @@ export async function createComment(body, target) {
     body: JSON.stringify(request),
   })
 }
+
+/**
+ * Copies every current review comment as structured Markdown.
+ * @returns {Promise<{ commentCount: number }>}
+ */
+export async function copyCommentsAsMarkdown() {
+  const request = { type: 'copy_comments_as_markdown' }
+  return requestJson('/api/comments/copy-markdown', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
