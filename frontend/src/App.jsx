@@ -91,8 +91,9 @@ export default function App() {
   const fileDiff = fileLoading ? null : fileRequest.data
   const fileError = fileLoading ? null : fileRequest.error
 
-  async function handleCreateComment(body, target) {
+  async function handleCreateComment(body, target, beforeCommit) {
     const comment = await createComment(body, target)
+    beforeCommit?.()
     setComments((current) => (
       current.some((existing) => existing.id === comment.id)
         ? current

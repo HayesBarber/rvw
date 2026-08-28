@@ -99,6 +99,10 @@ textarea {
   overflow: auto;
 }
 
+.diff-pane > .pane-body {
+  overflow: hidden;
+}
+
 .pane-status,
 .fatal-error {
   margin: 0;
