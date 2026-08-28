@@ -1,7 +1,7 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
-const provider_module = @import("provider.zig");
+const provider_module = @import("../provider.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -9,9 +9,9 @@ const Io = std.Io;
 pub const Core = struct {
     allocator: Allocator,
     io: Io,
-    provider: provider_module.ReviewProvider,
+    provider: provider_module.review.ReviewProvider,
 
-    pub fn init(allocator: Allocator, io: Io, provider: provider_module.ReviewProvider) Core {
+    pub fn init(allocator: Allocator, io: Io, provider: provider_module.review.ReviewProvider) Core {
         return .{ .allocator = allocator, .io = io, .provider = provider };
     }
 
