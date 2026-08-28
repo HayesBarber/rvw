@@ -34,7 +34,7 @@ const Handler = struct {
         const response = self.dispatcher.dispatch(request) catch |err| {
             const code = model.errorCode(err);
             const status: std.http.Status = switch (code) {
-                .unknown_review, .unknown_file => .not_found,
+                .unknown_diff, .unknown_file => .not_found,
                 else => .internal_server_error,
             };
             return self.failure(res, status, code);
@@ -50,14 +50,14 @@ const Handler = struct {
     }
 };
 
-fn getReviewOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_review_overview);
+fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .get_diff_overview);
 }
 
-fn getFileReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
-    const encoded_review_id = req.param("review_id") orelse
+fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const encoded_diff_id = req.param("diff_id") orelse
         return handler.failure(res, .bad_request, .malformed_request);
-    const review_id = (httpz.Url.unescape(res.arena, &.{}, encoded_review_id) catch
+    const diff_id = (httpz.Url.unescape(res.arena, &.{}, encoded_diff_id) catch
         return handler.failure(res, .bad_request, .malformed_request)).value;
     const query = req.query() catch
         return handler.failure(res, .bad_request, .malformed_request);
@@ -65,8 +65,8 @@ fn getFileReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
 
-    return handler.dispatchRequest(res, .{ .get_file_review = .{
-        .review_id = review_id,
+    return handler.dispatchRequest(res, .{ .get_file_diff = .{
+        .diff_id = diff_id,
         .path = path,
     } });
 }
@@ -78,8 +78,8 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     defer server.stop();
 
     const router = try server.router(.{});
-    router.get("/api/reviews/active", getReviewOverview, .{});
-    router.get("/api/reviews/:review_id/files", getFileReview, .{});
+    router.get("/api/diffs/active", getDiffOverview, .{});
+    router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
 
     std.log.info("rvw listening on http://{f}", .{address});
     try server.listen();

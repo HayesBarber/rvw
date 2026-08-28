@@ -6,8 +6,8 @@ const Allocator = std.mem.Allocator;
 
 pub fn encodeResponse(allocator: Allocator, response: model.Response) ![]u8 {
     return switch (response) {
-        .review_overview => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .file_review => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .diff_overview => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .file_diff => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
     };
 }
 
@@ -33,22 +33,22 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         else => return encodeEnvelopeError(allocator, .malformed_request),
     };
 
-    const request: model.Request = if (std.mem.eql(u8, operation, "get_review_overview"))
-        .get_review_overview
-    else if (std.mem.eql(u8, operation, "get_file_review")) blk: {
-        const review_id = jsonString(object.get("reviewId")) orelse
+    const request: model.Request = if (std.mem.eql(u8, operation, "get_diff_overview"))
+        .get_diff_overview
+    else if (std.mem.eql(u8, operation, "get_file_diff")) blk: {
+        const diff_id = jsonString(object.get("diffId")) orelse
             return encodeEnvelopeError(allocator, .malformed_request);
         const path = jsonString(object.get("path")) orelse
             return encodeEnvelopeError(allocator, .malformed_request);
-        break :blk .{ .get_file_review = .{ .review_id = review_id, .path = path } };
+        break :blk .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
     } else return encodeEnvelopeError(allocator, .unknown_operation);
 
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
     return switch (response) {
-        .review_overview => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .file_review => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .diff_overview => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .file_diff => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
 }
 

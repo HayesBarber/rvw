@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFileReview, getReviewOverview } from './api.js'
+import { getDiffOverview, getFileDiff } from './api.js'
 import DiffPane from './components/DiffPane.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
 
@@ -16,7 +16,7 @@ export default function App() {
   useEffect(() => {
     let active = true
 
-    getReviewOverview()
+    getDiffOverview()
       .then((nextOverview) => {
         if (!active) return
         setOverview(nextOverview)
@@ -36,12 +36,12 @@ export default function App() {
 
     let active = true
 
-    getFileReview(overview.review.id, selectedPath)
-      .then((nextFileReview) => {
+    getFileDiff(overview.id, selectedPath)
+      .then((nextFileDiff) => {
         if (active) {
           setFileRequest({
             path: selectedPath,
-            data: nextFileReview,
+            data: nextFileDiff,
             error: null,
           })
         }
@@ -74,14 +74,14 @@ export default function App() {
   }
 
   const fileLoading = fileRequest.path !== selectedPath
-  const fileReview = fileLoading ? null : fileRequest.data
+  const fileDiff = fileLoading ? null : fileRequest.data
   const fileError = fileLoading ? null : fileRequest.error
 
   return (
     <main className="review-shell">
       <section className="pane tree-pane">
         <header className="pane-header">
-          <strong>{overview.review.repository.name}</strong>
+          <strong>{overview.repository.name}</strong>
         </header>
         <div className="pane-body">
           <FileTreePane
@@ -98,7 +98,7 @@ export default function App() {
         </header>
         <div className="pane-body">
           <DiffPane
-            fileReview={fileReview}
+            fileDiff={fileDiff}
             loading={fileLoading}
             error={fileError}
           />

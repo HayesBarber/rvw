@@ -1,1 +1,1 @@
-pub const review = @import("provider/review.zig");
+pub const diff = @import("provider/diff.zig");

@@ -1,6 +1,6 @@
 const std = @import("std");
 const model = @import("../../app/model.zig");
-const review_provider = @import("interface.zig");
+const diff_provider = @import("interface.zig");
 const repository = @import("../../repository.zig");
 
 const Allocator = std.mem.Allocator;
@@ -30,7 +30,7 @@ const Loaded = union(enum) {
 
 pub const GitProvider = struct {
     arena: std.heap.ArenaAllocator,
-    overview: model.ReviewOverview,
+    overview: model.DiffOverview,
     file_contents: []const model.FileContent,
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8) !GitProvider {
@@ -48,7 +48,7 @@ pub const GitProvider = struct {
         if (snapshot.head == null) try appendUntracked(allocator, io, root, &changes);
         std.mem.sort(Change, changes.items, {}, lessThanChange);
 
-        const review_id = if (snapshot.head) |head|
+        const diff_id = if (snapshot.head) |head|
             try std.fmt.allocPrint(allocator, "{s}..{s}", .{ snapshot.base, head })
         else
             try std.fmt.allocPrint(allocator, "working-tree:{s}", .{snapshot.base});
@@ -62,24 +62,20 @@ pub const GitProvider = struct {
                 .status = change.status,
                 .additions = change.additions,
                 .deletions = change.deletions,
-                .commentCount = 0,
             });
             try file_contents.append(allocator, try buildFileContent(allocator, io, root, snapshot, change));
         }
 
-        const source: model.ReviewSource = if (snapshot.head) |head|
+        const source: model.DiffSource = if (snapshot.head) |head|
             .{ .commit_range = .{ .base = snapshot.base, .head = head } }
         else
             .{ .working_tree = .{ .base = snapshot.base } };
-        const overview: model.ReviewOverview = .{
-            .review = .{
-                .id = review_id,
-                .repository = .{ .name = std.fs.path.basename(root) },
-                .source = source,
-            },
+        const overview: model.DiffOverview = .{
+            .id = diff_id,
+            .repository = .{ .name = std.fs.path.basename(root) },
+            .source = source,
             .initialPath = if (summaries.items.len == 0) null else summaries.items[0].path,
             .files = try summaries.toOwnedSlice(allocator),
-            .comments = &.{},
         };
 
         return .{
@@ -94,18 +90,18 @@ pub const GitProvider = struct {
         self.* = undefined;
     }
 
-    pub fn interface(self: *GitProvider) review_provider.ReviewProvider {
+    pub fn interface(self: *GitProvider) diff_provider.DiffProvider {
         return .{ .context = self, .vtable = &vtable };
     }
 
-    fn getOverview(context: *anyopaque, _: Io) !model.ReviewOverview {
+    fn getDiffOverview(context: *anyopaque, _: Io) !model.DiffOverview {
         const self: *GitProvider = @ptrCast(@alignCast(context));
         return self.overview;
     }
 
-    fn getFileReview(context: *anyopaque, _: Io, review_id: []const u8, path: []const u8) !model.FileReview {
+    fn getFileDiff(context: *anyopaque, _: Io, diff_id: []const u8, path: []const u8) !model.FileDiff {
         const self: *GitProvider = @ptrCast(@alignCast(context));
-        if (!std.mem.eql(u8, review_id, self.overview.review.id)) return error.UnknownReview;
+        if (!std.mem.eql(u8, diff_id, self.overview.id)) return error.UnknownDiff;
         for (self.overview.files, self.file_contents) |file, content| {
             if (std.mem.eql(u8, file.path, path)) return .{
                 .path = file.path,
@@ -117,9 +113,9 @@ pub const GitProvider = struct {
         return error.UnknownFile;
     }
 
-    const vtable: review_provider.ReviewProvider.VTable = .{
-        .getOverview = getOverview,
-        .getFileReview = getFileReview,
+    const vtable: diff_provider.DiffProvider.VTable = .{
+        .getDiffOverview = getDiffOverview,
+        .getFileDiff = getFileDiff,
     };
 };
 
@@ -134,7 +130,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
         error.InvalidRevision => "range contains an unknown or non-commit revision",
         error.UnsupportedPath => "repository contains a changed path that is not valid UTF-8",
         error.GitOutputTooLarge => "Git change metadata exceeds the supported size",
-        error.GitCommandFailed, error.MalformedGitOutput => "Git could not produce the review snapshot",
+        error.GitCommandFailed, error.MalformedGitOutput => "Git could not produce the diff snapshot",
         else => @errorName(err),
     };
 }

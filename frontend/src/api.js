@@ -9,15 +9,15 @@
  * @property {FileStatus} status
  * @property {number | null} additions
  * @property {number | null} deletions
- * @property {number} commentCount
  */
 
 /**
- * @typedef {Object} ReviewOverview
- * @property {{ id: string, repository: { name: string }, source: { kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string } }} review
+ * @typedef {Object} DiffOverview
+ * @property {string} id
+ * @property {{ name: string }} repository
+ * @property {{ kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string }} source
  * @property {string | null} initialPath
  * @property {FileSummary[]} files
- * @property {ReviewComment[]} comments
  */
 
 /**
@@ -28,18 +28,7 @@
  */
 
 /**
- * @typedef {{ kind: 'file', path: string } | { kind: 'line', path: string, side: 'old' | 'new', startLine: number, endLine: number }} CommentTarget
- */
-
-/**
- * @typedef {Object} ReviewComment
- * @property {string} id
- * @property {string} body
- * @property {CommentTarget} target
- */
-
-/**
- * @typedef {Object} FileReview
+ * @typedef {Object} FileDiff
  * @property {string} path
  * @property {string | null} previousPath
  * @property {FileStatus} status
@@ -69,22 +58,22 @@ async function getJson(url, nativeRequest) {
 }
 
 /**
- * Loads metadata and file summaries for the active review.
- * @returns {Promise<ReviewOverview>}
+ * Loads metadata and file summaries for the active diff.
+ * @returns {Promise<DiffOverview>}
  */
-export async function getReviewOverview() {
-  return getJson('/api/reviews/active', { type: 'get_review_overview' })
+export async function getDiffOverview() {
+  return getJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
 /**
  * Loads display content for one canonical file path.
- * @param {string} reviewId
+ * @param {string} diffId
  * @param {string} path
- * @returns {Promise<FileReview>}
+ * @returns {Promise<FileDiff>}
  */
-export async function getFileReview(reviewId, path) {
+export async function getFileDiff(diffId, path) {
   return getJson(
-    `/api/reviews/${encodeURIComponent(reviewId)}/files?path=${encodeURIComponent(path)}`,
-    { type: 'get_file_review', reviewId, path },
+    `/api/diffs/${encodeURIComponent(diffId)}/files?path=${encodeURIComponent(path)}`,
+    { type: 'get_file_diff', diffId, path },
   )
 }

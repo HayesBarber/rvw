@@ -9,10 +9,10 @@ const Io = std.Io;
 pub const Core = struct {
     allocator: Allocator,
     io: Io,
-    provider: provider_module.review.ReviewProvider,
+    diff_provider: provider_module.diff.DiffProvider,
 
-    pub fn init(allocator: Allocator, io: Io, provider: provider_module.review.ReviewProvider) Core {
-        return .{ .allocator = allocator, .io = io, .provider = provider };
+    pub fn init(allocator: Allocator, io: Io, diff_provider: provider_module.diff.DiffProvider) Core {
+        return .{ .allocator = allocator, .io = io, .diff_provider = diff_provider };
     }
 
     pub fn dispatcher(self: *Core) dispatcher_module.Dispatcher {
@@ -26,9 +26,9 @@ pub const Core = struct {
 
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
-            .get_review_overview => .{ .review_overview = try self.provider.getOverview(self.io) },
-            .get_file_review => |details| .{
-                .file_review = try self.provider.getFileReview(self.io, details.review_id, details.path),
+            .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
+            .get_file_diff => |details| .{
+                .file_diff = try self.diff_provider.getFileDiff(self.io, details.diff_id, details.path),
             },
         };
     }
