@@ -127,9 +127,15 @@ function CommentComposer({ target, onCancel, onCreate }) {
 }
 
 function SavedComment({ comment }) {
+  const lineLabel = comment.target.kind === 'line'
+    ? (comment.target.startLine === comment.target.endLine
+        ? `Line ${comment.target.startLine}`
+        : `Lines ${comment.target.startLine}–${comment.target.endLine}`)
+    : 'File comment'
+
   return (
     <article className="saved-comment">
-      <header>You</header>
+      <header>{lineLabel}</header>
       <p>{comment.body}</p>
     </article>
   )
