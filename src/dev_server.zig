@@ -28,8 +28,8 @@ pub fn main(init: std.process.Init) !void {
         return error.InvalidHost;
     };
 
-    var git = rvw.provider.git.GitProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
-        std.log.err("unable to open Git review: {s}", .{rvw.provider.git.errorMessage(err)});
+    var git = rvw.provider.review.git.GitProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
+        std.log.err("unable to open Git review: {s}", .{rvw.provider.review.git.errorMessage(err)});
         return err;
     };
     defer git.deinit();

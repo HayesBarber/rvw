@@ -5,7 +5,7 @@ const allocator = std.heap.page_allocator;
 
 const RvwCore = struct {
     threaded: std.Io.Threaded,
-    git: rvw.provider.git.GitProvider,
+    git: rvw.provider.review.git.GitProvider,
     core: rvw.core.Core,
 };
 
@@ -27,9 +27,9 @@ pub export fn rvw_core_create(
     const range: ?[]const u8 = if (range_ptr) |value| std.mem.span(value) else null;
     const handle = allocator.create(RvwCore) catch return null;
     handle.threaded = .init(allocator, .{});
-    handle.git = rvw.provider.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+    handle.git = rvw.provider.review.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to open Git review: {s}", .{rvw.provider.git.errorMessage(err)}) catch null;
+        const message = std.fmt.allocPrint(allocator, "unable to open Git review: {s}", .{rvw.provider.review.git.errorMessage(err)}) catch null;
         if (message) |value| {
             if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
         }

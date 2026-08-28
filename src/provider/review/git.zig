@@ -1,7 +1,7 @@
 const std = @import("std");
-const model = @import("../app/model.zig");
-const provider = @import("interface.zig");
-const repository = @import("../repository.zig");
+const model = @import("../../app/model.zig");
+const review_provider = @import("interface.zig");
+const repository = @import("../../repository.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -94,7 +94,7 @@ pub const GitProvider = struct {
         self.* = undefined;
     }
 
-    pub fn interface(self: *GitProvider) provider.ReviewProvider {
+    pub fn interface(self: *GitProvider) review_provider.ReviewProvider {
         return .{ .context = self, .vtable = &vtable };
     }
 
@@ -117,7 +117,7 @@ pub const GitProvider = struct {
         return error.UnknownFile;
     }
 
-    const vtable: provider.ReviewProvider.VTable = .{
+    const vtable: review_provider.ReviewProvider.VTable = .{
         .getOverview = getOverview,
         .getFileReview = getFileReview,
     };

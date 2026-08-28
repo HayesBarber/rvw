@@ -9,9 +9,9 @@ const Io = std.Io;
 pub const Core = struct {
     allocator: Allocator,
     io: Io,
-    provider: provider_module.ReviewProvider,
+    provider: provider_module.review.ReviewProvider,
 
-    pub fn init(allocator: Allocator, io: Io, provider: provider_module.ReviewProvider) Core {
+    pub fn init(allocator: Allocator, io: Io, provider: provider_module.review.ReviewProvider) Core {
         return .{ .allocator = allocator, .io = io, .provider = provider };
     }
 
