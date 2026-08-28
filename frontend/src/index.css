@@ -118,8 +118,10 @@ textarea {
 }
 
 .copy-markdown-button:disabled {
+  border-color: #414145;
+  background: #202022;
+  color: #adadb1;
   cursor: default;
-  opacity: 0.5;
 }
 
 .pane-body {
