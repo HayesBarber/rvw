@@ -29,7 +29,7 @@ input {
 
 .review-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  grid-template-columns: 320px minmax(0, 1fr);
   width: 100%;
   min-width: 960px;
   height: 100vh;
@@ -63,8 +63,7 @@ input {
   text-overflow: ellipsis;
 }
 
-.pane-header span,
-.comment-target {
+.pane-header span {
   color: #666666;
   font-size: 0.75rem;
 }
@@ -89,26 +88,5 @@ input {
   margin: 0;
   padding: 16px;
   color: #666666;
-}
-
-.comments {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-}
-
-.comment {
-  padding: 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-}
-
-.comment p {
-  margin: 0;
-}
-
-.comment p + p {
-  margin-top: 8px;
-  line-height: 1.45;
 }
 
