@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
                 detail = String(decoding: UnsafeBufferPointer(start: pointer, count: creationError.len), as: UTF8.self)
                 rvw_buffer_free(nil, creationError)
             } else {
-                detail = "The Git review provider could not be initialized."
+                detail = "The Git diff provider could not be initialized."
             }
             let alert = NSAlert()
             alert.messageText = "Unable to open review"

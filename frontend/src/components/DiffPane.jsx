@@ -5,7 +5,7 @@ const diffOptions = {
   diffStyle: 'split',
 }
 
-export default function DiffPane({ fileReview, loading, error }) {
+export default function DiffPane({ fileDiff, loading, error }) {
   if (loading) {
     return <PaneStatus>Loading file…</PaneStatus>
   }
@@ -14,11 +14,11 @@ export default function DiffPane({ fileReview, loading, error }) {
     return <PaneStatus>{error}</PaneStatus>
   }
 
-  if (!fileReview) {
+  if (!fileDiff) {
     return <PaneStatus>Select a file to view it.</PaneStatus>
   }
 
-  if (fileReview.content.kind === 'unavailable') {
+  if (fileDiff.content.kind === 'unavailable') {
     const descriptions = {
       binary: 'Binary file contents cannot be displayed.',
       'invalid-utf8': 'This file is not valid UTF-8 text.',
@@ -26,19 +26,19 @@ export default function DiffPane({ fileReview, loading, error }) {
       symlink: 'Symbolic link changes cannot be displayed.',
       submodule: 'Submodule changes cannot be displayed.',
     }
-    return <PaneStatus>{descriptions[fileReview.content.reason]}</PaneStatus>
+    return <PaneStatus>{descriptions[fileDiff.content.reason]}</PaneStatus>
   }
 
   return (
     <Virtualizer className="diff-scroll">
-      {fileReview.content.kind === 'diff' ? (
+      {fileDiff.content.kind === 'diff' ? (
         <MultiFileDiff
-          oldFile={fileReview.content.oldFile}
-          newFile={fileReview.content.newFile}
+          oldFile={fileDiff.content.oldFile}
+          newFile={fileDiff.content.newFile}
           options={diffOptions}
         />
       ) : (
-        <File file={fileReview.content.file} />
+        <File file={fileDiff.content.file} />
       )}
     </Virtualizer>
   )

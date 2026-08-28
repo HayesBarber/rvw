@@ -10,14 +10,14 @@ pub const FileStatus = enum {
 
 pub const Repository = struct { name: []const u8 };
 
-pub const ReviewSource = union(enum) {
+pub const DiffSource = union(enum) {
     working_tree: struct { base: []const u8 },
     commit_range: struct {
         base: []const u8,
         head: []const u8,
     },
 
-    pub fn jsonStringify(self: ReviewSource, writer: *std.json.Stringify) !void {
+    pub fn jsonStringify(self: DiffSource, writer: *std.json.Stringify) !void {
         try writer.beginObject();
         switch (self) {
             .working_tree => |source| {
@@ -39,19 +39,12 @@ pub const ReviewSource = union(enum) {
     }
 };
 
-pub const Review = struct {
-    id: []const u8,
-    repository: Repository,
-    source: ReviewSource,
-};
-
 pub const FileSummary = struct {
     path: []const u8,
     previousPath: ?[]const u8 = null,
     status: FileStatus,
     additions: ?usize,
     deletions: ?usize,
-    commentCount: usize,
 };
 
 pub const UnavailableReason = enum {
@@ -109,17 +102,18 @@ pub const CommentTarget = union(enum) {
     }
 };
 
-pub const ReviewComment = struct {
+pub const Comment = struct {
     id: []const u8,
     body: []const u8,
     target: CommentTarget,
 };
 
-pub const ReviewOverview = struct {
-    review: Review,
+pub const DiffOverview = struct {
+    id: []const u8,
+    repository: Repository,
+    source: DiffSource,
     initialPath: ?[]const u8,
     files: []const FileSummary,
-    comments: []const ReviewComment,
 };
 
 pub const FileContents = struct {
@@ -180,7 +174,7 @@ pub const FileContent = union(enum) {
     }
 };
 
-pub const FileReview = struct {
+pub const FileDiff = struct {
     path: []const u8,
     previousPath: ?[]const u8 = null,
     status: FileStatus,
@@ -188,34 +182,34 @@ pub const FileReview = struct {
 };
 
 pub const Request = union(enum) {
-    get_review_overview,
-    get_file_review: struct {
-        review_id: []const u8,
+    get_diff_overview,
+    get_file_diff: struct {
+        diff_id: []const u8,
         path: []const u8,
     },
 };
 
 pub const Response = union(enum) {
-    review_overview: ReviewOverview,
-    file_review: FileReview,
+    diff_overview: DiffOverview,
+    file_diff: FileDiff,
 };
 
 pub const AppError = error{
-    UnknownReview,
+    UnknownDiff,
     UnknownFile,
 };
 
 pub const ErrorCode = enum {
     malformed_request,
     unknown_operation,
-    unknown_review,
+    unknown_diff,
     unknown_file,
     internal_error,
 };
 
 pub fn errorCode(err: anyerror) ErrorCode {
     return switch (err) {
-        error.UnknownReview => .unknown_review,
+        error.UnknownDiff => .unknown_diff,
         error.UnknownFile => .unknown_file,
         else => .internal_error,
     };
@@ -225,7 +219,7 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
     return switch (code) {
         .malformed_request => "Malformed request",
         .unknown_operation => "Unknown operation",
-        .unknown_review => "Unknown review",
+        .unknown_diff => "Unknown diff",
         .unknown_file => "Unknown file",
         .internal_error => "Internal error",
     };

@@ -16,9 +16,9 @@ typedef struct rvw_buffer {
 } rvw_buffer;
 
 /*
- * Creates an independent, thread-safe Git review snapshot. `directory` must
+ * Creates an independent, thread-safe Git diff snapshot. `directory` must
  * identify a Git worktree root. `range` is either NULL for a working-tree
- * review or a two-commit expression such as "main..feature". On failure,
+ * diff or a two-commit expression such as "main..feature". On failure,
  * `error_out` receives UTF-8 text that may be freed with rvw_buffer_free(NULL,
  * ...).
  */
@@ -26,7 +26,7 @@ rvw_core *rvw_core_create(const char *directory, const char *range, rvw_buffer *
 
 /*
  * Dispatches a length-delimited UTF-8 JSON request. Supported request types are
- * get_review_overview and get_file_review. Every non-empty result is a JSON
+ * get_diff_overview and get_file_diff. Every non-empty result is a JSON
  * envelope containing either {"ok":true,"data":...} or
  * {"ok":false,"error":{"code":...,"message":...}}.
  */
