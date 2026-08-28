@@ -110,6 +110,13 @@ textarea {
   color: #adadb1;
 }
 
+.fatal-error {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .comment-composer,
 .saved-comment {
   width: min(720px, calc(100% - 32px));
