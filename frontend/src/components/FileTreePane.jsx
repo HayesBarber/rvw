@@ -20,7 +20,7 @@ export default function FileTreePane({ files, selectedPath, onSelectFile }) {
   const { model } = useFileTree({
     paths: files.map((file) => file.path),
     gitStatus,
-    initialExpandedPaths: ['src', 'src/app'],
+    initialExpansion: 'open',
     initialSelectedPaths: [selectedPath],
   })
   const selectedPaths = useFileTreeSelection(model)
@@ -34,4 +34,3 @@ export default function FileTreePane({ files, selectedPath, onSelectFile }) {
 
   return <FileTree model={model} className="file-tree" />
 }
-
