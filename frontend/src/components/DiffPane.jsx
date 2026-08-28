@@ -1,11 +1,276 @@
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 import PaneStatus from './PaneStatus.jsx'
 
-const diffOptions = {
+const baseOptions = {
   diffStyle: 'split',
+  enableGutterUtility: true,
+  enableLineSelection: true,
+  lineHoverHighlight: 'line',
 }
 
-export default function DiffPane({ fileDiff, loading, error }) {
+function normalizeRange(path, range, isDiff) {
+  const startSide = range.side ?? range.endSide ?? 'additions'
+  const endSide = range.endSide ?? startSide
+  const crossesSides = isDiff && startSide !== endSide
+  const startLine = crossesSides ? range.end : Math.min(range.start, range.end)
+  const endLine = crossesSides ? range.end : Math.max(range.start, range.end)
+  const side = endSide
+
+  return {
+    annotationSide: side,
+    selection: isDiff
+      ? { start: startLine, end: endLine, side, endSide: side }
+      : { start: startLine, end: endLine },
+    target: {
+      kind: 'line',
+      path,
+      side: side === 'deletions' ? 'old' : 'new',
+      startLine,
+      endLine,
+    },
+  }
+}
+
+function targetLabel(target) {
+  const side = target.side === 'old' ? 'old' : 'new'
+  const lines = target.startLine === target.endLine
+    ? `line ${target.startLine}`
+    : `lines ${target.startLine}–${target.endLine}`
+  return `Comment on ${side} ${lines}`
+}
+
+function CommentComposer({ target, onCancel, onCreate }) {
+  const [body, setBody] = useState('')
+  const [error, setError] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const formRef = useRef(null)
+  const textareaRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const scrollContainer = textarea.closest('.diff-scroll')
+    const scrollPosition = scrollContainer
+      ? { left: scrollContainer.scrollLeft, top: scrollContainer.scrollTop }
+      : null
+
+    textarea.focus({ preventScroll: true })
+
+    // WebKit can still move an overflow container when focus enters content
+    // rendered through a shadow-root slot, despite preventScroll.
+    if (scrollContainer && scrollPosition) {
+      scrollContainer.scrollLeft = scrollPosition.left
+      scrollContainer.scrollTop = scrollPosition.top
+    }
+  }, [])
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    const nextBody = body.trim()
+    if (!nextBody || saving) return
+
+    setSaving(true)
+    setError(null)
+    try {
+      await onCreate(nextBody, target)
+      onCancel()
+    } catch (nextError) {
+      setError(nextError.message)
+      setSaving(false)
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'Escape' && !saving) {
+      event.preventDefault()
+      onCancel()
+    } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault()
+      formRef.current?.requestSubmit()
+    }
+  }
+
+  return (
+    <form
+      ref={formRef}
+      className="comment-composer"
+      data-vim-ignore
+      onSubmit={handleSubmit}
+    >
+      <label className="comment-target" htmlFor="comment-body">
+        {targetLabel(target)}
+      </label>
+      <textarea
+        ref={textareaRef}
+        id="comment-body"
+        rows="4"
+        value={body}
+        placeholder="Leave a comment"
+        disabled={saving}
+        onChange={(event) => setBody(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      {error && <p className="comment-error" role="alert">{error}</p>}
+      <div className="comment-actions">
+        <span>⌘↵ to submit</span>
+        <button type="button" disabled={saving} onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" disabled={saving || body.trim().length === 0}>
+          {saving ? 'Saving…' : 'Comment'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function SavedComment({ comment }) {
+  const lineLabel = comment.target.kind === 'line'
+    ? (comment.target.startLine === comment.target.endLine
+        ? `Line ${comment.target.startLine}`
+        : `Lines ${comment.target.startLine}–${comment.target.endLine}`)
+    : 'File comment'
+
+  return (
+    <article className="saved-comment">
+      <header>{lineLabel}</header>
+      <p>{comment.body}</p>
+    </article>
+  )
+}
+
+function commentAnnotation(comment, isDiff, fallbackSide) {
+  const lineNumber = comment.target.kind === 'line' ? comment.target.endLine : 0
+  const metadata = { kind: 'comment', comment }
+  if (!isDiff) return { lineNumber, metadata }
+
+  const side = comment.target.kind === 'line'
+    ? (comment.target.side === 'old' ? 'deletions' : 'additions')
+    : fallbackSide
+  return { lineNumber, side, metadata }
+}
+
+export default function DiffPane({
+  fileDiff,
+  loading,
+  error,
+  comments,
+  onCreateComment,
+}) {
+  const [draft, setDraft] = useState(null)
+  const [selectedLines, setSelectedLines] = useState(null)
+  const renderedFileRef = useRef(null)
+  const scrollGuardRef = useRef(null)
+
+  const finishScrollGuard = useCallback(() => {
+    const guard = scrollGuardRef.current
+    if (!guard) return
+
+    // Force WebKit to resolve the rebuilt layout while the old height is
+    // still pinned, then restore the exact viewport before releasing it.
+    guard.pre.offsetHeight
+    guard.scrollContainer.scrollLeft = guard.left
+    guard.scrollContainer.scrollTop = guard.top
+    guard.pre.style.minHeight = guard.previousMinHeight
+    scrollGuardRef.current = null
+  }, [])
+
+  const handlePostRender = useCallback((node, _instance, phase) => {
+    if (phase === 'unmount') {
+      finishScrollGuard()
+      renderedFileRef.current = null
+      return
+    }
+
+    renderedFileRef.current = node
+    finishScrollGuard()
+  }, [finishScrollGuard])
+
+  const guardNextAnnotationRender = useCallback(() => {
+    if (scrollGuardRef.current) return
+
+    const node = renderedFileRef.current
+    const pre = node?.shadowRoot?.querySelector('pre')
+    const scrollContainer = node?.closest('.diff-scroll')
+    const height = pre?.offsetHeight ?? 0
+    if (!pre || !scrollContainer || height === 0) return
+
+    scrollGuardRef.current = {
+      left: scrollContainer.scrollLeft,
+      top: scrollContainer.scrollTop,
+      pre,
+      previousMinHeight: pre.style.minHeight,
+      scrollContainer,
+    }
+    pre.style.minHeight = `${height}px`
+  }, [])
+
+  const isDiff = fileDiff?.content.kind === 'diff'
+  const beginComment = useCallback((range) => {
+    if (!fileDiff || !range) return
+    const nextDraft = normalizeRange(fileDiff.path, range, isDiff)
+    guardNextAnnotationRender()
+    setSelectedLines(nextDraft.selection)
+    setDraft(nextDraft)
+  }, [fileDiff, guardNextAnnotationRender, isDiff])
+
+  const cancelComment = useCallback(() => {
+    guardNextAnnotationRender()
+    setDraft(null)
+    setSelectedLines(null)
+  }, [guardNextAnnotationRender])
+
+  const createComment = useCallback((body, target) => (
+    onCreateComment(body, target, guardNextAnnotationRender)
+  ), [guardNextAnnotationRender, onCreateComment])
+
+  const options = useMemo(() => ({
+    ...baseOptions,
+    onGutterUtilityClick: beginComment,
+    onLineSelected: setSelectedLines,
+    onLineSelectionChange: setSelectedLines,
+    onLineSelectionEnd: setSelectedLines,
+    onPostRender: handlePostRender,
+  }), [beginComment, handlePostRender])
+
+  const lineAnnotations = useMemo(() => {
+    if (!fileDiff) return []
+    const fallbackSide = fileDiff.content.kind === 'diff' && !fileDiff.content.newFile
+      ? 'deletions'
+      : 'additions'
+    const nextAnnotations = comments
+      .filter((comment) => comment.target.path === fileDiff.path)
+      .map((comment) => commentAnnotation(comment, isDiff, fallbackSide))
+
+    if (draft) {
+      const annotation = {
+        lineNumber: draft.target.endLine,
+        metadata: { kind: 'draft', draft },
+      }
+      nextAnnotations.push(isDiff
+        ? { ...annotation, side: draft.annotationSide }
+        : annotation)
+    }
+    return nextAnnotations
+  }, [comments, draft, fileDiff, isDiff])
+
+  const renderAnnotation = useCallback((annotation) => {
+    if (annotation.metadata.kind === 'draft') {
+      const { target } = annotation.metadata.draft
+      return (
+        <CommentComposer
+          key={`${target.side}:${target.startLine}:${target.endLine}`}
+          target={target}
+          onCancel={cancelComment}
+          onCreate={createComment}
+        />
+      )
+    }
+    return <SavedComment comment={annotation.metadata.comment} />
+  }, [cancelComment, createComment])
+
   if (loading) {
     return <PaneStatus>Loading file…</PaneStatus>
   }
@@ -35,10 +300,19 @@ export default function DiffPane({ fileDiff, loading, error }) {
         <MultiFileDiff
           oldFile={fileDiff.content.oldFile}
           newFile={fileDiff.content.newFile}
-          options={diffOptions}
+          lineAnnotations={lineAnnotations}
+          selectedLines={selectedLines}
+          renderAnnotation={renderAnnotation}
+          options={options}
         />
       ) : (
-        <File file={fileDiff.content.file} />
+        <File
+          file={fileDiff.content.file}
+          lineAnnotations={lineAnnotations}
+          selectedLines={selectedLines}
+          renderAnnotation={renderAnnotation}
+          options={options}
+        />
       )}
     </Virtualizer>
   )

@@ -6,6 +6,7 @@ const allocator = std.heap.page_allocator;
 const RvwCore = struct {
     threaded: std.Io.Threaded,
     git: rvw.provider.diff.git.GitProvider,
+    comments: rvw.provider.comment.memory.MemoryProvider,
     core: rvw.core.Core,
 };
 
@@ -36,7 +37,13 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    handle.core = rvw.core.Core.init(allocator, handle.threaded.io(), handle.git.interface());
+    handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
+    handle.core = rvw.core.Core.init(
+        allocator,
+        handle.threaded.io(),
+        handle.git.interface(),
+        handle.comments.interface(),
+    );
     return handle;
 }
 
@@ -62,6 +69,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
+    core.comments.deinit();
     core.git.deinit();
     core.threaded.deinit();
     allocator.destroy(core);

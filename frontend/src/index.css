@@ -24,7 +24,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -98,9 +99,122 @@ input {
   overflow: auto;
 }
 
+.diff-pane > .pane-body {
+  overflow: hidden;
+}
+
 .pane-status,
 .fatal-error {
   margin: 0;
   padding: 16px;
   color: #adadb1;
+}
+
+.comment-composer,
+.saved-comment {
+  width: min(720px, calc(100% - 32px));
+  margin: 12px 16px;
+  border: 1px solid #303033;
+  border-radius: 7px;
+  background: #141415;
+  color: #fafafa;
+  font-family: system-ui, sans-serif;
+}
+
+.comment-composer {
+  padding: 12px;
+}
+
+.comment-target,
+.saved-comment header {
+  display: block;
+  margin-bottom: 8px;
+  color: #adadb1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.comment-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  outline: none;
+  background: #0a0a0a;
+  color: #fafafa;
+  line-height: 1.45;
+}
+
+.comment-composer textarea:focus {
+  border-color: #69b1ff;
+  box-shadow: 0 0 0 1px #69b1ff;
+}
+
+.comment-composer textarea::placeholder {
+  color: #737378;
+}
+
+.comment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.comment-actions span {
+  margin-right: auto;
+  color: #737378;
+  font-size: 0.7rem;
+}
+
+.comment-actions button {
+  padding: 5px 10px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.comment-actions button[type='submit'] {
+  border-color: #3778c2;
+  background: #2463a8;
+}
+
+.comment-actions button:hover:not(:disabled) {
+  background: #303033;
+}
+
+.comment-actions button[type='submit']:hover:not(:disabled) {
+  background: #2d74c4;
+}
+
+.comment-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.comment-error {
+  margin: 8px 0 0;
+  color: #ff6762;
+  font-size: 0.75rem;
+}
+
+.saved-comment {
+  padding: 12px 14px;
+}
+
+.saved-comment header {
+  margin-bottom: 4px;
+  color: #fafafa;
+}
+
+.saved-comment p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
