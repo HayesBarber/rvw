@@ -35,12 +35,16 @@
  * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents } | { kind: 'unavailable', reason: 'binary' | 'invalid-utf8' | 'too-large' | 'symlink' | 'submodule' }} content
  */
 
-async function getJson(url, nativeRequest) {
+async function requestJson(url, nativeRequest, options = {}) {
   const native = window.webkit?.messageHandlers?.native
   if (native) return native.postMessage(nativeRequest)
 
   const response = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...options.headers,
+    },
   })
 
   let body
@@ -62,7 +66,7 @@ async function getJson(url, nativeRequest) {
  * @returns {Promise<DiffOverview>}
  */
 export async function getDiffOverview() {
-  return getJson('/api/diffs/active', { type: 'get_diff_overview' })
+  return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
 /**
@@ -72,8 +76,38 @@ export async function getDiffOverview() {
  * @returns {Promise<FileDiff>}
  */
 export async function getFileDiff(diffId, path) {
-  return getJson(
+  return requestJson(
     `/api/diffs/${encodeURIComponent(diffId)}/files?path=${encodeURIComponent(path)}`,
     { type: 'get_file_diff', diffId, path },
   )
+}
+
+/**
+ * @typedef {Object} Comment
+ * @property {string} id
+ * @property {string} body
+ * @property {{ kind: 'file', path: string } | { kind: 'line', path: string, side: 'old' | 'new', startLine: number, endLine: number }} target
+ */
+
+/**
+ * Loads every comment for the active review.
+ * @returns {Promise<Comment[]>}
+ */
+export async function getComments() {
+  return requestJson('/api/comments', { type: 'get_comments' })
+}
+
+/**
+ * Creates a comment for the active review.
+ * @param {string} body
+ * @param {Comment['target']} target
+ * @returns {Promise<Comment>}
+ */
+export async function createComment(body, target) {
+  const request = { type: 'create_comment', body, target }
+  return requestJson('/api/comments', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
 }

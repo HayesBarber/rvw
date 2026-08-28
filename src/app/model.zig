@@ -187,16 +187,24 @@ pub const Request = union(enum) {
         diff_id: []const u8,
         path: []const u8,
     },
+    get_comments,
+    create_comment: struct {
+        body: []const u8,
+        target: CommentTarget,
+    },
 };
 
 pub const Response = union(enum) {
     diff_overview: DiffOverview,
     file_diff: FileDiff,
+    comments: []const Comment,
+    comment: Comment,
 };
 
 pub const AppError = error{
     UnknownDiff,
     UnknownFile,
+    InvalidComment,
 };
 
 pub const ErrorCode = enum {
@@ -211,6 +219,7 @@ pub fn errorCode(err: anyerror) ErrorCode {
     return switch (err) {
         error.UnknownDiff => .unknown_diff,
         error.UnknownFile => .unknown_file,
+        error.InvalidComment => .malformed_request,
         else => .internal_error,
     };
 }

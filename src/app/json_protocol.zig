@@ -8,6 +8,8 @@ pub fn encodeResponse(allocator: Allocator, response: model.Response) ![]u8 {
     return switch (response) {
         .diff_overview => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
         .file_diff => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .comments => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .comment => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
     };
 }
 
@@ -23,25 +25,10 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
     };
     defer parsed.deinit();
 
-    const object = switch (parsed.value) {
-        .object => |object| object,
-        else => return encodeEnvelopeError(allocator, .malformed_request),
-    };
-    const operation_value = object.get("type") orelse return encodeEnvelopeError(allocator, .malformed_request);
-    const operation = switch (operation_value) {
-        .string => |value| value,
-        else => return encodeEnvelopeError(allocator, .malformed_request),
-    };
-
-    const request: model.Request = if (std.mem.eql(u8, operation, "get_diff_overview"))
-        .get_diff_overview
-    else if (std.mem.eql(u8, operation, "get_file_diff")) blk: {
-        const diff_id = jsonString(object.get("diffId")) orelse
-            return encodeEnvelopeError(allocator, .malformed_request);
-        const path = jsonString(object.get("path")) orelse
-            return encodeEnvelopeError(allocator, .malformed_request);
-        break :blk .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
-    } else return encodeEnvelopeError(allocator, .unknown_operation);
+    const request = decodeRequestValue(parsed.value) catch |err| return encodeEnvelopeError(
+        allocator,
+        if (err == error.UnknownOperation) .unknown_operation else .malformed_request,
+    );
 
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
@@ -49,7 +36,33 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
     return switch (response) {
         .diff_overview => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
         .file_diff => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .comments => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .comment => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
+}
+
+pub const DecodeError = error{ MalformedRequest, UnknownOperation };
+
+pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
+    const object = switch (value) {
+        .object => |object| object,
+        else => return error.MalformedRequest,
+    };
+    const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
+
+    if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
+    if (std.mem.eql(u8, operation, "get_file_diff")) {
+        const diff_id = jsonString(object.get("diffId")) orelse return error.MalformedRequest;
+        const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
+        return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
+    }
+    if (std.mem.eql(u8, operation, "get_comments")) return .get_comments;
+    if (std.mem.eql(u8, operation, "create_comment")) {
+        const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
+        const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
+        return .{ .create_comment = .{ .body = body, .target = target } };
+    }
+    return error.UnknownOperation;
 }
 
 fn jsonString(value: ?std.json.Value) ?[]const u8 {
@@ -57,6 +70,41 @@ fn jsonString(value: ?std.json.Value) ?[]const u8 {
         .string => |string| string,
         else => null,
     };
+}
+
+fn jsonUnsigned(value: ?std.json.Value) ?usize {
+    return switch (value orelse return null) {
+        .integer => |integer| if (integer >= 0) @intCast(integer) else null,
+        else => null,
+    };
+}
+
+fn parseCommentTarget(value: ?std.json.Value) ?model.CommentTarget {
+    const object = switch (value orelse return null) {
+        .object => |object| object,
+        else => return null,
+    };
+    const kind = jsonString(object.get("kind")) orelse return null;
+    const path = jsonString(object.get("path")) orelse return null;
+    if (std.mem.eql(u8, kind, "file")) return .{ .file = .{ .path = path } };
+    if (!std.mem.eql(u8, kind, "line")) return null;
+
+    const side_value = jsonString(object.get("side")) orelse return null;
+    const start_line = jsonUnsigned(object.get("startLine")) orelse return null;
+    const end_line = jsonUnsigned(object.get("endLine")) orelse return null;
+    if (std.mem.eql(u8, side_value, "old")) return .{ .line = .{
+        .path = path,
+        .side = .old,
+        .startLine = start_line,
+        .endLine = end_line,
+    } };
+    if (std.mem.eql(u8, side_value, "new")) return .{ .line = .{
+        .path = path,
+        .side = .new,
+        .startLine = start_line,
+        .endLine = end_line,
+    } };
+    return null;
 }
 
 fn encodeEnvelopeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {

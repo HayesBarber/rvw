@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getDiffOverview, getFileDiff } from './api.js'
+import {
+  createComment,
+  getComments,
+  getDiffOverview,
+  getFileDiff,
+} from './api.js'
 import DiffPane from './components/DiffPane.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
 
@@ -7,6 +12,7 @@ export default function App() {
   const [overview, setOverview] = useState(null)
   const [selectedPath, setSelectedPath] = useState(null)
   const [overviewError, setOverviewError] = useState(null)
+  const [comments, setComments] = useState([])
   const [fileRequest, setFileRequest] = useState({
     path: null,
     data: null,
@@ -24,6 +30,14 @@ export default function App() {
       })
       .catch((error) => {
         if (active) setOverviewError(error.message)
+      })
+
+    getComments()
+      .then((nextComments) => {
+        if (active) setComments(nextComments)
+      })
+      .catch(() => {
+        // Comments can still be created if the initial list request fails.
       })
 
     return () => {
@@ -77,6 +91,16 @@ export default function App() {
   const fileDiff = fileLoading ? null : fileRequest.data
   const fileError = fileLoading ? null : fileRequest.error
 
+  async function handleCreateComment(body, target) {
+    const comment = await createComment(body, target)
+    setComments((current) => (
+      current.some((existing) => existing.id === comment.id)
+        ? current
+        : [...current, comment]
+    ))
+    return comment
+  }
+
   return (
     <main className="review-shell">
       <section className="pane tree-pane">
@@ -98,9 +122,12 @@ export default function App() {
         </header>
         <div className="pane-body">
           <DiffPane
+            key={selectedPath}
             fileDiff={fileDiff}
             loading={fileLoading}
             error={fileError}
+            comments={comments}
+            onCreateComment={handleCreateComment}
           />
         </div>
       </section>

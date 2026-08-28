@@ -43,6 +43,11 @@ const Handler = struct {
         res.body = try json_protocol.encodeResponse(res.arena, response);
     }
 
+    fn dispatchCreated(self: *Handler, res: *httpz.Response, request: model.Request) !void {
+        try self.dispatchRequest(res, request);
+        if (res.status < 400) res.status = @intFromEnum(std.http.Status.created);
+    }
+
     fn failure(_: *Handler, res: *httpz.Response, status: std.http.Status, code: model.ErrorCode) !void {
         setJsonHeaders(res);
         res.status = @intFromEnum(status);
@@ -71,6 +76,24 @@ fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !vo
     } });
 }
 
+fn getComments(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .get_comments);
+}
+
+fn createComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .create_comment => return handler.dispatchCreated(res, request),
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
 pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dispatcher, address: std.Io.net.IpAddress) !void {
     var handler: Handler = .{ .dispatcher = dispatcher };
     var server = try httpz.Server(*Handler).init(io, allocator, .{ .address = .{ .ip = address } }, &handler);
@@ -80,6 +103,8 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     const router = try server.router(.{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
+    router.get("/api/comments", getComments, .{});
+    router.post("/api/comments", createComment, .{});
 
     std.log.info("rvw listening on http://{f}", .{address});
     try server.listen();

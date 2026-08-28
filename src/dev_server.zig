@@ -33,7 +33,9 @@ pub fn main(init: std.process.Init) !void {
         return err;
     };
     defer git.deinit();
-    var core = rvw.core.Core.init(init.gpa, init.io, git.interface());
+    var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
+    defer comments.deinit();
+    var core = rvw.core.Core.init(init.gpa, init.io, git.interface(), comments.interface());
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
 }
