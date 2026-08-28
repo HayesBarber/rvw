@@ -106,16 +106,15 @@ textarea {
 
 .copy-markdown-button {
   padding: 5px 10px;
-  border: 1px solid #414145;
+  border: 1px solid #3da765;
   border-radius: 5px;
-  background: #202022;
+  background: #246b3d;
   color: #fafafa;
   cursor: pointer;
 }
 
 .copy-markdown-button:hover:not(:disabled) {
-  border-color: #56565b;
-  background: #303033;
+  background: #2d8049;
 }
 
 .copy-markdown-button:disabled {
