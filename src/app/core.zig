@@ -1,7 +1,7 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
-const provider_module = @import("provider.zig");
+const provider_module = @import("../provider.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;

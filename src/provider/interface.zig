@@ -1,5 +1,5 @@
 const std = @import("std");
-const model = @import("model.zig");
+const model = @import("../app/model.zig");
 
 const Io = std.Io;
 

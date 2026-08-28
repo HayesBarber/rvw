@@ -1,6 +1,6 @@
 const std = @import("std");
-const model = @import("model.zig");
-const provider = @import("provider.zig");
+const model = @import("../app/model.zig");
+const provider = @import("interface.zig");
 const repository = @import("../repository.zig");
 
 const Allocator = std.mem.Allocator;
