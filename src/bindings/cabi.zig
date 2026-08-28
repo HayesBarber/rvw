@@ -7,6 +7,7 @@ const RvwCore = struct {
     threaded: std.Io.Threaded,
     git: rvw.provider.diff.git.GitProvider,
     comments: rvw.provider.comment.memory.MemoryProvider,
+    clipboard: rvw.output.SystemClipboard,
     core: rvw.core.Core,
 };
 
@@ -38,11 +39,13 @@ pub export fn rvw_core_create(
         return null;
     };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
+    handle.clipboard = .{};
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),
         handle.git.interface(),
         handle.comments.interface(),
+        handle.clipboard.interface(),
     );
     return handle;
 }

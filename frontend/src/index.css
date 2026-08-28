@@ -84,6 +84,43 @@ textarea {
   font-size: 0.75rem;
 }
 
+.review-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.copy-status.success {
+  color: #63d488;
+}
+
+.copy-status.error {
+  max-width: 300px;
+  overflow: hidden;
+  color: #ff6762;
+  text-overflow: ellipsis;
+}
+
+.copy-markdown-button {
+  padding: 5px 10px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.copy-markdown-button:hover:not(:disabled) {
+  border-color: #56565b;
+  background: #303033;
+}
+
+.copy-markdown-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .pane-body {
   height: calc(100vh - 44px);
   min-height: 0;

@@ -188,10 +188,15 @@ pub const Request = union(enum) {
         path: []const u8,
     },
     get_comments,
+    copy_comments_as_markdown,
     create_comment: struct {
         body: []const u8,
         target: CommentTarget,
     },
+};
+
+pub const CopyCommentsResult = struct {
+    commentCount: usize,
 };
 
 pub const Response = union(enum) {
@@ -199,12 +204,14 @@ pub const Response = union(enum) {
     file_diff: FileDiff,
     comments: []const Comment,
     comment: Comment,
+    copy_comments_result: CopyCommentsResult,
 };
 
 pub const AppError = error{
     UnknownDiff,
     UnknownFile,
     InvalidComment,
+    NoComments,
 };
 
 pub const ErrorCode = enum {
@@ -212,6 +219,8 @@ pub const ErrorCode = enum {
     unknown_operation,
     unknown_diff,
     unknown_file,
+    no_comments,
+    clipboard_unavailable,
     internal_error,
 };
 
@@ -220,6 +229,12 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.UnknownDiff => .unknown_diff,
         error.UnknownFile => .unknown_file,
         error.InvalidComment => .malformed_request,
+        error.NoComments => .no_comments,
+        error.ClipboardCommandFailed,
+        error.ClipboardToolNotFound,
+        error.ClipboardWriteFailed,
+        error.UnsupportedPlatform,
+        => .clipboard_unavailable,
         else => .internal_error,
     };
 }
@@ -230,6 +245,19 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .unknown_operation => "Unknown operation",
         .unknown_diff => "Unknown diff",
         .unknown_file => "Unknown file",
+        .no_comments => "No review comments to copy",
+        .clipboard_unavailable => "Unable to copy review comments to the clipboard",
         .internal_error => "Internal error",
     };
+}
+
+test "clipboard failures have a user-facing error" {
+    try std.testing.expectEqual(
+        ErrorCode.clipboard_unavailable,
+        errorCode(error.ClipboardCommandFailed),
+    );
+    try std.testing.expectEqualStrings(
+        "Unable to copy review comments to the clipboard",
+        errorMessage(.clipboard_unavailable),
+    );
 }

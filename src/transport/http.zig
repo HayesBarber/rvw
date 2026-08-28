@@ -35,6 +35,7 @@ const Handler = struct {
             const code = model.errorCode(err);
             const status: std.http.Status = switch (code) {
                 .unknown_diff, .unknown_file => .not_found,
+                .malformed_request, .no_comments => .bad_request,
                 else => .internal_server_error,
             };
             return self.failure(res, status, code);
@@ -94,6 +95,20 @@ fn createComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
     }
 }
 
+fn copyCommentsAsMarkdown(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .copy_comments_as_markdown => return handler.dispatchRequest(res, request),
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
 pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dispatcher, address: std.Io.net.IpAddress) !void {
     var handler: Handler = .{ .dispatcher = dispatcher };
     var server = try httpz.Server(*Handler).init(io, allocator, .{ .address = .{ .ip = address } }, &handler);
@@ -105,6 +120,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
     router.get("/api/comments", getComments, .{});
     router.post("/api/comments", createComment, .{});
+    router.post("/api/comments/copy-markdown", copyCommentsAsMarkdown, .{});
 
     std.log.info("rvw listening on http://{f}", .{address});
     try server.listen();

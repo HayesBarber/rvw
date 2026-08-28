@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  copyCommentsAsMarkdown,
   createComment,
   getComments,
   getDiffOverview,
@@ -13,6 +14,7 @@ export default function App() {
   const [selectedPath, setSelectedPath] = useState(null)
   const [overviewError, setOverviewError] = useState(null)
   const [comments, setComments] = useState([])
+  const [copyState, setCopyState] = useState({ status: 'idle', message: '' })
   const [fileRequest, setFileRequest] = useState({
     path: null,
     data: null,
@@ -99,7 +101,22 @@ export default function App() {
         ? current
         : [...current, comment]
     ))
+    setCopyState({ status: 'idle', message: '' })
     return comment
+  }
+
+  async function handleCopyComments() {
+    setCopyState({ status: 'pending', message: 'Copying…' })
+    try {
+      const result = await copyCommentsAsMarkdown()
+      const suffix = result.commentCount === 1 ? 'comment' : 'comments'
+      setCopyState({
+        status: 'success',
+        message: `Copied ${result.commentCount} ${suffix}`,
+      })
+    } catch (error) {
+      setCopyState({ status: 'error', message: error.message })
+    }
   }
 
   return (
@@ -120,6 +137,25 @@ export default function App() {
       <section className="pane diff-pane">
         <header className="pane-header">
           <strong>{selectedPath}</strong>
+          <div className="review-actions">
+            {copyState.message && (
+              <span
+                className={`copy-status ${copyState.status}`}
+                role={copyState.status === 'error' ? 'alert' : 'status'}
+              >
+                {copyState.message}
+              </span>
+            )}
+            <button
+              className="copy-markdown-button"
+              type="button"
+              disabled={comments.length === 0 || copyState.status === 'pending'}
+              title={comments.length === 0 ? 'Add a comment before copying' : undefined}
+              onClick={handleCopyComments}
+            >
+              Copy as Markdown
+            </button>
+          </div>
         </header>
         <div className="pane-body">
           <DiffPane
