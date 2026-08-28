@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { getFileReview, getReviewOverview } from './api.js'
 import DiffPane from './components/DiffPane.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
-import ReviewPane from './components/ReviewPane.jsx'
 
 export default function App() {
   const [overview, setOverview] = useState(null)
@@ -103,16 +102,6 @@ export default function App() {
             loading={fileLoading}
             error={fileError}
           />
-        </div>
-      </section>
-
-      <section className="pane review-pane">
-        <header className="pane-header">
-          <strong>Review</strong>
-          <span>{overview.comments.length} comments</span>
-        </header>
-        <div className="pane-body">
-          <ReviewPane comments={overview.comments} />
         </div>
       </section>
     </main>
