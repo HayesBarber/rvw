@@ -5,7 +5,7 @@ const allocator = std.heap.page_allocator;
 
 const RvwCore = struct {
     threaded: std.Io.Threaded,
-    fixture: rvw.fixture_provider.FixtureProvider,
+    git: rvw.git_provider.GitProvider,
     core: rvw.core.Core,
 };
 
@@ -14,11 +14,29 @@ pub const RvwBuffer = extern struct {
     len: usize,
 };
 
-pub export fn rvw_core_create() callconv(.c) ?*RvwCore {
+pub export fn rvw_core_create(
+    directory_ptr: ?[*:0]const u8,
+    range_ptr: ?[*:0]const u8,
+    error_out: ?*RvwBuffer,
+) callconv(.c) ?*RvwCore {
+    if (error_out) |output| output.* = emptyBuffer();
+    const directory = std.mem.span(directory_ptr orelse {
+        setCreationError(error_out, "missing repository directory");
+        return null;
+    });
+    const range: ?[]const u8 = if (range_ptr) |value| std.mem.span(value) else null;
     const handle = allocator.create(RvwCore) catch return null;
     handle.threaded = .init(allocator, .{});
-    handle.fixture = .{};
-    handle.core = rvw.core.Core.init(allocator, handle.threaded.io(), handle.fixture.interface());
+    handle.git = rvw.git_provider.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+        handle.threaded.deinit();
+        const message = std.fmt.allocPrint(allocator, "unable to open Git review: {s}", .{rvw.git_provider.errorMessage(err)}) catch null;
+        if (message) |value| {
+            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
+        }
+        allocator.destroy(handle);
+        return null;
+    };
+    handle.core = rvw.core.Core.init(allocator, handle.threaded.io(), handle.git.interface());
     return handle;
 }
 
@@ -44,10 +62,17 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
+    core.git.deinit();
     core.threaded.deinit();
     allocator.destroy(core);
 }
 
 fn emptyBuffer() RvwBuffer {
     return .{ .ptr = null, .len = 0 };
+}
+
+fn setCreationError(error_out: ?*RvwBuffer, message: []const u8) void {
+    const output = error_out orelse return;
+    const owned = allocator.dupe(u8, message) catch return;
+    output.* = .{ .ptr = owned.ptr, .len = owned.len };
 }

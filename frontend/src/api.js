@@ -1,20 +1,21 @@
 /**
- * @typedef {'modified' | 'added' | 'deleted' | 'unchanged'} FileStatus
+ * @typedef {'modified' | 'added' | 'deleted' | 'renamed' | 'unchanged'} FileStatus
  */
 
 /**
  * @typedef {Object} FileSummary
  * @property {string} path Canonical repository-relative path.
+ * @property {string | null} previousPath
  * @property {FileStatus} status
- * @property {number} additions
- * @property {number} deletions
+ * @property {number | null} additions
+ * @property {number | null} deletions
  * @property {number} commentCount
  */
 
 /**
  * @typedef {Object} ReviewOverview
- * @property {{ id: string, repository: { name: string }, source: { kind: 'working-tree', base: string } }} review
- * @property {string} initialPath
+ * @property {{ id: string, repository: { name: string }, source: { kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string } }} review
+ * @property {string | null} initialPath
  * @property {FileSummary[]} files
  * @property {ReviewComment[]} comments
  */
@@ -40,8 +41,9 @@
 /**
  * @typedef {Object} FileReview
  * @property {string} path
+ * @property {string | null} previousPath
  * @property {FileStatus} status
- * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents }} content
+ * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents } | { kind: 'unavailable', reason: 'binary' | 'invalid-utf8' | 'too-large' | 'symlink' | 'submodule' }} content
  */
 
 async function getJson(url, nativeRequest) {

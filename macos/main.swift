@@ -55,7 +55,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard let core = rvw_core_create() else { fatalError("Unable to start rvw") }
+        var creationError = rvw_buffer(ptr: nil, len: 0)
+        let core = launchConfiguration.directory.path.withCString { directory in
+            if let range = launchConfiguration.range {
+                return range.withCString { rvw_core_create(directory, $0, &creationError) }
+            }
+            return rvw_core_create(directory, nil, &creationError)
+        }
+        guard let core else {
+            let detail: String
+            if let pointer = creationError.ptr, creationError.len > 0 {
+                detail = String(decoding: UnsafeBufferPointer(start: pointer, count: creationError.len), as: UTF8.self)
+                rvw_buffer_free(nil, creationError)
+            } else {
+                detail = "The Git review provider could not be initialized."
+            }
+            let alert = NSAlert()
+            alert.messageText = "Unable to open review"
+            alert.informativeText = detail
+            alert.alertStyle = .critical
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         guard let resources = Bundle.main.resourceURL?.appendingPathComponent("web") else {
             fatalError("Unable to find the frontend")
         }
