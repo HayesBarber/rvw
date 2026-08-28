@@ -26,7 +26,7 @@ pub const Clipboard = struct {
     }
 };
 
-/// Clipboard implementation for the supported desktop platforms.
+/// Clipboard implementation for macOS and Linux.
 pub const SystemClipboard = struct {
     runner: Runner = .system,
 
@@ -72,12 +72,10 @@ var system_runner_context: u8 = 0;
 fn copyForOs(runner: Runner, os: std.Target.Os.Tag, io: Io, text: []const u8) !void {
     switch (os) {
         .macos => try runner.run(io, &.{"/usr/bin/pbcopy"}, text),
-        .windows => try runner.run(io, &.{"clip.exe"}, text),
         .linux => runner.run(io, &.{"wl-copy"}, text) catch |err| switch (err) {
             error.ClipboardToolNotFound => try runner.run(io, &.{ "xclip", "-selection", "clipboard" }, text),
             else => return err,
         },
-        .dragonfly, .freebsd, .netbsd, .openbsd => try runner.run(io, &.{ "xclip", "-selection", "clipboard" }, text),
         else => return error.UnsupportedPlatform,
     }
 }
