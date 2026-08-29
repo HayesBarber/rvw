@@ -184,6 +184,8 @@ pub const FileDiff = struct {
 
 pub const Request = union(enum) {
     get_diff_overview,
+    get_files,
+    get_file: struct { path: []const u8 },
     get_file_diff: struct {
         diff_id: []const u8,
         path: []const u8,
@@ -208,6 +210,8 @@ pub const CopyCommentsResult = struct {
 
 pub const Response = union(enum) {
     diff_overview: DiffOverview,
+    files: []const []const u8,
+    file: FileDiff,
     file_diff: FileDiff,
     comments: []const Comment,
     comment: Comment,

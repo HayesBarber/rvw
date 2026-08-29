@@ -21,7 +21,7 @@ export default function FileTreePane({ files, selectedPath, onSelectFile }) {
     paths: files.map((file) => file.path),
     gitStatus,
     initialExpansion: 'open',
-    initialSelectedPaths: [selectedPath],
+    initialSelectedPaths: selectedPath ? [selectedPath] : [],
   })
   const selectedPaths = useFileTreeSelection(model)
 

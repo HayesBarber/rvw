@@ -83,6 +83,26 @@ export async function getFileDiff(diffId, path) {
 }
 
 /**
+ * Lists every file exposed by the repository FileProvider.
+ * @returns {Promise<string[]>}
+ */
+export async function getFiles() {
+  return requestJson('/api/files', { type: 'get_files' })
+}
+
+/**
+ * Loads one unchanged repository file in the same display shape as a diff.
+ * @param {string} path
+ * @returns {Promise<FileDiff>}
+ */
+export async function getFile(path) {
+  return requestJson(
+    `/api/files/content?path=${encodeURIComponent(path)}`,
+    { type: 'get_file', path },
+  )
+}
+
+/**
  * @typedef {Object} Comment
  * @property {string} id
  * @property {string} body

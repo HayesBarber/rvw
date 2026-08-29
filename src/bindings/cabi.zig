@@ -6,6 +6,7 @@ const allocator = std.heap.page_allocator;
 const RvwCore = struct {
     threaded: std.Io.Threaded,
     git: rvw.provider.diff.git.GitProvider,
+    files: rvw.provider.file.filesystem.FilesystemProvider,
     comments: rvw.provider.comment.memory.MemoryProvider,
     clipboard: rvw.output.SystemClipboard,
     default_logger: rvw.log.DefaultLogger,
@@ -52,12 +53,27 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    handle.files = rvw.provider.file.filesystem.FilesystemProvider.init(
+        allocator,
+        handle.threaded.io(),
+        directory,
+    ) catch |err| {
+        handle.git.deinit();
+        handle.threaded.deinit();
+        const message = std.fmt.allocPrint(allocator, "unable to enumerate repository files: {t}", .{err}) catch null;
+        if (message) |value| {
+            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
+        }
+        allocator.destroy(handle);
+        return null;
+    };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),
         handle.git.interface(),
+        handle.files.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
         handle.logger,
@@ -88,6 +104,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
     core.comments.deinit();
+    core.files.deinit();
     core.git.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();
