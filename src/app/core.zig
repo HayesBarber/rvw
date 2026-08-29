@@ -1,7 +1,7 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
-const logging = @import("../logging.zig");
+const log = @import("../log.zig");
 const output = @import("../output.zig");
 const provider_module = @import("../provider.zig");
 
@@ -14,7 +14,7 @@ pub const Core = struct {
     diff_provider: provider_module.diff.DiffProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
-    logger: logging.Logger,
+    logger: log.Logger,
 
     pub fn init(
         allocator: Allocator,
@@ -22,7 +22,7 @@ pub const Core = struct {
         diff_provider: provider_module.diff.DiffProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
-        logger: logging.Logger,
+        logger: log.Logger,
     ) Core {
         return .{
             .allocator = allocator,
@@ -71,12 +71,12 @@ pub const Core = struct {
                 if (!validLogMessage(details.message)) return error.InvalidLogEntry;
                 self.logger.log(self.io, .{
                     .level = details.level,
-                    .source = "frontend",
+                    .source = .frontend,
                     .message = details.message,
                     .context = details.context,
                     .metrics = details.metrics,
                 });
-                break :blk .{ .log_result = .{ .accepted = true } };
+                break :blk .log;
             },
         };
     }
@@ -136,7 +136,7 @@ test "copy comments as Markdown serializes all comments and copies once" {
         fake_diff,
         comments.interface(),
         clipboard,
-        logging.stderrLogger(std.testing.allocator),
+        log.stderrLogger(std.testing.allocator),
     );
     const response = try core.dispatch(.copy_comments_as_markdown);
     switch (response) {
@@ -171,7 +171,7 @@ test "copy comments as Markdown rejects an empty review" {
         unused_diff,
         comments.interface(),
         unused_clipboard,
-        logging.stderrLogger(std.testing.allocator),
+        log.stderrLogger(std.testing.allocator),
     );
 
     try std.testing.expectError(error.NoComments, core.dispatch(.copy_comments_as_markdown));
@@ -207,7 +207,7 @@ test "copy comments as Markdown propagates clipboard failures" {
         unused_diff,
         comments.interface(),
         clipboard,
-        logging.stderrLogger(std.testing.allocator),
+        log.stderrLogger(std.testing.allocator),
     );
 
     try std.testing.expectError(
@@ -228,7 +228,7 @@ fn validComment(body: []const u8, target: model.CommentTarget) bool {
 
 fn validLogMessage(message: []const u8) bool {
     return message.len > 0 and
-        message.len <= logging.maximum_message_size and
+        message.len <= log.maximum_message_size and
         std.unicode.utf8ValidateSlice(message);
 }
 
@@ -238,10 +238,10 @@ test "frontend logging validates messages and uses the shared logger" {
 
     const Capture = struct {
         calls: usize = 0,
-        source: []const u8 = "",
+        source: ?log.Source = null,
         message: []const u8 = "",
 
-        fn write(context: *anyopaque, _: Io, event: logging.Event) !void {
+        fn write(context: *anyopaque, _: Io, event: log.Event) !void {
             const self: *@This() = @ptrCast(@alignCast(context));
             self.calls += 1;
             self.source = event.source;
@@ -249,7 +249,7 @@ test "frontend logging validates messages and uses the shared logger" {
         }
     };
     var capture: Capture = .{};
-    const logger: logging.Logger = .{
+    const logger: log.Logger = .{
         .allocator = std.testing.allocator,
         .context = &capture,
         .vtable = &.{ .write = Capture.write },
@@ -267,20 +267,19 @@ test "frontend logging validates messages and uses the shared logger" {
         logger,
     );
 
-    const response = try core.dispatch(.{ .log = .{ .level = .info, .message = "render complete" } });
-    switch (response) {
-        .log_result => |result| try std.testing.expect(result.accepted),
-        else => return error.UnexpectedResponse,
-    }
+    try std.testing.expectEqual(
+        model.Response.log,
+        try core.dispatch(.{ .log = .{ .level = .info, .message = "render complete" } }),
+    );
     try std.testing.expectEqual(@as(usize, 1), capture.calls);
-    try std.testing.expectEqualStrings("frontend", capture.source);
+    try std.testing.expectEqual(log.Source.frontend, capture.source.?);
     try std.testing.expectEqualStrings("render complete", capture.message);
 
     try std.testing.expectError(
         error.InvalidLogEntry,
         core.dispatch(.{ .log = .{ .level = .debug, .message = "" } }),
     );
-    const oversized = try std.testing.allocator.alloc(u8, logging.maximum_message_size + 1);
+    const oversized = try std.testing.allocator.alloc(u8, log.maximum_message_size + 1);
     defer std.testing.allocator.free(oversized);
     @memset(oversized, 'x');
     try std.testing.expectError(

@@ -1,5 +1,5 @@
 const std = @import("std");
-const logging = @import("../logging.zig");
+const log = @import("../log.zig");
 
 pub const FileStatus = enum {
     modified,
@@ -195,7 +195,7 @@ pub const Request = union(enum) {
         target: CommentTarget,
     },
     log: struct {
-        level: logging.Level,
+        level: log.Level,
         message: []const u8,
         context: ?std.json.Value = null,
         metrics: ?std.json.Value = null,
@@ -206,17 +206,13 @@ pub const CopyCommentsResult = struct {
     commentCount: usize,
 };
 
-pub const LogResult = struct {
-    accepted: bool,
-};
-
 pub const Response = union(enum) {
     diff_overview: DiffOverview,
     file_diff: FileDiff,
     comments: []const Comment,
     comment: Comment,
     copy_comments_result: CopyCommentsResult,
-    log_result: LogResult,
+    log,
 };
 
 pub const AppError = error{

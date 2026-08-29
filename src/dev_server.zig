@@ -36,20 +36,14 @@ pub fn main(init: std.process.Init) !void {
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
-    var file_logger: ?rvw.logging.FileLogger = rvw.logging.FileLogger.init(init.gpa, init.io, .{
+    var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
         .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
         .temporary_directory = init.environ_map.get("TMPDIR"),
-    }) catch |err| failed: {
-        std.log.err("unable to create application log file: {t}", .{err});
-        break :failed null;
-    };
-    defer if (file_logger) |*logger| logger.deinit();
-    const logger = if (file_logger) |*value|
-        value.interface()
-    else
-        rvw.logging.stderrLogger(init.gpa);
-    logger.log(init.io, .{ .level = .info, .source = "backend", .message = "application started" });
+    });
+    defer default_logger.deinit();
+    const logger = default_logger.interface();
+    logger.log(init.io, .{ .level = .info, .source = .backend, .message = "application started" });
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,

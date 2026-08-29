@@ -1,17 +1,13 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
+const log = @import("../log.zig");
 const model = @import("model.zig");
 
 const Allocator = std.mem.Allocator;
 
 pub fn encodeResponse(allocator: Allocator, response: model.Response) ![]u8 {
     return switch (response) {
-        .diff_overview => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .file_diff => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .comments => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .comment => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .copy_comments_result => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
-        .log_result => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        inline else => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
     };
 }
 
@@ -36,12 +32,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
     return switch (response) {
-        .diff_overview => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .file_diff => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .comments => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .comment => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .copy_comments_result => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
-        .log_result => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
 }
 
@@ -83,7 +74,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     return error.UnknownOperation;
 }
 
-fn parseLogLevel(value: []const u8) ?@import("../logging.zig").Level {
+fn parseLogLevel(value: []const u8) ?log.Level {
     if (std.mem.eql(u8, value, "debug")) return .debug;
     if (std.mem.eql(u8, value, "info")) return .info;
     if (std.mem.eql(u8, value, "warning")) return .warning;
@@ -176,6 +167,13 @@ test "copy comments result encodes the copied comment count" {
     try std.testing.expectEqualStrings("{\"commentCount\":2}", encoded);
 }
 
+test "log response has no return value" {
+    const encoded = try encodeResponse(std.testing.allocator, .log);
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expectEqualStrings("{}", encoded);
+}
+
 test "frontend log requests validate levels and structured fields" {
     var parsed = try std.json.parseFromSlice(
         std.json.Value,
@@ -187,7 +185,7 @@ test "frontend log requests validate levels and structured fields" {
     const request = try decodeRequestValue(parsed.value);
     switch (request) {
         .log => |details| {
-            try std.testing.expectEqual(@import("../logging.zig").Level.warning, details.level);
+            try std.testing.expectEqual(log.Level.warning, details.level);
             try std.testing.expectEqualStrings("slow", details.message);
             try std.testing.expectEqualStrings("diff", details.context.?.object.get("view").?.string);
             try std.testing.expectEqual(@as(i64, 12), details.metrics.?.object.get("durationMs").?.integer);

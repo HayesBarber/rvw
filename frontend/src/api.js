@@ -135,7 +135,7 @@ export async function copyCommentsAsMarkdown() {
  * @param {LogLevel} level
  * @param {string} message
  * @param {{ context?: Object, metrics?: Object }} [details]
- * @returns {Promise<{ accepted: boolean }>}
+ * @returns {Promise<void>}
  */
 export async function logEvent(level, message, details = {}) {
   const request = {
@@ -145,7 +145,7 @@ export async function logEvent(level, message, details = {}) {
     ...(details.context === undefined ? {} : { context: details.context }),
     ...(details.metrics === undefined ? {} : { metrics: details.metrics }),
   }
-  return requestJson('/api/logs', request, {
+  await requestJson('/api/logs', request, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
