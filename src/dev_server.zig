@@ -49,7 +49,11 @@ pub fn main(init: std.process.Init) !void {
     });
     defer default_logger.deinit();
     const logger = default_logger.interface();
-    logger.log(init.io, .{ .level = .info, .source = .backend, .message = "application started" });
+    var configuration = try rvw.config.load(init.gpa, init.io, .{
+        .home = init.environ_map.get("HOME"),
+    });
+    defer configuration.deinit();
+    rvw.startup.logApplicationStarted(logger, init.io, configuration.snapshot);
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
@@ -58,6 +62,7 @@ pub fn main(init: std.process.Init) !void {
         comments.interface(),
         clipboard.interface(),
         logger,
+        configuration.snapshot,
     );
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);

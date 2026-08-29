@@ -11,6 +11,7 @@ const RvwCore = struct {
     clipboard: rvw.output.SystemClipboard,
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
+    configuration: rvw.config.Loaded,
     core: rvw.core.Core,
 };
 
@@ -38,11 +39,6 @@ pub export fn rvw_core_create(
         .temporary_directory = environmentVariable("TMPDIR"),
     });
     handle.logger = handle.default_logger.interface();
-    handle.logger.log(handle.threaded.io(), .{
-        .level = .info,
-        .source = .backend,
-        .message = "application started",
-    });
     handle.git = rvw.provider.diff.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         handle.default_logger.deinit();
         handle.threaded.deinit();
@@ -67,6 +63,21 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
+        .home = environmentVariable("HOME"),
+    }) catch {
+        handle.files.deinit();
+        handle.git.deinit();
+        handle.default_logger.deinit();
+        handle.threaded.deinit();
+        allocator.destroy(handle);
+        return null;
+    };
+    rvw.startup.logApplicationStarted(
+        handle.logger,
+        handle.threaded.io(),
+        handle.configuration.snapshot,
+    );
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
     handle.core = rvw.core.Core.init(
@@ -77,6 +88,7 @@ pub export fn rvw_core_create(
         handle.comments.interface(),
         handle.clipboard.interface(),
         handle.logger,
+        handle.configuration.snapshot,
     );
     return handle;
 }
@@ -106,6 +118,7 @@ pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     core.comments.deinit();
     core.files.deinit();
     core.git.deinit();
+    core.configuration.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();
     allocator.destroy(core);

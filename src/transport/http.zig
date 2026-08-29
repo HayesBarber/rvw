@@ -56,6 +56,10 @@ const Handler = struct {
     }
 };
 
+fn getConfiguration(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .get_configuration);
+}
+
 fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(res, .get_diff_overview);
 }
@@ -143,6 +147,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     defer server.stop();
 
     const router = try server.router(.{});
+    router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
     router.get("/api/files", getFiles, .{});

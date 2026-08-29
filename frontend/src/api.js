@@ -62,6 +62,21 @@ async function requestJson(url, nativeRequest, options = {}) {
 }
 
 /**
+ * @typedef {Object} ConfigurationDiagnostic
+ * @property {'malformed_json' | 'invalid_schema' | 'file_read_failure'} code
+ * @property {string} message
+ * @property {string} path
+ */
+
+/**
+ * Loads the startup snapshot of optional user configuration and its diagnostic.
+ * @returns {Promise<{ configuration: Object, diagnostic: ConfigurationDiagnostic | null }>}
+ */
+export async function getConfiguration() {
+  return requestJson('/api/configuration', { type: 'get_configuration' })
+}
+
+/**
  * Loads metadata and file summaries for the active diff.
  * @returns {Promise<DiffOverview>}
  */

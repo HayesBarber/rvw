@@ -1,4 +1,5 @@
 const std = @import("std");
+const config = @import("../config.zig");
 const log = @import("../log.zig");
 
 pub const FileStatus = enum {
@@ -183,6 +184,7 @@ pub const FileDiff = struct {
 };
 
 pub const Request = union(enum) {
+    get_configuration,
     get_diff_overview,
     get_files,
     get_file: struct { path: []const u8 },
@@ -209,6 +211,7 @@ pub const CopyCommentsResult = struct {
 };
 
 pub const Response = union(enum) {
+    configuration: config.Snapshot,
     diff_overview: DiffOverview,
     files: []const []const u8,
     file: FileDiff,
