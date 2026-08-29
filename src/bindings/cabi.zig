@@ -11,6 +11,7 @@ const RvwCore = struct {
     clipboard: rvw.output.SystemClipboard,
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
+    configuration: rvw.config.Loaded,
     core: rvw.core.Core,
 };
 
@@ -67,6 +68,21 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
+        .home = environmentVariable("HOME"),
+    }) catch {
+        handle.files.deinit();
+        handle.git.deinit();
+        handle.default_logger.deinit();
+        handle.threaded.deinit();
+        allocator.destroy(handle);
+        return null;
+    };
+    logConfigurationDiagnostics(
+        handle.logger,
+        handle.threaded.io(),
+        handle.configuration.snapshot.diagnostics,
+    );
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
     handle.core = rvw.core.Core.init(
@@ -77,6 +93,7 @@ pub export fn rvw_core_create(
         handle.comments.interface(),
         handle.clipboard.interface(),
         handle.logger,
+        handle.configuration.snapshot,
     );
     return handle;
 }
@@ -106,9 +123,24 @@ pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     core.comments.deinit();
     core.files.deinit();
     core.git.deinit();
+    core.configuration.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();
     allocator.destroy(core);
+}
+
+fn logConfigurationDiagnostics(
+    logger: rvw.log.Logger,
+    io: std.Io,
+    diagnostics: []const rvw.config.Diagnostic,
+) void {
+    for (diagnostics) |diagnostic| {
+        logger.log(io, .{
+            .level = .warning,
+            .source = .backend,
+            .message = diagnostic.message,
+        });
+    }
 }
 
 fn environmentVariable(comptime name: [:0]const u8) ?[]const u8 {

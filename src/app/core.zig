@@ -1,4 +1,5 @@
 const std = @import("std");
+const config = @import("../config.zig");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
 const log = @import("../log.zig");
@@ -16,6 +17,7 @@ pub const Core = struct {
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
     logger: log.Logger,
+    configuration: config.Snapshot,
 
     pub fn init(
         allocator: Allocator,
@@ -25,6 +27,7 @@ pub const Core = struct {
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
         logger: log.Logger,
+        configuration: config.Snapshot,
     ) Core {
         return .{
             .allocator = allocator,
@@ -34,6 +37,7 @@ pub const Core = struct {
             .comment_provider = comment_provider,
             .clipboard = clipboard,
             .logger = logger,
+            .configuration = configuration,
         };
     }
 
@@ -48,6 +52,7 @@ pub const Core = struct {
 
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
+            .get_configuration => .{ .configuration = self.configuration },
             .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
             .get_files => .{ .files = try self.file_provider.getFiles(self.io) },
             .get_file => |details| .{ .file = .{
