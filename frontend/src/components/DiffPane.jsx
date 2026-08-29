@@ -1,4 +1,11 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 import PaneStatus from './PaneStatus.jsx'
 
@@ -8,6 +15,7 @@ const baseOptions = {
   enableLineSelection: true,
   lineHoverHighlight: 'line',
 }
+const actionAdapter = Object.freeze({})
 
 function normalizeRange(path, range, isDiff) {
   const startSide = range.side ?? range.endSide ?? 'additions'
@@ -158,11 +166,17 @@ export default function DiffPane({
   error,
   comments,
   onCreateComment,
+  registerActionAdapter,
 }) {
   const [draft, setDraft] = useState(null)
   const [selectedLines, setSelectedLines] = useState(null)
   const renderedFileRef = useRef(null)
   const scrollGuardRef = useRef(null)
+
+  useEffect(
+    () => registerActionAdapter(actionAdapter),
+    [registerActionAdapter],
+  )
 
   const finishScrollGuard = useCallback(() => {
     const guard = scrollGuardRef.current
