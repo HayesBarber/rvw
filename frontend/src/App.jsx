@@ -225,6 +225,7 @@ export default function App() {
             <FileTreePane
               key={`${treeMode}:${treeMode === 'files' ? allFilesRequest.status : 'ready'}`}
               files={visibleFiles}
+              mode={treeMode}
               selectedPath={activePath}
               onSelectFile={setSelectedPath}
             />
