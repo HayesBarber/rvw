@@ -7,3 +7,4 @@ pub const http = @import("transport/http.zig");
 pub const unix_socket = @import("transport/unix_socket.zig");
 pub const repository = @import("repository.zig");
 pub const output = @import("output.zig");
+pub const log = @import("log.zig");

@@ -1,4 +1,5 @@
 const std = @import("std");
+const log = @import("../log.zig");
 
 pub const FileStatus = enum {
     modified,
@@ -193,6 +194,12 @@ pub const Request = union(enum) {
         body: []const u8,
         target: CommentTarget,
     },
+    log: struct {
+        level: log.Level,
+        message: []const u8,
+        context: ?std.json.Value = null,
+        metrics: ?std.json.Value = null,
+    },
 };
 
 pub const CopyCommentsResult = struct {
@@ -205,12 +212,14 @@ pub const Response = union(enum) {
     comments: []const Comment,
     comment: Comment,
     copy_comments_result: CopyCommentsResult,
+    log,
 };
 
 pub const AppError = error{
     UnknownDiff,
     UnknownFile,
     InvalidComment,
+    InvalidLogEntry,
     NoComments,
 };
 
@@ -229,6 +238,7 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.UnknownDiff => .unknown_diff,
         error.UnknownFile => .unknown_file,
         error.InvalidComment => .malformed_request,
+        error.InvalidLogEntry => .malformed_request,
         error.NoComments => .no_comments,
         error.ClipboardCommandFailed,
         error.ClipboardToolNotFound,

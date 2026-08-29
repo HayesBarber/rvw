@@ -8,6 +8,8 @@ const RvwCore = struct {
     git: rvw.provider.diff.git.GitProvider,
     comments: rvw.provider.comment.memory.MemoryProvider,
     clipboard: rvw.output.SystemClipboard,
+    default_logger: rvw.log.DefaultLogger,
+    logger: rvw.log.Logger,
     core: rvw.core.Core,
 };
 
@@ -29,7 +31,19 @@ pub export fn rvw_core_create(
     const range: ?[]const u8 = if (range_ptr) |value| std.mem.span(value) else null;
     const handle = allocator.create(RvwCore) catch return null;
     handle.threaded = .init(allocator, .{});
+    handle.default_logger = rvw.log.DefaultLogger.init(allocator, handle.threaded.io(), .{
+        .home = environmentVariable("HOME"),
+        .xdg_state_home = environmentVariable("XDG_STATE_HOME"),
+        .temporary_directory = environmentVariable("TMPDIR"),
+    });
+    handle.logger = handle.default_logger.interface();
+    handle.logger.log(handle.threaded.io(), .{
+        .level = .info,
+        .source = .backend,
+        .message = "application started",
+    });
     handle.git = rvw.provider.diff.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+        handle.default_logger.deinit();
         handle.threaded.deinit();
         const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)}) catch null;
         if (message) |value| {
@@ -46,6 +60,7 @@ pub export fn rvw_core_create(
         handle.git.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
+        handle.logger,
     );
     return handle;
 }
@@ -74,8 +89,14 @@ pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
     core.comments.deinit();
     core.git.deinit();
+    core.default_logger.deinit();
     core.threaded.deinit();
     allocator.destroy(core);
+}
+
+fn environmentVariable(comptime name: [:0]const u8) ?[]const u8 {
+    const value = std.c.getenv(name) orelse return null;
+    return std.mem.span(value);
 }
 
 fn emptyBuffer() RvwBuffer {

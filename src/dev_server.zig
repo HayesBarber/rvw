@@ -36,12 +36,21 @@ pub fn main(init: std.process.Init) !void {
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
+    var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
+        .home = init.environ_map.get("HOME"),
+        .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
+        .temporary_directory = init.environ_map.get("TMPDIR"),
+    });
+    defer default_logger.deinit();
+    const logger = default_logger.interface();
+    logger.log(init.io, .{ .level = .info, .source = .backend, .message = "application started" });
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
         git.interface(),
         comments.interface(),
         clipboard.interface(),
+        logger,
     );
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
