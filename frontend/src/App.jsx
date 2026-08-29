@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
-import {
-  copyCommentsAsMarkdown,
-  createComment,
-  getComments,
-  getDiffOverview,
-  getFile,
-  getFileDiff,
-  getFiles,
-} from './api.js'
+import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import DiffPane from './components/DiffPane.jsx'
 import FileFinder from './components/FileFinder.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
+import {
+  RequestStatus,
+  useCopyComments,
+  useRepositoryFiles,
+  useReviewComments,
+  useReviewFile,
+  useReviewOverview,
+} from './review-data.js'
 import {
   ActiveSurface,
   initialWorkspaceState,
@@ -19,53 +18,23 @@ import {
 } from './workspace.js'
 
 export default function App() {
-  const [overview, setOverview] = useState(null)
   const [workspace, dispatchWorkspace] = useReducer(
     workspaceReducer,
     initialWorkspaceState,
   )
-  const [allFilesRequest, setAllFilesRequest] = useState({
-    status: 'idle',
-    paths: [],
-    error: null,
-  })
-  const [overviewError, setOverviewError] = useState(null)
-  const [comments, setComments] = useState([])
-  const [copyState, setCopyState] = useState({ status: 'idle', message: '' })
-  const [fileRequest, setFileRequest] = useState({
-    path: null,
-    data: null,
-    error: null,
-  })
+  const overviewRequest = useReviewOverview()
+  const allFilesRequest = useRepositoryFiles()
+  const commentsRequest = useReviewComments()
+  const copyRequest = useCopyComments()
+  const overview = overviewRequest.data
 
   useEffect(() => {
-    let active = true
-
-    getDiffOverview()
-      .then((nextOverview) => {
-        if (!active) return
-        setOverview(nextOverview)
-        dispatchWorkspace({
-          type: 'review_loaded',
-          initialPath: nextOverview.initialPath,
-        })
-      })
-      .catch((error) => {
-        if (active) setOverviewError(error.message)
-      })
-
-    getComments()
-      .then((nextComments) => {
-        if (active) setComments(nextComments)
-      })
-      .catch(() => {
-        // Comments can still be created if the initial list request fails.
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
+    if (!overview) return
+    dispatchWorkspace({
+      type: 'review_loaded',
+      initialPath: overview.initialPath,
+    })
+  }, [overview])
 
   const changedPaths = useMemo(
     () => new Set(overview?.files.map((file) => file.path) ?? []),
@@ -74,7 +43,7 @@ export default function App() {
   const filesModeEntries = useMemo(() => {
     if (!overview) return []
     const changedByPath = new Map(overview.files.map((file) => [file.path, file]))
-    const paths = new Set(allFilesRequest.paths)
+    const paths = new Set(allFilesRequest.data)
     for (const file of overview.files) paths.add(file.path)
     return [...paths]
       .sort((left, right) => left.localeCompare(right))
@@ -85,7 +54,7 @@ export default function App() {
         additions: null,
         deletions: null,
       })
-  }, [allFilesRequest.paths, overview])
+  }, [allFilesRequest.data, overview])
   const visibleFiles = useMemo(
     () => workspace.treeMode === TreeMode.FILES
       ? filesModeEntries
@@ -103,29 +72,10 @@ export default function App() {
     return visibleFiles[0]?.path ?? null
   }, [overview, visibleFiles, workspace.selectedPath])
 
-  const loadAllFiles = useCallback(() => {
-    setAllFilesRequest((current) => ({
-      ...current,
-      status: 'loading',
-      error: null,
-    }))
-    getFiles()
-      .then((paths) => {
-        setAllFilesRequest({ status: 'success', paths, error: null })
-      })
-      .catch((error) => {
-        setAllFilesRequest((current) => ({
-          ...current,
-          status: 'error',
-          error: error.message,
-        }))
-      })
-  }, [])
-
   const openFileFinder = useCallback(() => {
     dispatchWorkspace({ type: 'finder_opened' })
-    if (allFilesRequest.status === 'idle') loadAllFiles()
-  }, [allFilesRequest.status, loadAllFiles])
+    if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
+  }, [allFilesRequest])
 
   useEffect(() => {
     function handleShortcut(event) {
@@ -139,75 +89,51 @@ export default function App() {
     return () => document.removeEventListener('keydown', handleShortcut)
   }, [openFileFinder])
 
-  useEffect(() => {
-    if (!overview || !activePath) return
+  const fileRequest = useReviewFile({
+    diffId: overview?.id ?? null,
+    path: activePath,
+    changed: changedPaths.has(activePath),
+  })
 
-    let active = true
-
-    const request = changedPaths.has(activePath)
-      ? getFileDiff(overview.id, activePath)
-      : getFile(activePath)
-
-    request
-      .then((nextFileDiff) => {
-        if (active) {
-          setFileRequest({
-            path: activePath,
-            data: nextFileDiff,
-            error: null,
-          })
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setFileRequest({
-            path: activePath,
-            data: null,
-            error: error.message,
-          })
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [activePath, changedPaths, overview])
-
-  if (overviewError) {
-    return <main className="fatal-error">Unable to load review: {overviewError}</main>
+  if (overviewRequest.status === RequestStatus.ERROR) {
+    return (
+      <main className="fatal-error">
+        Unable to load review: {overviewRequest.error}
+      </main>
+    )
   }
 
   if (!overview) {
     return <main className="fatal-error">Loading review…</main>
   }
 
-  const fileLoading = activePath !== null && fileRequest.path !== activePath
-  const fileDiff = !activePath || fileLoading ? null : fileRequest.data
-  const fileError = !activePath || fileLoading ? null : fileRequest.error
+  const fileLoading = fileRequest.status === RequestStatus.LOADING
+  const fileDiff = fileRequest.status === RequestStatus.SUCCESS
+    ? fileRequest.data
+    : null
+  const fileError = fileRequest.status === RequestStatus.ERROR
+    ? fileRequest.error
+    : null
+  const comments = commentsRequest.data
+  const copyMessage = (() => {
+    if (copyRequest.status === RequestStatus.LOADING) return 'Copying…'
+    if (copyRequest.status === RequestStatus.ERROR) return copyRequest.error
+    if (copyRequest.status !== RequestStatus.SUCCESS) return ''
+    const suffix = copyRequest.data.commentCount === 1 ? 'comment' : 'comments'
+    return `Copied ${copyRequest.data.commentCount} ${suffix}`
+  })()
 
   async function handleCreateComment(body, target, beforeCommit) {
-    const comment = await createComment(body, target)
-    beforeCommit?.()
-    setComments((current) => (
-      current.some((existing) => existing.id === comment.id)
-        ? current
-        : [...current, comment]
-    ))
-    setCopyState({ status: 'idle', message: '' })
+    const comment = await commentsRequest.create(body, target, beforeCommit)
+    copyRequest.reset()
     return comment
   }
 
   async function handleCopyComments() {
-    setCopyState({ status: 'pending', message: 'Copying…' })
     try {
-      const result = await copyCommentsAsMarkdown()
-      const suffix = result.commentCount === 1 ? 'comment' : 'comments'
-      setCopyState({
-        status: 'success',
-        message: `Copied ${result.commentCount} ${suffix}`,
-      })
-    } catch (error) {
-      setCopyState({ status: 'error', message: error.message })
+      await copyRequest.copy()
+    } catch {
+      // The request exposes its error for the existing status message.
     }
   }
 
@@ -221,8 +147,11 @@ export default function App() {
       visiblePaths: nextFiles.map((file) => file.path),
       initialPath: overview.initialPath,
     })
-    if (nextMode === TreeMode.FILES && allFilesRequest.status === 'idle') {
-      loadAllFiles()
+    if (
+      nextMode === TreeMode.FILES &&
+      allFilesRequest.status === RequestStatus.IDLE
+    ) {
+      allFilesRequest.load()
     }
   }
 
@@ -269,16 +198,16 @@ export default function App() {
           </div>
         </header>
         <div className="pane-body">
-          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === 'loading' && (
+          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === RequestStatus.LOADING && (
             <p className="tree-load-status" role="status">Loading files…</p>
           )}
-          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === 'error' && (
+          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === RequestStatus.ERROR && (
             <div className="tree-load-error" role="alert">
               <span>Unable to load files: {allFilesRequest.error}</span>
-              <button type="button" onClick={loadAllFiles}>Retry</button>
+              <button type="button" onClick={allFilesRequest.load}>Retry</button>
             </div>
           )}
-          {visibleFiles.length === 0 && allFilesRequest.status !== 'loading' ? (
+          {visibleFiles.length === 0 && allFilesRequest.status !== RequestStatus.LOADING ? (
             <p className="tree-load-status">
               {workspace.treeMode === TreeMode.CHANGES
                 ? 'No changes to review.'
@@ -316,18 +245,21 @@ export default function App() {
             >
               Find file
             </button>
-            {copyState.message && (
+            {copyMessage && (
               <span
-                className={`copy-status ${copyState.status}`}
-                role={copyState.status === 'error' ? 'alert' : 'status'}
+                className={`copy-status ${copyRequest.status}`}
+                role={copyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
               >
-                {copyState.message}
+                {copyMessage}
               </span>
             )}
             <button
               className="copy-markdown-button"
               type="button"
-              disabled={comments.length === 0 || copyState.status === 'pending'}
+              disabled={
+                comments.length === 0 ||
+                copyRequest.status === RequestStatus.LOADING
+              }
               title={comments.length === 0 ? 'Add a comment before copying' : undefined}
               onClick={handleCopyComments}
             >
@@ -352,7 +284,7 @@ export default function App() {
           files={filesModeEntries}
           status={allFilesRequest.status}
           error={allFilesRequest.error}
-          onRetry={loadAllFiles}
+          onRetry={allFilesRequest.load}
           onOpen={handleFinderOpen}
           onClose={() => dispatchWorkspace({ type: 'finder_closed' })}
         />
