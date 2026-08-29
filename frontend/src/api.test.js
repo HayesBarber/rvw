@@ -10,7 +10,7 @@ const configurationSnapshot = {
       },
     },
   },
-  diagnostics: [],
+  diagnostic: null,
 }
 
 test('configuration uses the native bridge request when available', async () => {

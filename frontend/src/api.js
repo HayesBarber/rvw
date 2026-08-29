@@ -69,8 +69,8 @@ async function requestJson(url, nativeRequest, options = {}) {
  */
 
 /**
- * Loads the startup snapshot of optional user configuration and diagnostics.
- * @returns {Promise<{ configuration: Object, diagnostics: ConfigurationDiagnostic[] }>}
+ * Loads the startup snapshot of optional user configuration and its diagnostic.
+ * @returns {Promise<{ configuration: Object, diagnostic: ConfigurationDiagnostic | null }>}
  */
 export async function getConfiguration() {
   return requestJson('/api/configuration', { type: 'get_configuration' })

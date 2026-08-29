@@ -39,11 +39,6 @@ pub export fn rvw_core_create(
         .temporary_directory = environmentVariable("TMPDIR"),
     });
     handle.logger = handle.default_logger.interface();
-    handle.logger.log(handle.threaded.io(), .{
-        .level = .info,
-        .source = .backend,
-        .message = "application started",
-    });
     handle.git = rvw.provider.diff.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         handle.default_logger.deinit();
         handle.threaded.deinit();
@@ -78,10 +73,10 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    logConfigurationDiagnostics(
+    rvw.startup.logApplicationStarted(
         handle.logger,
         handle.threaded.io(),
-        handle.configuration.snapshot.diagnostics,
+        handle.configuration.snapshot,
     );
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
@@ -127,20 +122,6 @@ pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     core.default_logger.deinit();
     core.threaded.deinit();
     allocator.destroy(core);
-}
-
-fn logConfigurationDiagnostics(
-    logger: rvw.log.Logger,
-    io: std.Io,
-    diagnostics: []const rvw.config.Diagnostic,
-) void {
-    for (diagnostics) |diagnostic| {
-        logger.log(io, .{
-            .level = .warning,
-            .source = .backend,
-            .message = diagnostic.message,
-        });
-    }
 }
 
 fn environmentVariable(comptime name: [:0]const u8) ?[]const u8 {

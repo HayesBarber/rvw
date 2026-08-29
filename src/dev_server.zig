@@ -49,12 +49,11 @@ pub fn main(init: std.process.Init) !void {
     });
     defer default_logger.deinit();
     const logger = default_logger.interface();
-    logger.log(init.io, .{ .level = .info, .source = .backend, .message = "application started" });
     var configuration = try rvw.config.load(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
     });
     defer configuration.deinit();
-    logConfigurationDiagnostics(logger, init.io, configuration.snapshot.diagnostics);
+    rvw.startup.logApplicationStarted(logger, init.io, configuration.snapshot);
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
@@ -67,20 +66,6 @@ pub fn main(init: std.process.Init) !void {
     );
 
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
-}
-
-fn logConfigurationDiagnostics(
-    logger: rvw.log.Logger,
-    io: std.Io,
-    diagnostics: []const rvw.config.Diagnostic,
-) void {
-    for (diagnostics) |diagnostic| {
-        logger.log(io, .{
-            .level = .warning,
-            .source = .backend,
-            .message = diagnostic.message,
-        });
-    }
 }
 
 fn parseOptions(args: []const []const u8, environ: *const std.process.Environ.Map) !Options {
