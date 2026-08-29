@@ -3,6 +3,8 @@ import test from 'node:test'
 import {
   ActionScope,
   ApplicationAction,
+  DEFAULT_LEADER_KEY,
+  LEADER_KEY,
   applicationActionCatalog,
   compileApplicationKeymap,
   defaultApplicationBindings,
@@ -51,7 +53,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_DOWN], [['j'], ['<Down>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_FIRST], [['g', 'g']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_LAST], [['G']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.ITEM_ACTIVATE], [['<Enter>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FILE_TREE_ITEM_ACTIVATE], [['<Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_COLLAPSE_OR_PARENT], [['h'], ['<Left>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_EXPAND], [['l'], ['<Right>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_FILE_TREE], [['g', 't']])
@@ -59,7 +61,28 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_CHANGES], [['g', 'c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_FILES], [['g', 'f']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y', 'c']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
+})
+
+test('leader placeholders compile to a concrete key without mutating the keymap', () => {
+  const keymap = {
+    [ApplicationAction.COPY_COMMENTS]: [[LEADER_KEY, 'y']],
+  }
+
+  assert.equal(DEFAULT_LEADER_KEY, '\\')
+  assert.deepEqual(compileApplicationKeymap(keymap), [{
+    mode: VimMode.NORMAL,
+    keys: ['\\', 'y'],
+    command: ApplicationAction.COPY_COMMENTS,
+  }])
+  assert.deepEqual(compileApplicationKeymap(keymap, { leader: '<Space>' }), [{
+    mode: VimMode.NORMAL,
+    keys: ['<Space>', 'y'],
+    command: ApplicationAction.COPY_COMMENTS,
+  }])
+  assert.deepEqual(keymap, {
+    [ApplicationAction.COPY_COMMENTS]: [[LEADER_KEY, 'y']],
+  })
 })
 
 test('compiled bindings preserve counts and multi-key sequences', () => {

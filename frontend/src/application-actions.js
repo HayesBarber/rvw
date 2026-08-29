@@ -11,7 +11,7 @@ export const ApplicationAction = Object.freeze({
   CURSOR_DOWN: 'cursor.down',
   CURSOR_FIRST: 'cursor.first',
   CURSOR_LAST: 'cursor.last',
-  ITEM_ACTIVATE: 'item.activate',
+  FILE_TREE_ITEM_ACTIVATE: 'file_tree.item.activate',
   TREE_COLLAPSE_OR_PARENT: 'tree.collapse_or_parent',
   TREE_EXPAND: 'tree.expand',
   FOCUS_FILE_TREE: 'focus.file_tree',
@@ -27,7 +27,7 @@ const actionDefinitions = [
   [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down.'],
   [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the first item.'],
   [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the last item.'],
-  [ApplicationAction.ITEM_ACTIVATE, ActionScope.FILE_TREE, 'Activate the focused file-tree item.'],
+  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, 'Activate the focused file-tree item.'],
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
   [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, 'Expand the focused tree item.'],
   [ApplicationAction.FOCUS_FILE_TREE, ActionScope.GLOBAL, 'Focus the file tree.'],
@@ -49,6 +49,9 @@ export const applicationActionCatalog = Object.freeze(Object.fromEntries(
 const keySequence = (...keys) => Object.freeze(keys)
 const actionBindings = (...sequences) => Object.freeze(sequences)
 
+export const LEADER_KEY = '<leader>'
+export const DEFAULT_LEADER_KEY = '\\'
+
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_UP]: actionBindings(
@@ -61,7 +64,7 @@ export const defaultNormalKeymap = Object.freeze({
   ),
   [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
   [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
-  [ApplicationAction.ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
+  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: actionBindings(
     keySequence('h'),
     keySequence('<Left>'),
@@ -78,7 +81,7 @@ export const defaultNormalKeymap = Object.freeze({
     keySequence('<C-p>'),
     keySequence('<D-p>'),
   ),
-  [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y', 'c')),
+  [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
 })
 
 function validateKeymap(keymap) {
@@ -109,13 +112,19 @@ function validateKeymap(keymap) {
  * controller. Compiling once here also rejects duplicate and ambiguous input
  * before a keymap is installed at runtime.
  */
-export function compileApplicationKeymap(keymap = defaultNormalKeymap) {
+export function compileApplicationKeymap(
+  keymap = defaultNormalKeymap,
+  { leader = DEFAULT_LEADER_KEY } = {},
+) {
   validateKeymap(keymap)
+  if (typeof leader !== 'string' || leader.length === 0 || leader === LEADER_KEY) {
+    throw new TypeError('Application keymap leader must be a concrete non-empty key')
+  }
 
   const bindings = Object.entries(keymap).flatMap(([action, sequences]) => (
     sequences.map((keys) => Object.freeze({
       mode: VimMode.NORMAL,
-      keys: Object.freeze([...keys]),
+      keys: Object.freeze(keys.map((key) => key === LEADER_KEY ? leader : key)),
       command: action,
     }))
   ))
