@@ -9,12 +9,14 @@ import {
   getFiles,
 } from './api.js'
 import DiffPane from './components/DiffPane.jsx'
+import FileFinder from './components/FileFinder.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
 
 export default function App() {
   const [overview, setOverview] = useState(null)
   const [selectedPath, setSelectedPath] = useState(null)
   const [treeMode, setTreeMode] = useState('changes')
+  const [finderOpen, setFinderOpen] = useState(false)
   const [allFilesRequest, setAllFilesRequest] = useState({
     status: 'idle',
     paths: [],
@@ -106,6 +108,23 @@ export default function App() {
       })
   }, [])
 
+  const openFileFinder = useCallback(() => {
+    setFinderOpen(true)
+    if (allFilesRequest.status === 'idle') loadAllFiles()
+  }, [allFilesRequest.status, loadAllFiles])
+
+  useEffect(() => {
+    function handleShortcut(event) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        openFileFinder()
+      }
+    }
+
+    document.addEventListener('keydown', handleShortcut)
+    return () => document.removeEventListener('keydown', handleShortcut)
+  }, [openFileFinder])
+
   useEffect(() => {
     if (!overview || !activePath) return
 
@@ -185,8 +204,15 @@ export default function App() {
     }
   }
 
+  function handleFinderOpen(path) {
+    setSelectedPath(path)
+    if (!changedPaths.has(path)) setTreeMode('files')
+    setFinderOpen(false)
+  }
+
   return (
-    <main className="review-shell">
+    <>
+      <main className="review-shell">
       <section className="pane tree-pane">
         <header className="pane-header">
           <strong>{overview.repository.name}</strong>
@@ -223,7 +249,7 @@ export default function App() {
             </p>
           ) : (
             <FileTreePane
-              key={`${treeMode}:${treeMode === 'files' ? allFilesRequest.status : 'ready'}`}
+              key={`${treeMode}:${treeMode === 'files' ? allFilesRequest.status : 'ready'}:${activePath ?? 'none'}`}
               files={visibleFiles}
               mode={treeMode}
               selectedPath={activePath}
@@ -237,6 +263,15 @@ export default function App() {
         <header className="pane-header">
           <strong>{activePath ?? 'No file selected'}</strong>
           <div className="review-actions">
+            <button
+              className="file-finder-button"
+              type="button"
+              aria-keyshortcuts="Meta+P Control+P"
+              title="Find file (⌘P / Ctrl+P)"
+              onClick={openFileFinder}
+            >
+              Find file
+            </button>
             {copyState.message && (
               <span
                 className={`copy-status ${copyState.status}`}
@@ -267,6 +302,17 @@ export default function App() {
           />
         </div>
       </section>
-    </main>
+      </main>
+      {finderOpen && (
+        <FileFinder
+          files={filesModeEntries}
+          status={allFilesRequest.status}
+          error={allFilesRequest.error}
+          onRetry={loadAllFiles}
+          onOpen={handleFinderOpen}
+          onClose={() => setFinderOpen(false)}
+        />
+      )}
+    </>
   )
 }
