@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test src/fuzzy.test.js"
+    "test": "node --test"
   },
   "dependencies": {
     "@pierre/diffs": "^1.3.5",
