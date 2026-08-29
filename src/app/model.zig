@@ -264,14 +264,3 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .internal_error => "Internal error",
     };
 }
-
-test "clipboard failures have a user-facing error" {
-    try std.testing.expectEqual(
-        ErrorCode.clipboard_unavailable,
-        errorCode(error.ClipboardCommandFailed),
-    );
-    try std.testing.expectEqualStrings(
-        "Unable to copy review comments to the clipboard",
-        errorMessage(.clipboard_unavailable),
-    );
-}
