@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import {
   copyCommentsAsMarkdown,
   createComment,
@@ -11,12 +11,19 @@ import {
 import DiffPane from './components/DiffPane.jsx'
 import FileFinder from './components/FileFinder.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
+import {
+  ActiveSurface,
+  initialWorkspaceState,
+  TreeMode,
+  workspaceReducer,
+} from './workspace.js'
 
 export default function App() {
   const [overview, setOverview] = useState(null)
-  const [selectedPath, setSelectedPath] = useState(null)
-  const [treeMode, setTreeMode] = useState('changes')
-  const [finderOpen, setFinderOpen] = useState(false)
+  const [workspace, dispatchWorkspace] = useReducer(
+    workspaceReducer,
+    initialWorkspaceState,
+  )
   const [allFilesRequest, setAllFilesRequest] = useState({
     status: 'idle',
     paths: [],
@@ -38,7 +45,10 @@ export default function App() {
       .then((nextOverview) => {
         if (!active) return
         setOverview(nextOverview)
-        setSelectedPath(nextOverview.initialPath)
+        dispatchWorkspace({
+          type: 'review_loaded',
+          initialPath: nextOverview.initialPath,
+        })
       })
       .catch((error) => {
         if (active) setOverviewError(error.message)
@@ -77,17 +87,21 @@ export default function App() {
       })
   }, [allFilesRequest.paths, overview])
   const visibleFiles = useMemo(
-    () => treeMode === 'files' ? filesModeEntries : (overview?.files ?? []),
-    [filesModeEntries, overview, treeMode],
+    () => workspace.treeMode === TreeMode.FILES
+      ? filesModeEntries
+      : (overview?.files ?? []),
+    [filesModeEntries, overview, workspace.treeMode],
   )
   const activePath = useMemo(() => {
     const visiblePaths = new Set(visibleFiles.map((file) => file.path))
-    if (selectedPath && visiblePaths.has(selectedPath)) return selectedPath
+    if (workspace.selectedPath && visiblePaths.has(workspace.selectedPath)) {
+      return workspace.selectedPath
+    }
     if (overview?.initialPath && visiblePaths.has(overview.initialPath)) {
       return overview.initialPath
     }
     return visibleFiles[0]?.path ?? null
-  }, [overview, selectedPath, visibleFiles])
+  }, [overview, visibleFiles, workspace.selectedPath])
 
   const loadAllFiles = useCallback(() => {
     setAllFilesRequest((current) => ({
@@ -109,7 +123,7 @@ export default function App() {
   }, [])
 
   const openFileFinder = useCallback(() => {
-    setFinderOpen(true)
+    dispatchWorkspace({ type: 'finder_opened' })
     if (allFilesRequest.status === 'idle') loadAllFiles()
   }, [allFilesRequest.status, loadAllFiles])
 
@@ -198,46 +212,67 @@ export default function App() {
   }
 
   function handleTreeModeChange(nextMode) {
-    setTreeMode(nextMode)
-    if (nextMode === 'files' && allFilesRequest.status === 'idle') {
+    const nextFiles = nextMode === TreeMode.FILES
+      ? filesModeEntries
+      : overview.files
+    dispatchWorkspace({
+      type: 'tree_mode_changed',
+      mode: nextMode,
+      visiblePaths: nextFiles.map((file) => file.path),
+      initialPath: overview.initialPath,
+    })
+    if (nextMode === TreeMode.FILES && allFilesRequest.status === 'idle') {
       loadAllFiles()
     }
   }
 
   function handleFinderOpen(path) {
-    setSelectedPath(path)
-    if (!changedPaths.has(path)) setTreeMode('files')
-    setFinderOpen(false)
+    dispatchWorkspace({
+      type: 'finder_file_opened',
+      path,
+      changed: changedPaths.has(path),
+    })
+  }
+
+  const activateSurface = (surface) => {
+    dispatchWorkspace({ type: 'surface_activated', surface })
   }
 
   return (
     <>
-      <main className="review-shell">
-      <section className="pane tree-pane">
+      <main
+        className="review-shell"
+        data-active-surface={workspace.activeSurface}
+      >
+      <section
+        className="pane tree-pane"
+        onPointerDown={() => activateSurface(ActiveSurface.FILE_TREE)}
+        onFocusCapture={() => activateSurface(ActiveSurface.FILE_TREE)}
+      >
         <header className="pane-header">
           <strong>{overview.repository.name}</strong>
           <div className="tree-mode-toggle" role="group" aria-label="File tree mode">
             <button
               type="button"
-              aria-pressed={treeMode === 'changes'}
-              onClick={() => handleTreeModeChange('changes')}
+              aria-pressed={workspace.treeMode === TreeMode.CHANGES}
+              onClick={() => handleTreeModeChange(TreeMode.CHANGES)}
             >
               Changes
             </button>
             <button
               type="button"
-              aria-pressed={treeMode === 'files'}
-              onClick={() => handleTreeModeChange('files')}
+              aria-pressed={workspace.treeMode === TreeMode.FILES}
+              onClick={() => handleTreeModeChange(TreeMode.FILES)}
             >
               Files
             </button>
           </div>
         </header>
         <div className="pane-body">
-          {treeMode === 'files' && allFilesRequest.status === 'loading' && (
+          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === 'loading' && (
             <p className="tree-load-status" role="status">Loading files…</p>
           )}
-          {treeMode === 'files' && allFilesRequest.status === 'error' && (
+          {workspace.treeMode === TreeMode.FILES && allFilesRequest.status === 'error' && (
             <div className="tree-load-error" role="alert">
               <span>Unable to load files: {allFilesRequest.error}</span>
               <button type="button" onClick={loadAllFiles}>Retry</button>
@@ -245,21 +280,30 @@ export default function App() {
           )}
           {visibleFiles.length === 0 && allFilesRequest.status !== 'loading' ? (
             <p className="tree-load-status">
-              {treeMode === 'changes' ? 'No changes to review.' : 'No files found.'}
+              {workspace.treeMode === TreeMode.CHANGES
+                ? 'No changes to review.'
+                : 'No files found.'}
             </p>
           ) : (
             <FileTreePane
-              key={`${treeMode}:${treeMode === 'files' ? allFilesRequest.status : 'ready'}:${activePath ?? 'none'}`}
+              key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}:${activePath ?? 'none'}`}
               files={visibleFiles}
-              mode={treeMode}
+              mode={workspace.treeMode}
               selectedPath={activePath}
-              onSelectFile={setSelectedPath}
+              onSelectFile={(path) => dispatchWorkspace({
+                type: 'file_selected',
+                path,
+              })}
             />
           )}
         </div>
       </section>
 
-      <section className="pane diff-pane">
+      <section
+        className="pane diff-pane"
+        onPointerDown={() => activateSurface(ActiveSurface.DIFF_PANE)}
+        onFocusCapture={() => activateSurface(ActiveSurface.DIFF_PANE)}
+      >
         <header className="pane-header">
           <strong>{activePath ?? 'No file selected'}</strong>
           <div className="review-actions">
@@ -303,14 +347,14 @@ export default function App() {
         </div>
       </section>
       </main>
-      {finderOpen && (
+      {workspace.finderOpen && (
         <FileFinder
           files={filesModeEntries}
           status={allFilesRequest.status}
           error={allFilesRequest.error}
           onRetry={loadAllFiles}
           onOpen={handleFinderOpen}
-          onClose={() => setFinderOpen(false)}
+          onClose={() => dispatchWorkspace({ type: 'finder_closed' })}
         />
       )}
     </>
