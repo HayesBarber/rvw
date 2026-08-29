@@ -1,8 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   FileTree,
   useFileTree,
-  useFileTreeSelection,
 } from '@pierre/trees/react'
 
 export default function FileTreePane({ files, mode, selectedPath, onSelectFile }) {
@@ -17,20 +16,50 @@ export default function FileTreePane({ files, mode, selectedPath, onSelectFile }
         .map((file) => ({ path: file.path, status: file.status })),
     [files],
   )
+  const filePathsRef = useRef(filePaths)
+  const onSelectFileRef = useRef(onSelectFile)
+  const synchronizingSelectionRef = useRef(false)
+
+  useEffect(() => {
+    filePathsRef.current = filePaths
+    onSelectFileRef.current = onSelectFile
+  }, [filePaths, onSelectFile])
+
+  const handleSelectionChange = useCallback((selectedPaths) => {
+    if (synchronizingSelectionRef.current) return
+    const nextPath = selectedPaths.findLast(
+      (path) => filePathsRef.current.has(path),
+    )
+    if (nextPath) onSelectFileRef.current(nextPath)
+  }, [])
+
   const { model } = useFileTree({
     paths: files.map((file) => file.path),
     gitStatus,
     initialExpansion: mode === 'changes' ? 'open' : 'closed',
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
+    onSelectionChange: handleSelectionChange,
   })
-  const selectedPaths = useFileTreeSelection(model)
 
   useEffect(() => {
-    const nextPath = selectedPaths.findLast((path) => filePaths.has(path))
-    if (nextPath && nextPath !== selectedPath) {
-      onSelectFile(nextPath)
+    const selectedPaths = model.getSelectedPaths()
+    if (
+      selectedPaths.length === (selectedPath ? 1 : 0) &&
+      selectedPaths[0] === selectedPath
+    ) {
+      return
     }
-  }, [filePaths, onSelectFile, selectedPath, selectedPaths])
+
+    synchronizingSelectionRef.current = true
+    try {
+      for (const path of selectedPaths) model.getItem(path)?.deselect()
+      if (selectedPath && filePaths.has(selectedPath)) {
+        model.getItem(selectedPath)?.select()
+      }
+    } finally {
+      synchronizingSelectionRef.current = false
+    }
+  }, [filePaths, model, selectedPath])
 
   return <FileTree model={model} className="file-tree" />
 }
