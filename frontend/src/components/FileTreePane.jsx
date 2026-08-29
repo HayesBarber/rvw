@@ -3,8 +3,10 @@ import {
   FileTree,
   useFileTree,
 } from '@pierre/trees/react'
-
-const actionAdapter = Object.freeze({})
+import {
+  createFileTreeActionAdapter,
+  fileTreeFocusCSS,
+} from '../file-tree-actions.js'
 
 export default function FileTreePane({
   files,
@@ -33,11 +35,6 @@ export default function FileTreePane({
     onSelectFileRef.current = onSelectFile
   }, [filePaths, onSelectFile])
 
-  useEffect(
-    () => registerActionAdapter(actionAdapter),
-    [registerActionAdapter],
-  )
-
   const handleSelectionChange = useCallback((selectedPaths) => {
     if (synchronizingSelectionRef.current) return
     const nextPath = selectedPaths.findLast(
@@ -52,7 +49,13 @@ export default function FileTreePane({
     initialExpansion: mode === 'changes' ? 'open' : 'closed',
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
     onSelectionChange: handleSelectionChange,
+    unsafeCSS: fileTreeFocusCSS,
   })
+
+  useEffect(
+    () => registerActionAdapter(createFileTreeActionAdapter(model, onSelectFile)),
+    [model, onSelectFile, registerActionAdapter],
+  )
 
   useEffect(() => {
     const selectedPaths = model.getSelectedPaths()
