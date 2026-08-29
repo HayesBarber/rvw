@@ -62,7 +62,17 @@ export function shouldCaptureKeyboardEvent(event) {
       if (target.hasAttribute('data-vim-ignore')) return false
     }
     const tagName = target.tagName?.toLowerCase()
-    if (target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    const role = typeof target.getAttribute === 'function'
+      ? target.getAttribute('role')
+      : null
+    if (
+      target.isContentEditable ||
+      tagName === 'input' ||
+      tagName === 'textarea' ||
+      tagName === 'select' ||
+      tagName === 'dialog' ||
+      role === 'dialog'
+    ) {
       return false
     }
     target = target.parentElement

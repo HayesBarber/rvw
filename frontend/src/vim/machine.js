@@ -200,9 +200,12 @@ export class VimController {
       this.state = result.state
       for (const listener of this.stateChangeListeners) listener()
     }
-    if (result.command) {
-      for (const listener of this.commandListeners) listener(result.command)
+    if (!result.command) return result
+
+    let handled = false
+    for (const listener of this.commandListeners) {
+      if (listener(result.command) === true) handled = true
     }
-    return result
+    return handled === result.handled ? result : { ...result, handled }
   }
 }

@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useMemo, useReducer } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import DiffPane from './components/DiffPane.jsx'
 import FileFinder from './components/FileFinder.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
+import {
+  createApplicationDispatcher,
+  createSurfaceActionRegistry,
+} from './application-dispatch.js'
+import { ApplicationAction } from './application-actions.js'
 import {
   RequestStatus,
   useCopyComments,
@@ -16,6 +28,7 @@ import {
   TreeMode,
   workspaceReducer,
 } from './workspace.js'
+import { useVimController } from './vim/index.js'
 
 export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(
@@ -27,6 +40,10 @@ export default function App() {
   const commentsRequest = useReviewComments()
   const copyRequest = useCopyComments()
   const overview = overviewRequest.data
+  const vimController = useVimController()
+  const fileTreePaneRef = useRef(null)
+  const diffPaneRef = useRef(null)
+  const [surfaceActions] = useState(createSurfaceActionRegistry)
 
   useEffect(() => {
     if (!overview) return
@@ -77,35 +94,11 @@ export default function App() {
     if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
   }, [allFilesRequest])
 
-  useEffect(() => {
-    function handleShortcut(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p') {
-        event.preventDefault()
-        openFileFinder()
-      }
-    }
-
-    document.addEventListener('keydown', handleShortcut)
-    return () => document.removeEventListener('keydown', handleShortcut)
-  }, [openFileFinder])
-
   const fileRequest = useReviewFile({
     diffId: overview?.id ?? null,
     path: activePath,
     changed: changedPaths.has(activePath),
   })
-
-  if (overviewRequest.status === RequestStatus.ERROR) {
-    return (
-      <main className="fatal-error">
-        Unable to load review: {overviewRequest.error}
-      </main>
-    )
-  }
-
-  if (!overview) {
-    return <main className="fatal-error">Loading review…</main>
-  }
 
   const fileLoading = fileRequest.status === RequestStatus.LOADING
   const fileDiff = fileRequest.status === RequestStatus.SUCCESS
@@ -129,15 +122,22 @@ export default function App() {
     return comment
   }
 
-  async function handleCopyComments() {
-    try {
-      await copyRequest.copy()
-    } catch {
-      // The request exposes its error for the existing status message.
+  const handleCopyComments = useCallback(() => {
+    if (
+      commentsRequest.data.length === 0 ||
+      copyRequest.status === RequestStatus.LOADING
+    ) {
+      return false
     }
-  }
 
-  function handleTreeModeChange(nextMode) {
+    copyRequest.copy().catch(() => {
+      // The request exposes its error for the existing status message.
+    })
+    return true
+  }, [commentsRequest.data.length, copyRequest])
+
+  const handleTreeModeChange = useCallback((nextMode) => {
+    if (!overview) return false
     const nextFiles = nextMode === TreeMode.FILES
       ? filesModeEntries
       : overview.files
@@ -153,7 +153,66 @@ export default function App() {
     ) {
       allFilesRequest.load()
     }
-  }
+    return true
+  }, [allFilesRequest, filesModeEntries, overview])
+
+  const focusSurface = useCallback((surface) => {
+    const pane = surface === ActiveSurface.FILE_TREE
+      ? fileTreePaneRef.current
+      : diffPaneRef.current
+    if (!pane) return false
+
+    dispatchWorkspace({ type: 'surface_activated', surface })
+    pane.focus({ preventScroll: true })
+    return true
+  }, [])
+
+  const registerFileTreeActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
+    [surfaceActions],
+  )
+  const registerDiffPaneActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
+    [surfaceActions],
+  )
+
+  const globalActions = useMemo(() => ({
+    [ApplicationAction.FOCUS_FILE_TREE]: () => (
+      focusSurface(ActiveSurface.FILE_TREE)
+    ),
+    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
+      focusSurface(ActiveSurface.DIFF_PANE)
+    ),
+    [ApplicationAction.SHOW_CHANGES]: () => (
+      handleTreeModeChange(TreeMode.CHANGES)
+    ),
+    [ApplicationAction.SHOW_FILES]: () => (
+      handleTreeModeChange(TreeMode.FILES)
+    ),
+    [ApplicationAction.OPEN_FILE_FINDER]: () => {
+      if (!overview) return false
+      openFileFinder()
+      return true
+    },
+    [ApplicationAction.COPY_COMMENTS]: handleCopyComments,
+  }), [
+    focusSurface,
+    handleCopyComments,
+    handleTreeModeChange,
+    openFileFinder,
+    overview,
+  ])
+
+  useEffect(() => {
+    const dispatchApplicationAction = createApplicationDispatcher({
+      getActiveSurface: () => workspace.activeSurface,
+      getSurfaceActions: surfaceActions.get,
+      globalActions,
+    })
+    return vimController.subscribeCommands((command) => (
+      dispatchApplicationAction(command.command, command.count)
+    ))
+  }, [globalActions, surfaceActions, vimController, workspace.activeSurface])
 
   function handleFinderOpen(path) {
     dispatchWorkspace({
@@ -167,6 +226,18 @@ export default function App() {
     dispatchWorkspace({ type: 'surface_activated', surface })
   }
 
+  if (overviewRequest.status === RequestStatus.ERROR) {
+    return (
+      <main className="fatal-error">
+        Unable to load review: {overviewRequest.error}
+      </main>
+    )
+  }
+
+  if (!overview) {
+    return <main className="fatal-error">Loading review…</main>
+  }
+
   return (
     <>
       <main
@@ -174,7 +245,9 @@ export default function App() {
         data-active-surface={workspace.activeSurface}
       >
       <section
+        ref={fileTreePaneRef}
         className="pane tree-pane"
+        tabIndex={-1}
         onPointerDown={() => activateSurface(ActiveSurface.FILE_TREE)}
         onFocusCapture={() => activateSurface(ActiveSurface.FILE_TREE)}
       >
@@ -223,13 +296,16 @@ export default function App() {
                 type: 'file_selected',
                 path,
               })}
+              registerActionAdapter={registerFileTreeActions}
             />
           )}
         </div>
       </section>
 
       <section
+        ref={diffPaneRef}
         className="pane diff-pane"
+        tabIndex={-1}
         onPointerDown={() => activateSurface(ActiveSurface.DIFF_PANE)}
         onFocusCapture={() => activateSurface(ActiveSurface.DIFF_PANE)}
       >
@@ -275,6 +351,7 @@ export default function App() {
             error={fileError}
             comments={comments}
             onCreateComment={handleCreateComment}
+            registerActionAdapter={registerDiffPaneActions}
           />
         </div>
       </section>

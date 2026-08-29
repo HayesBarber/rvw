@@ -4,7 +4,15 @@ import {
   useFileTree,
 } from '@pierre/trees/react'
 
-export default function FileTreePane({ files, mode, selectedPath, onSelectFile }) {
+const actionAdapter = Object.freeze({})
+
+export default function FileTreePane({
+  files,
+  mode,
+  selectedPath,
+  onSelectFile,
+  registerActionAdapter,
+}) {
   const filePaths = useMemo(
     () => new Set(files.map((file) => file.path)),
     [files],
@@ -24,6 +32,11 @@ export default function FileTreePane({ files, mode, selectedPath, onSelectFile }
     filePathsRef.current = filePaths
     onSelectFileRef.current = onSelectFile
   }, [filePaths, onSelectFile])
+
+  useEffect(
+    () => registerActionAdapter(actionAdapter),
+    [registerActionAdapter],
+  )
 
   const handleSelectionChange = useCallback((selectedPaths) => {
     if (synchronizingSelectionRef.current) return
