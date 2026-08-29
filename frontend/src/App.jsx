@@ -215,7 +215,7 @@ export default function App() {
             </p>
           ) : (
             <FileTreePane
-              key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}:${activePath ?? 'none'}`}
+              key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}`}
               files={visibleFiles}
               mode={workspace.treeMode}
               selectedPath={activePath}
