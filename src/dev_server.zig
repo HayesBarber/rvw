@@ -33,6 +33,12 @@ pub fn main(init: std.process.Init) !void {
         return err;
     };
     defer git.deinit();
+    var files = try rvw.provider.file.filesystem.FilesystemProvider.init(
+        init.gpa,
+        init.io,
+        options.directory.?,
+    );
+    defer files.deinit();
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
@@ -48,6 +54,7 @@ pub fn main(init: std.process.Init) !void {
         init.gpa,
         init.io,
         git.interface(),
+        files.interface(),
         comments.interface(),
         clipboard.interface(),
         logger,

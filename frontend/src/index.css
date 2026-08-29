@@ -68,7 +68,59 @@ textarea {
 }
 
 .tree-pane > .pane-header {
-  padding-left: 88px;
+  padding-left: 76px;
+}
+
+.tree-mode-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid #303033;
+  border-radius: 6px;
+  background: #0a0a0a;
+}
+
+.tree-mode-toggle button {
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #adadb1;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+
+.tree-mode-toggle button[aria-pressed='true'] {
+  background: #303033;
+  color: #fafafa;
+}
+
+.tree-load-status,
+.tree-load-error {
+  margin: 0;
+  padding: 10px 12px;
+  color: #adadb1;
+  font-size: 0.75rem;
+}
+
+.tree-load-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #ff6762;
+}
+
+.tree-load-error span {
+  flex: 1 1 auto;
+}
+
+.tree-load-error button {
+  padding: 2px 7px;
+  border: 1px solid #414145;
+  border-radius: 4px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
 }
 
 .diff-pane {

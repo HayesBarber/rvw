@@ -60,6 +60,19 @@ fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !
     return handler.dispatchRequest(res, .get_diff_overview);
 }
 
+fn getFiles(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .get_files);
+}
+
+fn getFile(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const query = req.query() catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    const path = query.get("path") orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path } });
+}
+
 fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const encoded_diff_id = req.param("diff_id") orelse
         return handler.failure(res, .bad_request, .malformed_request);
@@ -132,6 +145,8 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     const router = try server.router(.{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
+    router.get("/api/files", getFiles, .{});
+    router.get("/api/files/content", getFile, .{});
     router.get("/api/comments", getComments, .{});
     router.post("/api/comments", createComment, .{});
     router.post("/api/comments/copy-markdown", copyCommentsAsMarkdown, .{});

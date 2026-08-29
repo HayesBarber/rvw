@@ -12,6 +12,7 @@ pub const Core = struct {
     allocator: Allocator,
     io: Io,
     diff_provider: provider_module.diff.DiffProvider,
+    file_provider: provider_module.file.FileProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
     logger: log.Logger,
@@ -20,6 +21,7 @@ pub const Core = struct {
         allocator: Allocator,
         io: Io,
         diff_provider: provider_module.diff.DiffProvider,
+        file_provider: provider_module.file.FileProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
         logger: log.Logger,
@@ -28,6 +30,7 @@ pub const Core = struct {
             .allocator = allocator,
             .io = io,
             .diff_provider = diff_provider,
+            .file_provider = file_provider,
             .comment_provider = comment_provider,
             .clipboard = clipboard,
             .logger = logger,
@@ -46,6 +49,12 @@ pub const Core = struct {
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
+            .get_files => .{ .files = try self.file_provider.getFiles(self.io) },
+            .get_file => |details| .{ .file = .{
+                .path = details.path,
+                .status = .unchanged,
+                .content = try self.file_provider.getFile(self.io, details.path),
+            } },
             .get_file_diff => |details| .{
                 .file_diff = try self.diff_provider.getFileDiff(self.io, details.diff_id, details.path),
             },
@@ -134,6 +143,7 @@ test "copy comments as Markdown serializes all comments and copies once" {
         std.testing.allocator,
         threaded.io(),
         fake_diff,
+        .{ .context = &fake_diff_context, .vtable = undefined },
         comments.interface(),
         clipboard,
         log.stderrLogger(std.testing.allocator),
@@ -169,6 +179,7 @@ test "copy comments as Markdown rejects an empty review" {
         std.testing.allocator,
         threaded.io(),
         unused_diff,
+        .{ .context = &unused_context, .vtable = undefined },
         comments.interface(),
         unused_clipboard,
         log.stderrLogger(std.testing.allocator),
@@ -205,6 +216,7 @@ test "copy comments as Markdown propagates clipboard failures" {
         std.testing.allocator,
         threaded.io(),
         unused_diff,
+        .{ .context = &unused_context, .vtable = undefined },
         comments.interface(),
         clipboard,
         log.stderrLogger(std.testing.allocator),
@@ -214,6 +226,59 @@ test "copy comments as Markdown propagates clipboard failures" {
         error.ClipboardCommandFailed,
         core.dispatch(.copy_comments_as_markdown),
     );
+}
+
+test "file provider operations list paths and wrap unchanged file content" {
+    var threaded: Io.Threaded = .init(std.testing.allocator, .{ .environ = .empty });
+    defer threaded.deinit();
+
+    const FakeFiles = struct {
+        const paths: []const []const u8 = &.{ "README.md", "src/main.zig" };
+
+        fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
+            return paths;
+        }
+
+        fn getFile(_: *anyopaque, _: Io, path: []const u8) !model.FileContent {
+            if (!std.mem.eql(u8, path, "README.md")) return error.UnknownFile;
+            return .{ .file = .{ .file = .{ .name = "README.md", .contents = "hello\n" } } };
+        }
+    };
+    var context: u8 = 0;
+    const files: provider_module.file.FileProvider = .{
+        .context = &context,
+        .vtable = &.{ .getFiles = FakeFiles.getFiles, .getFile = FakeFiles.getFile },
+    };
+    const unused_diff: provider_module.diff.DiffProvider = .{ .context = &context, .vtable = undefined };
+    const unused_comments: provider_module.comment.CommentProvider = .{ .context = &context, .vtable = undefined };
+    const unused_clipboard: output.Clipboard = .{ .context = &context, .vtable = undefined };
+    var core = Core.init(
+        std.testing.allocator,
+        threaded.io(),
+        unused_diff,
+        files,
+        unused_comments,
+        unused_clipboard,
+    );
+
+    switch (try core.dispatch(.get_files)) {
+        .files => |paths| {
+            try std.testing.expectEqual(@as(usize, 2), paths.len);
+            try std.testing.expectEqualStrings("src/main.zig", paths[1]);
+        },
+        else => return error.UnexpectedResponse,
+    }
+    switch (try core.dispatch(.{ .get_file = .{ .path = "README.md" } })) {
+        .file => |file| {
+            try std.testing.expectEqual(.unchanged, file.status);
+            try std.testing.expectEqualStrings("README.md", file.path);
+            switch (file.content) {
+                .file => |content| try std.testing.expectEqualStrings("hello\n", content.file.contents),
+                else => return error.UnexpectedContent,
+            }
+        },
+        else => return error.UnexpectedResponse,
+    }
 }
 
 fn validComment(body: []const u8, target: model.CommentTarget) bool {

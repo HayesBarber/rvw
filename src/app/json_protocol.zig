@@ -46,6 +46,12 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
 
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
+    if (std.mem.eql(u8, operation, "get_files")) return .get_files;
+    if (std.mem.eql(u8, operation, "get_file")) {
+        const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
+        if (path.len == 0) return error.MalformedRequest;
+        return .{ .get_file = .{ .path = path } };
+    }
     if (std.mem.eql(u8, operation, "get_file_diff")) {
         const diff_id = jsonString(object.get("diffId")) orelse return error.MalformedRequest;
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
@@ -216,4 +222,39 @@ test "frontend log requests validate levels and structured fields" {
     );
     defer invalid.deinit();
     try std.testing.expectError(error.MalformedRequest, decodeRequestValue(invalid.value));
+}
+
+test "file requests decode through the JSON protocol" {
+    var list_parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"get_files\"}",
+        .{},
+    );
+    defer list_parsed.deinit();
+    switch (try decodeRequestValue(list_parsed.value)) {
+        .get_files => {},
+        else => return error.UnexpectedRequest,
+    }
+
+    var file_parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"get_file\",\"path\":\"src/main.zig\"}",
+        .{},
+    );
+    defer file_parsed.deinit();
+    switch (try decodeRequestValue(file_parsed.value)) {
+        .get_file => |details| try std.testing.expectEqualStrings("src/main.zig", details.path),
+        else => return error.UnexpectedRequest,
+    }
+}
+
+test "file list response encodes paths" {
+    const encoded = try encodeResponse(std.testing.allocator, .{
+        .files = &.{ "README.md", "src/main.zig" },
+    });
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expectEqualStrings("[\"README.md\",\"src/main.zig\"]", encoded);
 }

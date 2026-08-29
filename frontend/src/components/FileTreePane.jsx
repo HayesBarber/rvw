@@ -5,7 +5,7 @@ import {
   useFileTreeSelection,
 } from '@pierre/trees/react'
 
-export default function FileTreePane({ files, selectedPath, onSelectFile }) {
+export default function FileTreePane({ files, mode, selectedPath, onSelectFile }) {
   const filePaths = useMemo(
     () => new Set(files.map((file) => file.path)),
     [files],
@@ -20,8 +20,8 @@ export default function FileTreePane({ files, selectedPath, onSelectFile }) {
   const { model } = useFileTree({
     paths: files.map((file) => file.path),
     gitStatus,
-    initialExpansion: 'open',
-    initialSelectedPaths: [selectedPath],
+    initialExpansion: mode === 'changes' ? 'open' : 'closed',
+    initialSelectedPaths: selectedPath ? [selectedPath] : [],
   })
   const selectedPaths = useFileTreeSelection(model)
 
