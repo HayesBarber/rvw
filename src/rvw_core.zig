@@ -5,3 +5,4 @@ pub const core = @import("app/core.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
 pub const repository = @import("repository.zig");
 pub const output = @import("output.zig");
+pub const logging = @import("logging.zig");

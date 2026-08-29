@@ -11,6 +11,7 @@ pub fn encodeResponse(allocator: Allocator, response: model.Response) ![]u8 {
         .comments => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
         .comment => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
         .copy_comments_result => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
+        .log_result => |value| std.json.Stringify.valueAlloc(allocator, value, .{}),
     };
 }
 
@@ -40,6 +41,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         .comments => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
         .comment => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
         .copy_comments_result => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
+        .log_result => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
 }
 
@@ -65,7 +67,39 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
         const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
         return .{ .create_comment = .{ .body = body, .target = target } };
     }
+    if (std.mem.eql(u8, operation, "log")) {
+        const level = parseLogLevel(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse
+            return error.MalformedRequest;
+        const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
+        const context = parseOptionalObject(object.get("context")) orelse return error.MalformedRequest;
+        const metrics = parseOptionalObject(object.get("metrics")) orelse return error.MalformedRequest;
+        return .{ .log = .{
+            .level = level,
+            .message = message,
+            .context = context,
+            .metrics = metrics,
+        } };
+    }
     return error.UnknownOperation;
+}
+
+fn parseLogLevel(value: []const u8) ?@import("../logging.zig").Level {
+    if (std.mem.eql(u8, value, "debug")) return .debug;
+    if (std.mem.eql(u8, value, "info")) return .info;
+    if (std.mem.eql(u8, value, "warning")) return .warning;
+    if (std.mem.eql(u8, value, "error")) return .err;
+    return null;
+}
+
+/// The outer optional distinguishes malformed values from a valid absent/null
+/// value; structured context and metrics must be JSON objects when supplied.
+fn parseOptionalObject(value: ?std.json.Value) ??std.json.Value {
+    const actual = value orelse return @as(?std.json.Value, null);
+    return switch (actual) {
+        .null => @as(?std.json.Value, null),
+        .object => @as(?std.json.Value, actual),
+        else => null,
+    };
 }
 
 fn jsonString(value: ?std.json.Value) ?[]const u8 {
@@ -140,4 +174,48 @@ test "copy comments result encodes the copied comment count" {
     defer std.testing.allocator.free(encoded);
 
     try std.testing.expectEqualStrings("{\"commentCount\":2}", encoded);
+}
+
+test "frontend log requests validate levels and structured fields" {
+    var parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"log\",\"level\":\"warning\",\"message\":\"slow\",\"context\":{\"view\":\"diff\"},\"metrics\":{\"durationMs\":12}}",
+        .{},
+    );
+    defer parsed.deinit();
+    const request = try decodeRequestValue(parsed.value);
+    switch (request) {
+        .log => |details| {
+            try std.testing.expectEqual(@import("../logging.zig").Level.warning, details.level);
+            try std.testing.expectEqualStrings("slow", details.message);
+            try std.testing.expectEqualStrings("diff", details.context.?.object.get("view").?.string);
+            try std.testing.expectEqual(@as(i64, 12), details.metrics.?.object.get("durationMs").?.integer);
+        },
+        else => return error.UnexpectedRequest,
+    }
+
+    var minimal = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"log\",\"level\":\"debug\",\"message\":\"ready\"}",
+        .{},
+    );
+    defer minimal.deinit();
+    switch (try decodeRequestValue(minimal.value)) {
+        .log => |details| {
+            try std.testing.expect(details.context == null);
+            try std.testing.expect(details.metrics == null);
+        },
+        else => return error.UnexpectedRequest,
+    }
+
+    var invalid = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"log\",\"level\":\"fatal\",\"message\":\"boom\"}",
+        .{},
+    );
+    defer invalid.deinit();
+    try std.testing.expectError(error.MalformedRequest, decodeRequestValue(invalid.value));
 }

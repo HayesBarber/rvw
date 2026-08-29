@@ -124,3 +124,30 @@ export async function copyCommentsAsMarkdown() {
     body: JSON.stringify(request),
   })
 }
+
+/**
+ * @typedef {'debug' | 'info' | 'warning' | 'error'} LogLevel
+ */
+
+/**
+ * Sends a structured frontend event to the shared application logger. The
+ * backend owns the timestamp, source, and destination.
+ * @param {LogLevel} level
+ * @param {string} message
+ * @param {{ context?: Object, metrics?: Object }} [details]
+ * @returns {Promise<{ accepted: boolean }>}
+ */
+export async function logEvent(level, message, details = {}) {
+  const request = {
+    type: 'log',
+    level,
+    message,
+    ...(details.context === undefined ? {} : { context: details.context }),
+    ...(details.metrics === undefined ? {} : { metrics: details.metrics }),
+  }
+  return requestJson('/api/logs', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
