@@ -7,15 +7,32 @@ import {
   useState,
 } from 'react'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
+import {
+  createDiffCursorActionAdapter,
+  createDiffCursorRows,
+  reconcileDiffCursor,
+  scrollDiffCursorIntoView,
+} from '../diff-cursor-actions.js'
 import PaneStatus from './PaneStatus.jsx'
 
+const diffCursorCSS = `
+  [data-line][data-editor-active-line],
+  [data-column-number][data-editor-active-line] {
+    --diffs-editor-active-line-source-mix: 68%;
+  }
+
+  [data-line][data-editor-active-line] {
+    box-shadow: inset 0 1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent),
+      inset 0 -1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent);
+  }
+`
 const baseOptions = {
   diffStyle: 'split',
   enableGutterUtility: true,
   enableLineSelection: true,
   lineHoverHighlight: 'line',
+  unsafeCSS: diffCursorCSS,
 }
-const actionAdapter = Object.freeze({})
 
 function normalizeRange(path, range, isDiff) {
   const startSide = range.side ?? range.endSide ?? 'additions'
@@ -171,12 +188,27 @@ export default function DiffPane({
   const [draft, setDraft] = useState(null)
   const [selectedLines, setSelectedLines] = useState(null)
   const renderedFileRef = useRef(null)
+  const renderInstanceRef = useRef(null)
+  const cursorRowsRef = useRef([])
+  const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
 
-  useEffect(
-    () => registerActionAdapter(actionAdapter),
-    [registerActionAdapter],
-  )
+  const activateCursor = useCallback((cursor, scroll = true) => {
+    const instance = renderInstanceRef.current
+    const node = renderedFileRef.current
+    if (!instance || !node || !cursor) return false
+
+    cursorRef.current = cursor
+    instance.setEditorActiveLine(cursor.lineNumber, { side: cursor.side })
+    if (scroll) scrollDiffCursorIntoView(instance, node, cursor)
+    return true
+  }, [])
+
+  useEffect(() => registerActionAdapter(createDiffCursorActionAdapter({
+    getRows: () => cursorRowsRef.current,
+    getCursor: () => cursorRef.current,
+    activateCursor,
+  })), [activateCursor, registerActionAdapter])
 
   const finishScrollGuard = useCallback(() => {
     const guard = scrollGuardRef.current
@@ -191,16 +223,24 @@ export default function DiffPane({
     scrollGuardRef.current = null
   }, [])
 
-  const handlePostRender = useCallback((node, _instance, phase) => {
+  const handlePostRender = useCallback((node, instance, phase) => {
     if (phase === 'unmount') {
       finishScrollGuard()
       renderedFileRef.current = null
+      renderInstanceRef.current = null
+      cursorRowsRef.current = []
       return
     }
 
     renderedFileRef.current = node
+    renderInstanceRef.current = instance
+    const rows = createDiffCursorRows(instance)
+    const cursor = reconcileDiffCursor(rows, cursorRef.current)
+    cursorRowsRef.current = rows
+    cursorRef.current = cursor
+    if (cursor) activateCursor(cursor, false)
     finishScrollGuard()
-  }, [finishScrollGuard])
+  }, [activateCursor, finishScrollGuard])
 
   const guardNextAnnotationRender = useCallback(() => {
     if (scrollGuardRef.current) return
