@@ -50,7 +50,7 @@ const keySequence = (...keys) => Object.freeze(keys)
 const actionBindings = (...sequences) => Object.freeze(sequences)
 
 export const LEADER_KEY = '<leader>'
-export const DEFAULT_LEADER_KEY = '\\'
+export const DEFAULT_LEADER_KEY = '<Space>'
 
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({

@@ -69,15 +69,15 @@ test('leader placeholders compile to a concrete key without mutating the keymap'
     [ApplicationAction.COPY_COMMENTS]: [[LEADER_KEY, 'y']],
   }
 
-  assert.equal(DEFAULT_LEADER_KEY, '\\')
+  assert.equal(DEFAULT_LEADER_KEY, '<Space>')
   assert.deepEqual(compileApplicationKeymap(keymap), [{
     mode: VimMode.NORMAL,
-    keys: ['\\', 'y'],
+    keys: ['<Space>', 'y'],
     command: ApplicationAction.COPY_COMMENTS,
   }])
-  assert.deepEqual(compileApplicationKeymap(keymap, { leader: '<Space>' }), [{
+  assert.deepEqual(compileApplicationKeymap(keymap, { leader: '\\' }), [{
     mode: VimMode.NORMAL,
-    keys: ['<Space>', 'y'],
+    keys: ['\\', 'y'],
     command: ApplicationAction.COPY_COMMENTS,
   }])
   assert.deepEqual(keymap, {
