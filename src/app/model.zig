@@ -216,7 +216,7 @@ pub const Response = union(enum) {
     comments: []const Comment,
     comment: Comment,
     copy_comments_result: CopyCommentsResult,
-    log,
+    log: struct {},
 };
 
 pub const AppError = error{

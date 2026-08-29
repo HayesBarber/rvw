@@ -71,7 +71,13 @@ var system_runner_context: u8 = 0;
 
 fn copyForOs(runner: Runner, os: std.Target.Os.Tag, io: Io, text: []const u8) !void {
     switch (os) {
-        .macos => try runner.run(io, &.{"/usr/bin/pbcopy"}, text),
+        // pbcopy derives its input encoding from the locale. GUI launches may
+        // not provide one, causing UTF-8 text to be interpreted as MacRoman.
+        .macos => try runner.run(io, &.{
+            "/usr/bin/env",
+            "LC_ALL=en_US.UTF-8",
+            "/usr/bin/pbcopy",
+        }, text),
         .linux => runner.run(io, &.{"wl-copy"}, text) catch |err| switch (err) {
             error.ClipboardToolNotFound => try runner.run(io, &.{ "xclip", "-selection", "clipboard" }, text),
             else => return err,

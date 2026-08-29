@@ -85,7 +85,7 @@ pub const Core = struct {
                     .context = details.context,
                     .metrics = details.metrics,
                 });
-                break :blk .log;
+                break :blk .{ .log = .{} };
             },
         };
     }
