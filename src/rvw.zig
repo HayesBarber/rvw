@@ -12,7 +12,7 @@ pub const output = @import("output/output.zig");
 pub const log = @import("log/log.zig");
 
 test {
-    _ = @import("config.zig");
+    _ = @import("config/config.zig");
     _ = @import("app/startup.zig");
     _ = @import("app/core.zig");
     _ = @import("app/json_protocol.zig");

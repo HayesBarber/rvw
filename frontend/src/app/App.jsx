@@ -16,6 +16,7 @@ import {
 } from '../actions/application-dispatch.js'
 import { ApplicationAction } from '../actions/application-actions.js'
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
+import { closeApplication } from '../review/api.js'
 import {
   RequestStatus,
   useCopyComments,
@@ -215,6 +216,7 @@ export default function App() {
   )
 
   const globalActions = useMemo(() => ({
+    [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
       dispatchWorkspace({ type: 'file_tree_resized', steps: count })
       return true

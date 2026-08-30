@@ -38,7 +38,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     const run_tests = b.addRunArtifact(tests);
-    b.step("test", "Run unit tests").dependOn(&run_tests.step);
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_tests.step);
 
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
@@ -47,10 +48,14 @@ pub fn build(b: *std.Build) void {
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 
-    if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize);
+    if (b.graph.host.result.os.tag == .macos) addMacApp(b, optimize, test_step);
 }
 
-fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
+fn addMacApp(
+    b: *std.Build,
+    optimize: std.builtin.OptimizeMode,
+    test_step: *std.Build.Step,
+) void {
     const host = b.graph.host;
     const swift_target = switch (host.result.cpu.arch) {
         .aarch64 => "arm64-apple-macosx14.0",
@@ -96,10 +101,20 @@ fn addMacApp(b: *std.Build, optimize: std.builtin.OptimizeMode) void {
         "-framework", "WebKit",
     });
     swift.addFileArg(b.path("macos/main.swift"));
+    swift.addFileArg(b.path("macos/native_host.swift"));
     swift.step.dependOn(&library.step);
     swift.addFileArg(library.getEmittedBin());
     swift.addArg("-o");
     const executable = swift.addOutputFileArg("Rvw");
+
+    const swift_tests = b.addSystemCommand(&.{ "xcrun", "swiftc" });
+    swift_tests.addFileArg(b.path("macos/native_host.swift"));
+    swift_tests.addFileArg(b.path("macos/native_host_tests.swift"));
+    swift_tests.addArg("-o");
+    const swift_test_executable = swift_tests.addOutputFileArg("NativeHostTests");
+    const run_swift_tests = b.addSystemCommand(&.{"/usr/bin/env"});
+    run_swift_tests.addFileArg(swift_test_executable);
+    test_step.dependOn(&run_swift_tests.step);
 
     const install_executable = b.addInstallFileWithDir(
         executable,

@@ -64,6 +64,26 @@ async function requestJson(url, nativeRequest, options = {}) {
 }
 
 /**
+ * Requests normal application termination from the native host. Development
+ * mode deliberately leaves the HTTP server running and reports the action as
+ * unavailable instead of sending it an application-lifecycle request.
+ * @returns {boolean} Whether a native host accepted the request.
+ */
+export function closeApplication() {
+  const native = window.webkit?.messageHandlers?.native
+  if (!native) return false
+
+  try {
+    Promise.resolve(native.postMessage({ type: 'application_close' })).catch(() => {
+      // The native process may exit before WebKit settles the reply promise.
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * @typedef {Object} ConfigurationDiagnostic
  * @property {'malformed_json' | 'invalid_schema' | 'file_read_failure'} code
  * @property {string} message
