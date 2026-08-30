@@ -1,3 +1,4 @@
+// Generic fuzzy matching used by searchable frontend controls.
 function subsequenceScore(query, candidate) {
   let score = 0
   let previousIndex = -2
