@@ -377,11 +377,7 @@ export default function App() {
             <button
               className="file-comment-button"
               type="button"
-              aria-keyshortcuts="Shift+C"
               disabled={!canCommentOnFile}
-              title={canCommentOnFile
-                ? 'Comment on file (C)'
-                : 'File comments require an open text file'}
               onClick={handleAddFileComment}
             >
               Comment on file
