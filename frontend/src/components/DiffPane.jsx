@@ -228,80 +228,19 @@ function CommentEditor({ comment, onCancel, onSave }) {
   )
 }
 
-function DeleteConfirmation({ comment, onCancel, onDelete }) {
-  const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState(null)
-  const cancelRef = useRef(null)
-
-  useLayoutEffect(() => {
-    cancelRef.current?.focus({ preventScroll: true })
-  }, [])
-
-  async function confirmDelete() {
-    if (deleting) return
-    setDeleting(true)
-    setError(null)
-    try {
-      await onDelete(comment.id)
-    } catch (nextError) {
-      setError(nextError.message)
-      setDeleting(false)
-    }
-  }
-
-  return (
-    <div
-      className="comment-delete-confirmation"
-      role="alertdialog"
-      aria-label="Confirm comment deletion"
-      data-vim-ignore
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !deleting) {
-          event.preventDefault()
-          onCancel()
-        }
-      }}
-    >
-      <p>Permanently delete this comment?</p>
-      {error && <p className="comment-error" role="alert">{error}</p>}
-      <div className="comment-actions">
-        <button
-          ref={cancelRef}
-          type="button"
-          disabled={deleting}
-          onClick={onCancel}
-        >
-          Keep comment
-        </button>
-        <button
-          className="danger-button"
-          type="button"
-          disabled={deleting}
-          onClick={confirmDelete}
-        >
-          {deleting ? 'Deleting…' : 'Delete permanently'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function SavedComment({
   comment,
+  deleteError,
+  deleting,
   editing,
-  confirmingDelete,
   onActivate,
-  onBeginDelete,
   onBeginEdit,
-  onCancelDelete,
   onCancelEdit,
   onDelete,
   onEdit,
 }) {
   const editButtonRef = useRef(null)
-  const deleteButtonRef = useRef(null)
   const wasEditingRef = useRef(editing)
-  const wasConfirmingDeleteRef = useRef(confirmingDelete)
   const lineLabel = comment.target.kind === 'line'
     ? (comment.target.startLine === comment.target.endLine
         ? `Line ${comment.target.startLine}`
@@ -315,13 +254,6 @@ function SavedComment({
     wasEditingRef.current = editing
   }, [editing])
 
-  useLayoutEffect(() => {
-    if (wasConfirmingDeleteRef.current && !confirmingDelete) {
-      deleteButtonRef.current?.focus({ preventScroll: true })
-    }
-    wasConfirmingDeleteRef.current = confirmingDelete
-  }, [confirmingDelete])
-
   return (
     <article
       className="saved-comment"
@@ -332,7 +264,7 @@ function SavedComment({
     >
       <header>
         <span>{lineLabel}</span>
-        {!editing && !confirmingDelete && (
+        {!editing && (
           <span className="saved-comment-actions">
             <button
               ref={editButtonRef}
@@ -343,12 +275,12 @@ function SavedComment({
               Edit
             </button>
             <button
-              ref={deleteButtonRef}
               type="button"
               aria-label={`Delete comment on ${lineLabel}`}
-              onClick={() => onBeginDelete(comment)}
+              disabled={deleting}
+              onClick={() => onDelete(comment)}
             >
-              Delete
+              {deleting ? 'Deleting…' : 'Delete'}
             </button>
           </span>
         )}
@@ -358,13 +290,7 @@ function SavedComment({
       ) : (
         <p>{comment.body}</p>
       )}
-      {confirmingDelete && (
-        <DeleteConfirmation
-          comment={comment}
-          onCancel={onCancelDelete}
-          onDelete={onDelete}
-        />
-      )}
+      {deleteError && <p className="comment-error" role="alert">{deleteError}</p>}
     </article>
   )
 }
@@ -399,10 +325,12 @@ export default function DiffPane({
   const scrollGuardRef = useRef(null)
   const commentReturnFocusRef = useRef(null)
   const activeCommentIdRef = useRef(null)
+  const deletingCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [deletingCommentId, setDeletingCommentId] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => {
     commentsRef.current = comments
@@ -571,25 +499,32 @@ export default function DiffPane({
   const beginEditComment = useCallback((comment) => {
     guardNextAnnotationRender()
     activeCommentIdRef.current = comment.id
-    setDeletingCommentId(null)
+    setDeleteError(null)
     setEditingCommentId(comment.id)
   }, [guardNextAnnotationRender])
 
-  const beginDeleteComment = useCallback((comment) => {
+  const deleteCommentImmediately = useCallback(async (comment) => {
+    if (deletingCommentIdRef.current) return
+
     guardNextAnnotationRender()
     activeCommentIdRef.current = comment.id
+    deletingCommentIdRef.current = comment.id
     setEditingCommentId(null)
     setDeletingCommentId(comment.id)
-  }, [guardNextAnnotationRender])
+    setDeleteError(null)
+    try {
+      await deleteComment(comment.id)
+    } catch (nextError) {
+      setDeleteError({ commentId: comment.id, message: nextError.message })
+    } finally {
+      deletingCommentIdRef.current = null
+      setDeletingCommentId(null)
+    }
+  }, [deleteComment, guardNextAnnotationRender])
 
   const cancelEditComment = useCallback(() => {
     guardNextAnnotationRender()
     setEditingCommentId(null)
-  }, [guardNextAnnotationRender])
-
-  const cancelDeleteComment = useCallback(() => {
-    guardNextAnnotationRender()
-    setDeletingCommentId(null)
   }, [guardNextAnnotationRender])
 
   useEffect(() => registerActionAdapter({
@@ -611,16 +546,16 @@ export default function DiffPane({
       beginAddFile: beginFileComment,
       getComment: activeComment,
       beginEdit: beginEditComment,
-      beginDelete: beginDeleteComment,
+      deleteComment: deleteCommentImmediately,
     }),
   }), [
     activateCursor,
     activeComment,
     beginCursorComment,
     beginFileComment,
-    beginDeleteComment,
     beginEditComment,
     centerCursor,
+    deleteCommentImmediately,
     fileDiff,
     registerActionAdapter,
   ])
@@ -679,26 +614,24 @@ export default function DiffPane({
     return (
       <SavedComment
         comment={comment}
+        deleteError={deleteError?.commentId === comment.id ? deleteError.message : null}
+        deleting={deletingCommentId === comment.id}
         editing={editingCommentId === comment.id}
-        confirmingDelete={deletingCommentId === comment.id}
         onActivate={activateComment}
-        onBeginDelete={beginDeleteComment}
         onBeginEdit={beginEditComment}
-        onCancelDelete={cancelDeleteComment}
         onCancelEdit={cancelEditComment}
-        onDelete={deleteComment}
+        onDelete={deleteCommentImmediately}
         onEdit={editComment}
       />
     )
   }, [
     activateComment,
-    beginDeleteComment,
     beginEditComment,
     cancelComment,
-    cancelDeleteComment,
     cancelEditComment,
     createComment,
-    deleteComment,
+    deleteCommentImmediately,
+    deleteError,
     deletingCommentId,
     editComment,
     editingCommentId,

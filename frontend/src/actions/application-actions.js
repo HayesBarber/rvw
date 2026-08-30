@@ -57,7 +57,7 @@ const actionDefinitions = [
   [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, 'Add a comment at the active diff cursor.'],
   [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, 'Add a comment to the open file.'],
   [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, 'Edit the comment in the active context.'],
-  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context after confirmation.'],
+  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context.'],
 ]
 
 /** Stable application actions indexed by their user-configurable identifier. */
