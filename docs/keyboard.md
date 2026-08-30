@@ -28,7 +28,7 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
 | `comments.edit` | `e` | Edit the saved comment at the active diff context. |
-| `comments.delete` | `d c` | Open deletion confirmation for the saved comment at the active diff context. |
+| `comments.delete` | `d c` | Delete the saved comment at the active diff context. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 

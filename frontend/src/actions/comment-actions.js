@@ -63,7 +63,7 @@ export function createCommentActionAdapter({
   beginAddFile,
   getComment,
   beginEdit,
-  beginDelete,
+  deleteComment,
 }) {
   const invoke = (operation) => {
     const comment = getComment()
@@ -86,6 +86,6 @@ export function createCommentActionAdapter({
       return true
     },
     [ApplicationAction.EDIT_COMMENT]: () => invoke(beginEdit),
-    [ApplicationAction.DELETE_COMMENT]: () => invoke(beginDelete),
+    [ApplicationAction.DELETE_COMMENT]: () => invoke(deleteComment),
   })
 }

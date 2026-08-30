@@ -122,7 +122,7 @@ test('semantic actions operate only when a comment context is active', () => {
     beginAddFile: (target) => calls.push(['add-file', target]),
     getComment: () => current,
     beginEdit: (comment) => calls.push(['edit', comment.id]),
-    beginDelete: (comment) => calls.push(['delete', comment.id]),
+    deleteComment: (comment) => calls.push(['delete', comment.id]),
   })
 
   assert.equal(adapter[ApplicationAction.ADD_COMMENT](), true)

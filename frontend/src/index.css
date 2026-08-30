@@ -544,23 +544,3 @@ textarea {
   padding: 0;
   border: 0;
 }
-
-.comment-delete-confirmation {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #303033;
-}
-
-.comment-delete-confirmation > p {
-  margin: 0;
-  font-size: 0.8rem;
-}
-
-.comment-actions .danger-button {
-  border-color: #9a3835;
-  background: #762d2a;
-}
-
-.comment-actions .danger-button:hover:not(:disabled) {
-  background: #943b37;
-}
