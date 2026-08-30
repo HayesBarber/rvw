@@ -51,6 +51,62 @@ test('activation opens files without changing selection during focus movement', 
   assert.deepEqual(model.getSelectedPaths(), [])
 })
 
+test('half-page actions use the live viewport, scale counts, clamp, and keep focus semantics', (t) => {
+  const paths = Array.from({ length: 10 }, (_, index) => `${index}.txt`)
+  const model = createTree(paths)
+  t.after(() => model.cleanUp())
+  const opened = []
+  const scrollRequests = []
+  model.getFileTreeContainer = () => ({ clientHeight: model.getItemHeight() * 4 })
+  model.scrollToPath = (path, options) => scrollRequests.push([path, options])
+  const actions = createFileTreeActionAdapter(model, (path) => opened.push(path))
+
+  model.focusPath('2.txt')
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_DOWN](), true)
+  assert.equal(model.getFocusedPath(), '4.txt')
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_DOWN](2), true)
+  assert.equal(model.getFocusedPath(), '8.txt')
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_UP](20), true)
+  assert.equal(model.getFocusedPath(), '0.txt')
+  assert.deepEqual(model.getSelectedPaths(), [])
+  assert.deepEqual(opened, [])
+  assert.deepEqual(scrollRequests.at(-1), [
+    '0.txt',
+    { focus: false, offset: 'nearest' },
+  ])
+})
+
+test('half-page actions safely handle non-scrollable, unmounted, and empty trees', (t) => {
+  const nonScrollable = createTree(['0.txt', '1.txt', '2.txt'])
+  const unmounted = createTree()
+  const empty = createTree([])
+  t.after(() => {
+    nonScrollable.cleanUp()
+    unmounted.cleanUp()
+    empty.cleanUp()
+  })
+
+  nonScrollable.getFileTreeContainer = () => ({ clientHeight: 300 })
+  nonScrollable.scrollToPath = () => {}
+  nonScrollable.focusFirstItem()
+  assert.equal(createFileTreeActionAdapter(
+    nonScrollable,
+    () => {},
+  )[ApplicationAction.CURSOR_PAGE_DOWN](), true)
+  assert.equal(nonScrollable.getFocusedPath(), '2.txt')
+
+  assert.equal(createFileTreeActionAdapter(
+    unmounted,
+    () => {},
+  )[ApplicationAction.CURSOR_PAGE_DOWN](), false)
+
+  empty.getFileTreeContainer = () => ({ clientHeight: 120 })
+  assert.equal(createFileTreeActionAdapter(
+    empty,
+    () => {},
+  )[ApplicationAction.CURSOR_PAGE_UP](), false)
+})
+
 test('centering scrolls the focused item without focusing, selecting, or opening', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())

@@ -9,6 +9,7 @@ import {
   createDiffCursorActionAdapter,
   createDiffCursorRows,
   moveDiffCursor,
+  moveDiffCursorByPage,
   reconcileDiffCursor,
   scrollDiffCursorIntoView,
 } from './diff-cursor-actions.js'
@@ -166,6 +167,68 @@ test('cursor movement follows visual rows, preserves sides, and applies counts',
   ), { lineNumber: 11, side: DiffCursorSide.DELETIONS })
 })
 
+test('half-page movement uses rendered positions, preserves sides, scales counts, and clamps', () => {
+  const rows = Array.from({ length: 10 }, (_, index) => ({
+    index,
+    additions: index + 20,
+    ...(index === 6 ? {} : { deletions: index + 10 }),
+  }))
+  const viewport = { nodeType: 1, clientHeight: 100 }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition(lineNumber, side) {
+      const rowIndex = side === DiffCursorSide.DELETIONS
+        ? lineNumber - 10
+        : lineNumber - 20
+      return { top: rowIndex * 20, height: 20 }
+    },
+  }
+
+  assert.deepEqual(moveDiffCursorByPage(
+    instance,
+    rows,
+    { lineNumber: 12, side: DiffCursorSide.DELETIONS },
+    1,
+  ), { lineNumber: 15, side: DiffCursorSide.DELETIONS })
+  assert.deepEqual(moveDiffCursorByPage(
+    instance,
+    rows,
+    { lineNumber: 12, side: DiffCursorSide.DELETIONS },
+    1,
+    2,
+  ), { lineNumber: 17, side: DiffCursorSide.DELETIONS })
+  assert.deepEqual(moveDiffCursorByPage(
+    instance,
+    rows,
+    { lineNumber: 17, side: DiffCursorSide.DELETIONS },
+    -1,
+    20,
+  ), { lineNumber: 10, side: DiffCursorSide.DELETIONS })
+  viewport.clientHeight = 40
+  assert.deepEqual(moveDiffCursorByPage(
+    instance,
+    rows,
+    { lineNumber: 15, side: DiffCursorSide.DELETIONS },
+    1,
+  ), { lineNumber: 26, side: DiffCursorSide.ADDITIONS })
+})
+
+test('half-page movement safely handles non-scrollable and unavailable surfaces', () => {
+  const rows = [{ index: 0, additions: 1 }, { index: 1, additions: 2 }]
+  const cursor = { lineNumber: 1, side: DiffCursorSide.ADDITIONS }
+
+  assert.deepEqual(moveDiffCursorByPage({
+    getEditorViewport: () => ({ nodeType: 1, clientHeight: 200 }),
+    getLinePosition: (lineNumber) => ({ top: (lineNumber - 1) * 20, height: 20 }),
+  }, rows, cursor, 1), { lineNumber: 2, side: DiffCursorSide.ADDITIONS })
+  assert.equal(moveDiffCursorByPage(null, rows, cursor, 1), null)
+  assert.equal(moveDiffCursorByPage({
+    getEditorViewport: () => ({ nodeType: 1, clientHeight: 0 }),
+    getLinePosition: () => ({ top: 0, height: 20 }),
+  }, rows, cursor, 1), null)
+  assert.equal(moveDiffCursorByPage({}, [], cursor, 1), null)
+})
+
 test('cursor reconciliation preserves identity and chooses the nearest same-side line', () => {
   const rows = [
     { index: 0, additions: 3, deletions: 4 },
@@ -197,6 +260,10 @@ test('the action adapter handles first, last, centered, repeated movement, and e
   const actions = createDiffCursorActionAdapter({
     getRows: () => rows,
     getCursor: () => cursor,
+    getInstance: () => ({
+      getEditorViewport: () => ({ nodeType: 1, clientHeight: 80 }),
+      getLinePosition: (lineNumber) => ({ top: (lineNumber - 1) * 20, height: 20 }),
+    }),
     activateCursor(nextCursor) {
       cursor = nextCursor
       activated.push(nextCursor)
@@ -217,16 +284,21 @@ test('the action adapter handles first, last, centered, repeated movement, and e
   assert.equal(actions[ApplicationAction.CURSOR_UP](20), true)
   assert.deepEqual(cursor, { lineNumber: 1, side: DiffCursorSide.ADDITIONS })
   assert.equal(activated.length, 4)
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_DOWN](), true)
+  assert.deepEqual(cursor, { lineNumber: 3, side: DiffCursorSide.ADDITIONS })
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_UP](), true)
+  assert.deepEqual(cursor, { lineNumber: 1, side: DiffCursorSide.ADDITIONS })
   assert.equal(actions[ApplicationAction.CURSOR_CENTER](), true)
   assert.deepEqual(centered, [{
     lineNumber: 1,
     side: DiffCursorSide.ADDITIONS,
   }])
-  assert.equal(activated.length, 4)
+  assert.equal(activated.length, 6)
 
   rows = []
   cursor = null
   assert.equal(actions[ApplicationAction.CURSOR_DOWN](1), false)
+  assert.equal(actions[ApplicationAction.CURSOR_PAGE_DOWN](1), false)
   assert.equal(actions[ApplicationAction.CURSOR_FIRST](), false)
   assert.equal(actions[ApplicationAction.CURSOR_CENTER](), false)
 })

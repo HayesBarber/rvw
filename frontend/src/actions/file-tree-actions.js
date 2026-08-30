@@ -30,6 +30,21 @@ function moveFocus(model, operation, count = 1) {
   return model.getFocusedItem() !== null
 }
 
+function halfPageItemCount(model) {
+  const viewportHeight = model.getFileTreeContainer?.()?.clientHeight ?? 0
+  const itemHeight = model.getItemHeight?.() ?? 0
+  if (viewportHeight <= 0 || itemHeight <= 0) return 0
+  return Math.max(1, Math.round(viewportHeight / itemHeight / 2))
+}
+
+function moveFocusByPage(model, operation, count = 1) {
+  const pageItems = halfPageItemCount(model)
+  if (pageItems === 0) return false
+  return moveFocus(model, operation, pageItems * (
+    Number.isSafeInteger(count) && count > 0 ? count : 1
+  ))
+}
+
 /** Adapts semantic application actions to the public @pierre/trees API. */
 export function createFileTreeActionAdapter(model, onSelectFile) {
   return Object.freeze({
@@ -39,6 +54,16 @@ export function createFileTreeActionAdapter(model, onSelectFile) {
       count,
     ),
     [ApplicationAction.CURSOR_DOWN]: (count) => moveFocus(
+      model,
+      () => model.focusNextItem(),
+      count,
+    ),
+    [ApplicationAction.CURSOR_PAGE_UP]: (count) => moveFocusByPage(
+      model,
+      () => model.focusPreviousItem(),
+      count,
+    ),
+    [ApplicationAction.CURSOR_PAGE_DOWN]: (count) => moveFocusByPage(
       model,
       () => model.focusNextItem(),
       count,

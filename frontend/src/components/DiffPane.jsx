@@ -568,6 +568,7 @@ export default function DiffPane({
     ...createDiffCursorActionAdapter({
       getRows: () => cursorRowsRef.current,
       getCursor: () => cursorRef.current,
+      getInstance: () => renderInstanceRef.current,
       activateCursor,
       centerCursor,
     }),
