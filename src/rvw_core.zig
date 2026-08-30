@@ -1,10 +1,10 @@
 pub const model = @import("app/model.zig");
-pub const config = @import("config.zig");
-pub const provider = @import("provider.zig");
+pub const config = @import("config/config.zig");
+pub const provider = @import("provider/provider.zig");
 pub const dispatcher = @import("app/dispatcher.zig");
 pub const core = @import("app/core.zig");
 pub const startup = @import("app/startup.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
-pub const repository = @import("repository.zig");
-pub const output = @import("output.zig");
-pub const log = @import("log.zig");
+pub const repository = @import("util/repository.zig");
+pub const output = @import("output/output.zig");
+pub const log = @import("log/log.zig");
