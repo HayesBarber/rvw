@@ -1,4 +1,4 @@
-import { getConfiguration } from './api.js'
+import { getConfiguration } from './review/api.js'
 import {
   compileApplicationKeymap,
   defaultNormalKeymap,

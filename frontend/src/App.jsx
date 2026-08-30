@@ -23,7 +23,7 @@ import {
   useReviewComments,
   useReviewFile,
   useReviewOverview,
-} from './review-data.js'
+} from './review/review-data.js'
 import {
   ActiveSurface,
   initialWorkspaceState,
