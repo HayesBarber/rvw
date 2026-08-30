@@ -29,6 +29,7 @@ export const ApplicationAction = Object.freeze({
   OPEN_FILE_FINDER: 'file_finder.open',
   COPY_COMMENTS: 'comments.copy',
   ADD_COMMENT: 'comments.add',
+  ADD_FILE_COMMENT: 'comments.add_file',
   EDIT_COMMENT: 'comments.edit',
   DELETE_COMMENT: 'comments.delete',
 })
@@ -54,6 +55,7 @@ const actionDefinitions = [
   [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, 'Open the file finder.'],
   [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, 'Copy all review comments as Markdown.'],
   [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, 'Add a comment at the active diff cursor.'],
+  [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, 'Add a comment to the open file.'],
   [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, 'Edit the comment in the active context.'],
   [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context after confirmation.'],
 ]
@@ -113,6 +115,7 @@ export const defaultNormalKeymap = Object.freeze({
   ),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
+  [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'c')),
 })

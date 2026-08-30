@@ -2,6 +2,23 @@ import { ApplicationAction } from './application-actions.js'
 
 // Adapts review comments to the application action vocabulary.
 
+/** Builds a file-level target for a currently open repository path. */
+export function fileCommentTarget(path) {
+  if (typeof path !== 'string' || path.length === 0) return null
+  return { kind: 'file', path }
+}
+
+/** Resolves a file target only when displayable text is currently loaded. */
+export function openFileCommentTarget(fileDiff) {
+  if (
+    !fileDiff ||
+    (fileDiff.content?.kind !== 'diff' && fileDiff.content?.kind !== 'file')
+  ) {
+    return null
+  }
+  return fileCommentTarget(fileDiff.path)
+}
+
 /** Builds a single-line target when the cursor still identifies a renderable row. */
 export function commentTargetAtCursor(path, cursor, rows) {
   if (
@@ -42,6 +59,8 @@ export function commentAtCursor(comments, path, cursor) {
 export function createCommentActionAdapter({
   getAddTarget,
   beginAdd,
+  getAddFileTarget,
+  beginAddFile,
   getComment,
   beginEdit,
   beginDelete,
@@ -58,6 +77,12 @@ export function createCommentActionAdapter({
       const target = getAddTarget()
       if (!target) return false
       beginAdd(target)
+      return true
+    },
+    [ApplicationAction.ADD_FILE_COMMENT]: () => {
+      const target = getAddFileTarget()
+      if (!target) return false
+      beginAddFile(target)
       return true
     },
     [ApplicationAction.EDIT_COMMENT]: () => invoke(beginEdit),

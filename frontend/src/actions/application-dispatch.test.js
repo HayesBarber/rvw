@@ -110,7 +110,7 @@ test('diff-pane actions are unhandled unless the diff pane is active', () => {
   let additions = 0
   const registry = createSurfaceActionRegistry()
   registry.register(ActiveSurface.DIFF_PANE, {
-    [ApplicationAction.ADD_COMMENT]: () => {
+    [ApplicationAction.ADD_FILE_COMMENT]: () => {
       additions += 1
       return true
     },
@@ -120,9 +120,9 @@ test('diff-pane actions are unhandled unless the diff pane is active', () => {
     getSurfaceActions: registry.get,
   })
 
-  assert.equal(dispatch(ApplicationAction.ADD_COMMENT), false)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), false)
   activeSurface = ActiveSurface.DIFF_PANE
-  assert.equal(dispatch(ApplicationAction.ADD_COMMENT), true)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), true)
   assert.equal(additions, 1)
 })
 

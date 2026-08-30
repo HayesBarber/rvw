@@ -15,6 +15,7 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { ApplicationAction } from '../actions/application-actions.js'
+import { openFileCommentTarget } from '../actions/comment-actions.js'
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
 import { closeApplication } from '../review/api.js'
 import {
@@ -126,6 +127,7 @@ export default function App() {
   const fileError = fileRequest.status === RequestStatus.ERROR
     ? fileRequest.error
     : null
+  const canCommentOnFile = Boolean(openFileCommentTarget(fileDiff))
   const comments = commentsRequest.data
   const copyMessage = (() => {
     if (copyRequest.status === RequestStatus.LOADING) return 'Copying…'
@@ -214,6 +216,12 @@ export default function App() {
     (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
     [surfaceActions],
   )
+
+  const handleAddFileComment = useCallback(() => {
+    const action = surfaceActions
+      .get(ActiveSurface.DIFF_PANE)?.[ApplicationAction.ADD_FILE_COMMENT]
+    return typeof action === 'function' && action()
+  }, [surfaceActions])
 
   const globalActions = useMemo(() => ({
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
@@ -366,6 +374,14 @@ export default function App() {
         <header className="pane-header">
           <strong>{activePath ?? 'No file selected'}</strong>
           <div className="review-actions">
+            <button
+              className="file-comment-button"
+              type="button"
+              disabled={!canCommentOnFile}
+              onClick={handleAddFileComment}
+            >
+              Comment on file
+            </button>
             <button
               className="file-finder-button"
               type="button"
