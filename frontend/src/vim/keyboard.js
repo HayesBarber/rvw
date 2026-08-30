@@ -14,6 +14,45 @@ const namedKeys = Object.freeze({
   ' ': 'Space',
   Tab: 'Tab',
 })
+const namedKeyNotations = new Set(Object.values(namedKeys))
+const eventModifiers = Object.freeze([
+  Object.freeze(['ctrlKey', 'C']),
+  Object.freeze(['altKey', 'M']),
+  Object.freeze(['metaKey', 'D']),
+  Object.freeze(['shiftKey', 'S']),
+])
+const modifierPrefixes = Object.freeze(
+  Array.from({ length: (1 << eventModifiers.length) - 1 }, (_, index) => (
+    `${eventModifiers
+      .filter((_, bit) => (index + 1) & (1 << bit))
+      .map(([, notation]) => notation)
+      .join('-')}-`
+  )).sort((left, right) => right.length - left.length),
+)
+
+function isControlCharacter(key) {
+  const code = key.charCodeAt(0)
+  return code <= 0x1f || code === 0x7f
+}
+
+/** Returns whether a key matches the notation emitted by keyboardEventToKey. */
+export function isNormalizedVimKey(key) {
+  if (typeof key !== 'string' || key.length === 0) return false
+
+  if (key.length === 1) {
+    return key !== ' ' && !isControlCharacter(key)
+  }
+
+  if (!key.startsWith('<') || !key.endsWith('>')) return false
+  const notation = key.slice(1, -1)
+  if (namedKeyNotations.has(notation)) return true
+  const prefix = modifierPrefixes.find((candidate) => notation.startsWith(candidate))
+  if (!prefix) return false
+  const base = notation.slice(prefix.length)
+  if (namedKeyNotations.has(base)) return true
+  return base.length === 1 && base === base.toLowerCase() &&
+    !isControlCharacter(base) && base !== ' '
+}
 
 function printableKey(event) {
   if (event.code?.startsWith('Key')) return event.code.slice(3).toLowerCase()
@@ -35,11 +74,9 @@ export function keyboardEventToKey(event) {
 
   const base = named ?? printableKey(event)
   if (!base) return null
-  const modifiers = []
-  if (event.ctrlKey) modifiers.push('C')
-  if (event.altKey) modifiers.push('M')
-  if (event.metaKey) modifiers.push('D')
-  if (event.shiftKey) modifiers.push('S')
+  const modifiers = eventModifiers
+    .filter(([property]) => event[property])
+    .map(([, notation]) => notation)
   return `<${modifiers.length > 0 ? `${modifiers.join('-')}-` : ''}${base}>`
 }
 

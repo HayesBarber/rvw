@@ -1,4 +1,5 @@
 import { compileBindings, VimMode } from './vim/machine.js'
+import { isNormalizedVimKey } from './vim/keyboard.js'
 
 export const ActionScope = Object.freeze({
   GLOBAL: 'global',
@@ -102,6 +103,13 @@ function validateKeymap(keymap) {
       }
       if (sequence.some((key) => typeof key !== 'string' || key.length === 0)) {
         throw new TypeError(`Application action ${action} keys must be non-empty strings`)
+      }
+      for (const key of sequence) {
+        if (key !== LEADER_KEY && !isNormalizedVimKey(key)) {
+          throw new TypeError(
+            `Application action ${action} key ${JSON.stringify(key)} is not normalized Vim notation`,
+          )
+        }
       }
     }
   }

@@ -23,6 +23,12 @@ body {
   overflow: auto;
 }
 
+.application-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100vh;
+}
+
 button,
 input,
 textarea {
@@ -34,8 +40,43 @@ textarea {
   grid-template-columns: 320px minmax(0, 1fr);
   width: 100%;
   min-width: 960px;
-  height: 100vh;
+  min-height: 0;
   overflow: hidden;
+}
+
+.keyboard-status {
+  display: flex;
+  min-width: 0;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 10px;
+  border-top: 1px solid #303033;
+  background: #141415;
+  color: #adadb1;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.keyboard-diagnostic {
+  min-width: 0;
+  overflow: hidden;
+  color: #ff9c99;
+  text-overflow: ellipsis;
+}
+
+.keyboard-input-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.keyboard-input-status strong {
+  color: #8fb0ff;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
 }
 
 .pane {
@@ -341,7 +382,7 @@ textarea {
 }
 
 .fatal-error {
-  min-height: 100vh;
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
