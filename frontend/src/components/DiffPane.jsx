@@ -18,6 +18,7 @@ import {
   commentAtCursor,
   commentTargetAtCursor,
   createCommentActionAdapter,
+  openFileCommentTarget,
 } from '../actions/comment-actions.js'
 import PaneStatus from './PaneStatus.jsx'
 
@@ -64,6 +65,8 @@ function normalizeRange(path, range, isDiff) {
 }
 
 function targetLabel(target) {
+  if (target.kind === 'file') return `File comment on ${target.path}`
+
   const side = target.side === 'old' ? 'old' : 'new'
   const lines = target.startLine === target.endLine
     ? `line ${target.startLine}`
@@ -322,6 +325,7 @@ function SavedComment({
   return (
     <article
       className="saved-comment"
+      data-comment-kind={comment.target.kind}
       tabIndex={0}
       onFocus={() => onActivate(comment.id)}
       onPointerDown={() => onActivate(comment.id)}
@@ -393,6 +397,7 @@ export default function DiffPane({
   const cursorRowsRef = useRef([])
   const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
+  const commentReturnFocusRef = useRef(null)
   const activeCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
@@ -506,6 +511,7 @@ export default function DiffPane({
 
   const beginComment = useCallback((range) => {
     if (!fileDiff || !range) return
+    commentReturnFocusRef.current = document.activeElement
     const nextDraft = normalizeRange(fileDiff.path, range, isDiff)
     guardNextAnnotationRender()
     activateRangeCommentContext(range)
@@ -514,6 +520,7 @@ export default function DiffPane({
   }, [activateRangeCommentContext, fileDiff, guardNextAnnotationRender, isDiff])
 
   const beginCursorComment = useCallback((target) => {
+    commentReturnFocusRef.current = document.activeElement
     guardNextAnnotationRender()
     setDraft({
       annotationSide: target.side === 'old' ? 'deletions' : 'additions',
@@ -521,10 +528,22 @@ export default function DiffPane({
     })
   }, [guardNextAnnotationRender])
 
+  const beginFileComment = useCallback((target) => {
+    commentReturnFocusRef.current = document.activeElement
+    guardNextAnnotationRender()
+    setSelectedLines(null)
+    setDraft({ target })
+  }, [guardNextAnnotationRender])
+
   const cancelComment = useCallback(() => {
+    const returnFocus = commentReturnFocusRef.current
+    commentReturnFocusRef.current = null
     guardNextAnnotationRender()
     setDraft(null)
     setSelectedLines(null)
+    requestAnimationFrame(() => {
+      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
+    })
   }, [guardNextAnnotationRender])
 
   const createComment = useCallback((body, target) => (
@@ -588,6 +607,8 @@ export default function DiffPane({
         cursorRowsRef.current,
       ),
       beginAdd: beginCursorComment,
+      getAddFileTarget: () => openFileCommentTarget(fileDiff),
+      beginAddFile: beginFileComment,
       getComment: activeComment,
       beginEdit: beginEditComment,
       beginDelete: beginDeleteComment,
@@ -596,9 +617,11 @@ export default function DiffPane({
     activateCursor,
     activeComment,
     beginCursorComment,
+    beginFileComment,
     beginDeleteComment,
     beginEditComment,
     centerCursor,
+    fileDiff,
     registerActionAdapter,
   ])
 
@@ -621,13 +644,19 @@ export default function DiffPane({
       .map((comment) => commentAnnotation(comment, isDiff, fallbackSide))
 
     if (draft) {
+      const lineNumber = draft.target.kind === 'line' ? draft.target.endLine : 0
       const annotation = {
-        lineNumber: draft.target.endLine,
+        lineNumber,
         metadata: { kind: 'draft', draft },
       }
-      nextAnnotations.push(isDiff
-        ? { ...annotation, side: draft.annotationSide }
-        : annotation)
+      if (isDiff) {
+        const side = draft.target.kind === 'line'
+          ? draft.annotationSide
+          : fallbackSide
+        nextAnnotations.push({ ...annotation, side })
+      } else {
+        nextAnnotations.push(annotation)
+      }
     }
     return nextAnnotations
   }, [comments, draft, fileDiff, isDiff])
@@ -637,7 +666,9 @@ export default function DiffPane({
       const { target } = annotation.metadata.draft
       return (
         <CommentComposer
-          key={`${target.side}:${target.startLine}:${target.endLine}`}
+          key={target.kind === 'file'
+            ? `file:${target.path}`
+            : `${target.side}:${target.startLine}:${target.endLine}`}
           target={target}
           onCancel={cancelComment}
           onCreate={createComment}

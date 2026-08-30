@@ -24,6 +24,7 @@ test('configured actions replace defaults while missing actions retain them', ()
         normal: {
           [ApplicationAction.CURSOR_UP]: [['w']],
           [ApplicationAction.ADD_COMMENT]: [['a']],
+          [ApplicationAction.ADD_FILE_COMMENT]: [['f', 'c']],
         },
       },
     },
@@ -37,6 +38,10 @@ test('configured actions replace defaults while missing actions retain them', ()
     [['j'], ['<Down>']],
   )
   assert.deepEqual(bindingKeys(result.bindings, ApplicationAction.ADD_COMMENT), [['a']])
+  assert.deepEqual(
+    bindingKeys(result.bindings, ApplicationAction.ADD_FILE_COMMENT),
+    [['f', 'c']],
+  )
 })
 
 test('an empty configured sequence list disables its action', () => {

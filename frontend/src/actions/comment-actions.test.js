@@ -6,6 +6,8 @@ import {
   commentAtCursor,
   commentTargetAtCursor,
   createCommentActionAdapter,
+  fileCommentTarget,
+  openFileCommentTarget,
 } from './comment-actions.js'
 
 const comments = [{
@@ -77,6 +79,31 @@ test('line comment targets reject unavailable and stale cursor contexts', () => 
   }, [{ additions: 4 }]), null)
 })
 
+test('file comment targets contain only the current repository path', () => {
+  assert.deepEqual(fileCommentTarget('src/main.zig'), {
+    kind: 'file',
+    path: 'src/main.zig',
+  })
+  assert.equal(fileCommentTarget(null), null)
+  assert.equal(fileCommentTarget(''), null)
+})
+
+test('file comment targets support changed and unchanged text only', () => {
+  assert.deepEqual(openFileCommentTarget({
+    path: 'src/main.zig',
+    content: { kind: 'diff' },
+  }), { kind: 'file', path: 'src/main.zig' })
+  assert.deepEqual(openFileCommentTarget({
+    path: 'README.md',
+    content: { kind: 'file' },
+  }), { kind: 'file', path: 'README.md' })
+  assert.equal(openFileCommentTarget(null), null)
+  assert.equal(openFileCommentTarget({
+    path: 'logo.png',
+    content: { kind: 'unavailable', reason: 'binary' },
+  }), null)
+})
+
 test('semantic actions operate only when a comment context is active', () => {
   let current = comments[0]
   let addTarget = {
@@ -86,21 +113,27 @@ test('semantic actions operate only when a comment context is active', () => {
     startLine: 5,
     endLine: 5,
   }
+  let addFileTarget = fileCommentTarget('src/main.zig')
   const calls = []
   const adapter = createCommentActionAdapter({
     getAddTarget: () => addTarget,
     beginAdd: (target) => calls.push(['add', target]),
+    getAddFileTarget: () => addFileTarget,
+    beginAddFile: (target) => calls.push(['add-file', target]),
     getComment: () => current,
     beginEdit: (comment) => calls.push(['edit', comment.id]),
     beginDelete: (comment) => calls.push(['delete', comment.id]),
   })
 
   assert.equal(adapter[ApplicationAction.ADD_COMMENT](), true)
+  assert.equal(adapter[ApplicationAction.ADD_FILE_COMMENT](), true)
   assert.equal(adapter[ApplicationAction.EDIT_COMMENT](), true)
   assert.equal(adapter[ApplicationAction.DELETE_COMMENT](), true)
   addTarget = null
+  addFileTarget = null
   current = null
   assert.equal(adapter[ApplicationAction.ADD_COMMENT](), false)
+  assert.equal(adapter[ApplicationAction.ADD_FILE_COMMENT](), false)
   assert.equal(adapter[ApplicationAction.EDIT_COMMENT](), false)
   assert.deepEqual(calls, [
     ['add', {
@@ -110,6 +143,7 @@ test('semantic actions operate only when a comment context is active', () => {
       startLine: 5,
       endLine: 5,
     }],
+    ['add-file', { kind: 'file', path: 'src/main.zig' }],
     ['edit', 'comment-1'],
     ['delete', 'comment-1'],
   ])

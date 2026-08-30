@@ -206,7 +206,8 @@ textarea {
   cursor: pointer;
 }
 
-.file-finder-button {
+.file-finder-button,
+.file-comment-button {
   padding: 5px 10px;
   border: 1px solid #414145;
   border-radius: 5px;
@@ -215,8 +216,15 @@ textarea {
   cursor: pointer;
 }
 
-.file-finder-button:hover {
+.file-finder-button:hover,
+.file-comment-button:hover:not(:disabled) {
   background: #303033;
+}
+
+.file-comment-button:disabled {
+  color: #737378;
+  cursor: default;
+  opacity: 0.7;
 }
 
 .copy-markdown-button:hover:not(:disabled) {
@@ -484,6 +492,10 @@ textarea {
 
 .saved-comment {
   padding: 12px 14px;
+}
+
+.saved-comment[data-comment-kind='file'] {
+  border-left: 3px solid #8fb0ff;
 }
 
 .saved-comment header {
