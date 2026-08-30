@@ -14,4 +14,7 @@ pub const log = @import("log.zig");
 test {
     _ = @import("config.zig");
     _ = @import("app/startup.zig");
+    _ = @import("app/core.zig");
+    _ = @import("app/json_protocol.zig");
+    _ = @import("provider/comment/memory.zig");
 }

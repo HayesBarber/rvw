@@ -24,6 +24,8 @@ export const ApplicationAction = Object.freeze({
   SHOW_FILES: 'tree_mode.files',
   OPEN_FILE_FINDER: 'file_finder.open',
   COPY_COMMENTS: 'comments.copy',
+  EDIT_COMMENT: 'comments.edit',
+  DELETE_COMMENT: 'comments.delete',
 })
 
 const actionDefinitions = [
@@ -43,6 +45,8 @@ const actionDefinitions = [
   [ApplicationAction.SHOW_FILES, ActionScope.GLOBAL, 'Show all repository files in the file tree.'],
   [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, 'Open the file finder.'],
   [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, 'Copy all review comments as Markdown.'],
+  [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, 'Edit the comment in the active context.'],
+  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context after confirmation.'],
 ]
 
 /** Stable application actions indexed by their user-configurable identifier. */
@@ -96,6 +100,8 @@ export const defaultNormalKeymap = Object.freeze({
     keySequence('<D-p>'),
   ),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
+  [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
+  [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'c')),
 })
 
 function validateKeymap(keymap) {

@@ -22,6 +22,8 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `tree_mode.files` | `g f` | Show all repository files. |
 | `file_finder.open` | `<C-p>`, `<D-p>` | Open the file finder. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
+| `comments.edit` | `e` | Edit the saved comment at the active diff context. |
+| `comments.delete` | `d c` | Open deletion confirmation for the saved comment at the active diff context. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
@@ -33,7 +35,7 @@ rvw reads `~/.config/rvw/config.json` once when the application starts. Create t
 
 The JSON root accepts one optional `keybindings` object. `keybindings` accepts one optional `normal` object. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings.
 
-This complete example replaces three actions, disables one action, and leaves every omitted action at its built-in binding:
+This complete example replaces four actions, disables one action, and leaves every omitted action at its built-in binding:
 
 ```json
 {
@@ -42,6 +44,7 @@ This complete example replaces three actions, disables one action, and leaves ev
       "cursor.up": [["w"], ["<Up>"]],
       "cursor.down": [["s"], ["<Down>"]],
       "focus.file_tree": [["<leader>", "t"]],
+      "comments.edit": [["c", "e"]],
       "comments.copy": []
     }
   }

@@ -148,6 +148,35 @@ export async function createComment(body, target) {
 }
 
 /**
+ * Replaces only the body of an existing comment.
+ * @param {string} commentId
+ * @param {string} body
+ * @returns {Promise<Comment>}
+ */
+export async function editComment(commentId, body) {
+  const request = { type: 'edit_comment', commentId, body }
+  return requestJson(`/api/comments/${encodeURIComponent(commentId)}`, request, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
+/**
+ * Permanently deletes an existing comment.
+ * @param {string} commentId
+ * @returns {Promise<{ commentId: string }>}
+ */
+export async function deleteComment(commentId) {
+  const request = { type: 'delete_comment', commentId }
+  return requestJson(`/api/comments/${encodeURIComponent(commentId)}`, request, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
+/**
  * Copies every current review comment as structured Markdown.
  * @returns {Promise<{ commentCount: number }>}
  */

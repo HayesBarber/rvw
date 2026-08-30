@@ -33,11 +33,7 @@ const Handler = struct {
     fn dispatchRequest(self: *Handler, res: *httpz.Response, request: model.Request) !void {
         const response = self.dispatcher.dispatch(request) catch |err| {
             const code = model.errorCode(err);
-            const status: std.http.Status = switch (code) {
-                .unknown_diff, .unknown_file => .not_found,
-                .malformed_request, .no_comments => .bad_request,
-                else => .internal_server_error,
-            };
+            const status = errorStatus(code);
             return self.failure(res, status, code);
         };
         setJsonHeaders(res);
@@ -55,6 +51,18 @@ const Handler = struct {
         res.body = try json_protocol.encodeError(res.arena, code);
     }
 };
+
+fn errorStatus(code: model.ErrorCode) std.http.Status {
+    return switch (code) {
+        .unknown_diff, .unknown_file, .unknown_comment => .not_found,
+        .malformed_request,
+        .invalid_comment,
+        .invalid_comment_id,
+        .no_comments,
+        => .bad_request,
+        else => .internal_server_error,
+    };
+}
 
 fn getConfiguration(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(res, .get_configuration);
@@ -112,6 +120,62 @@ fn createComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
     }
 }
 
+fn editComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const comment_id = try commentIdParam(handler, req, res) orelse return;
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .edit_comment => |details| {
+            if (!std.mem.eql(u8, comment_id, details.comment_id)) {
+                return handler.failure(res, .bad_request, .invalid_comment_id);
+            }
+            return handler.dispatchRequest(res, request);
+        },
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
+fn deleteComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const comment_id = try commentIdParam(handler, req, res) orelse return;
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .delete_comment => |details| {
+            if (!std.mem.eql(u8, comment_id, details.comment_id)) {
+                return handler.failure(res, .bad_request, .invalid_comment_id);
+            }
+            return handler.dispatchRequest(res, request);
+        },
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
+fn commentIdParam(
+    handler: *Handler,
+    req: *httpz.Request,
+    res: *httpz.Response,
+) !?[]const u8 {
+    const encoded = req.param("comment_id") orelse {
+        try handler.failure(res, .bad_request, .invalid_comment_id);
+        return null;
+    };
+    const comment_id = (httpz.Url.unescape(res.arena, &.{}, encoded) catch {
+        try handler.failure(res, .bad_request, .invalid_comment_id);
+        return null;
+    }).value;
+    return comment_id;
+}
+
 fn copyCommentsAsMarkdown(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const body = req.body() orelse
         return handler.failure(res, .bad_request, .malformed_request);
@@ -154,6 +218,8 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.get("/api/files/content", getFile, .{});
     router.get("/api/comments", getComments, .{});
     router.post("/api/comments", createComment, .{});
+    router.patch("/api/comments/:comment_id", editComment, .{});
+    router.delete("/api/comments/:comment_id", deleteComment, .{});
     router.post("/api/comments/copy-markdown", copyCommentsAsMarkdown, .{});
     router.post("/api/logs", createLog, .{});
 
@@ -168,4 +234,10 @@ fn logRequest(req: *const httpz.Request) void {
 fn setJsonHeaders(res: *httpz.Response) void {
     res.header("content-type", "application/json; charset=utf-8");
     res.header("cache-control", "no-store");
+}
+
+test "HTTP comment mutation errors distinguish invalid and stale IDs" {
+    try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_comment));
+    try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_comment_id));
+    try std.testing.expectEqual(std.http.Status.not_found, errorStatus(.unknown_comment));
 }
