@@ -25,6 +25,7 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `tree_mode.files` | `g f` | Show all repository files. |
 | `file_finder.open` | `<C-p>`, `<D-p>` | Open the file finder. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
+| `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.edit` | `e` | Edit the saved comment at the active diff context. |
 | `comments.delete` | `d c` | Open deletion confirmation for the saved comment at the active diff context. |
 

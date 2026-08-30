@@ -5,6 +5,7 @@ export const ActionScope = Object.freeze({
   GLOBAL: 'global',
   ACTIVE_SURFACE: 'active_surface',
   FILE_TREE: 'file_tree',
+  DIFF_PANE: 'diff_pane',
 })
 
 export const ApplicationAction = Object.freeze({
@@ -27,6 +28,7 @@ export const ApplicationAction = Object.freeze({
   SHOW_FILES: 'tree_mode.files',
   OPEN_FILE_FINDER: 'file_finder.open',
   COPY_COMMENTS: 'comments.copy',
+  ADD_COMMENT: 'comments.add',
   EDIT_COMMENT: 'comments.edit',
   DELETE_COMMENT: 'comments.delete',
 })
@@ -51,6 +53,7 @@ const actionDefinitions = [
   [ApplicationAction.SHOW_FILES, ActionScope.GLOBAL, 'Show all repository files in the file tree.'],
   [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, 'Open the file finder.'],
   [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, 'Copy all review comments as Markdown.'],
+  [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, 'Add a comment at the active diff cursor.'],
   [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, 'Edit the comment in the active context.'],
   [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context after confirmation.'],
 ]
@@ -109,6 +112,7 @@ export const defaultNormalKeymap = Object.freeze({
     keySequence('<D-p>'),
   ),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
+  [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'c')),
 })
