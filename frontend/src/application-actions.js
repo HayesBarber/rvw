@@ -16,6 +16,8 @@ export const ApplicationAction = Object.freeze({
   FILE_TREE_ITEM_ACTIVATE: 'file_tree.item.activate',
   TREE_COLLAPSE_OR_PARENT: 'tree.collapse_or_parent',
   TREE_EXPAND: 'tree.expand',
+  TREE_SIZE_INCREASE: 'tree.size.increase',
+  TREE_SIZE_DECREASE: 'tree.size.decrease',
   FOCUS_FILE_TREE: 'focus.file_tree',
   FOCUS_DIFF_PANE: 'focus.diff_pane',
   SHOW_CHANGES: 'tree_mode.changes',
@@ -33,6 +35,8 @@ const actionDefinitions = [
   [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, 'Activate the focused file-tree item.'],
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
   [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, 'Expand the focused tree item.'],
+  [ApplicationAction.TREE_SIZE_INCREASE, ActionScope.GLOBAL, 'Widen the file-tree pane.'],
+  [ApplicationAction.TREE_SIZE_DECREASE, ActionScope.GLOBAL, 'Narrow the file-tree pane.'],
   [ApplicationAction.FOCUS_FILE_TREE, ActionScope.GLOBAL, 'Focus the file tree.'],
   [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.GLOBAL, 'Focus the diff pane.'],
   [ApplicationAction.SHOW_CHANGES, ActionScope.GLOBAL, 'Show changed files in the file tree.'],
@@ -76,6 +80,12 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.TREE_EXPAND]: actionBindings(
     keySequence('l'),
     keySequence('<Right>'),
+  ),
+  [ApplicationAction.TREE_SIZE_INCREASE]: actionBindings(
+    keySequence('<C-w>', '>'),
+  ),
+  [ApplicationAction.TREE_SIZE_DECREASE]: actionBindings(
+    keySequence('<C-w>', '<'),
   ),
   [ApplicationAction.FOCUS_FILE_TREE]: actionBindings(keySequence('g', 't')),
   [ApplicationAction.FOCUS_DIFF_PANE]: actionBindings(keySequence('g', 'd')),
