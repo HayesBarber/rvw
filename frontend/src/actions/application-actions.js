@@ -1,5 +1,5 @@
-import { compileBindings, VimMode } from './vim/machine.js'
-import { isNormalizedVimKey } from './vim/keyboard.js'
+import { compileBindings, VimMode } from '../vim/machine.js'
+import { isNormalizedVimKey } from '../vim/keyboard.js'
 
 export const ActionScope = Object.freeze({
   GLOBAL: 'global',

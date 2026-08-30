@@ -3,6 +3,8 @@ import {
   applicationActionCatalog,
 } from './application-actions.js'
 
+// Routes semantic actions to the currently active application surface.
+
 function invokeAction(actions, action, count) {
   const handler = actions?.[action]
   return typeof handler === 'function' && handler(count) === true

@@ -3,7 +3,7 @@ import test from 'node:test'
 import {
   ApplicationAction,
   defaultApplicationBindings,
-} from './application-actions.js'
+} from './actions/application-actions.js'
 import {
   USER_CONFIGURATION_PATH,
   loadKeyboardConfiguration,

@@ -10,7 +10,7 @@ import {
   defaultApplicationBindings,
   defaultNormalKeymap,
 } from './application-actions.js'
-import { VimController, VimMode } from './vim/machine.js'
+import { VimController, VimMode } from '../vim/machine.js'
 
 test('the action catalog is frozen, enumerable, and documented', () => {
   const actionIds = Object.values(ApplicationAction)

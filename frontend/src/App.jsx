@@ -13,8 +13,8 @@ import KeyboardStatus from './components/KeyboardStatus.jsx'
 import {
   createApplicationDispatcher,
   createSurfaceActionRegistry,
-} from './application-dispatch.js'
-import { ApplicationAction } from './application-actions.js'
+} from './actions/application-dispatch.js'
+import { ApplicationAction } from './actions/application-actions.js'
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
 import {
   RequestStatus,

@@ -1,5 +1,7 @@
 import { ApplicationAction } from './application-actions.js'
 
+// Adapts file tree operations to the application action vocabulary.
+
 export const fileTreeFocusCSS = `
   [data-type='item'][tabindex='0'] {
     box-shadow: inset 0 0 0 var(--trees-focus-ring-width)

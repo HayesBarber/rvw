@@ -13,11 +13,11 @@ import {
   createDiffCursorRows,
   reconcileDiffCursor,
   scrollDiffCursorIntoView,
-} from '../diff-cursor-actions.js'
+} from '../actions/diff-cursor-actions.js'
 import {
   commentAtCursor,
   createCommentActionAdapter,
-} from '../comment-actions.js'
+} from '../actions/comment-actions.js'
 import PaneStatus from './PaneStatus.jsx'
 
 const diffCursorCSS = `

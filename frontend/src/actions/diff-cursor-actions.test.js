@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+
 import { parseDiffFromFile } from '@pierre/diffs'
 import { ApplicationAction } from './application-actions.js'
 import {

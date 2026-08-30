@@ -2,7 +2,7 @@ import { getConfiguration } from './api.js'
 import {
   compileApplicationKeymap,
   defaultNormalKeymap,
-} from './application-actions.js'
+} from './actions/application-actions.js'
 
 export const USER_CONFIGURATION_PATH = '~/.config/rvw/config.json'
 
