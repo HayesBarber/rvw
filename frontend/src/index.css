@@ -487,12 +487,68 @@ textarea {
 }
 
 .saved-comment header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 4px;
   color: #fafafa;
 }
 
-.saved-comment p {
+.saved-comment:focus {
+  outline: 1px solid #69b1ff;
+  outline-offset: 1px;
+}
+
+.saved-comment > p {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.45;
+}
+
+.saved-comment-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.saved-comment-actions button {
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: #9ecbff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.saved-comment-actions button:hover,
+.saved-comment-actions button:focus-visible {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.comment-editor {
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.comment-delete-confirmation {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #303033;
+}
+
+.comment-delete-confirmation > p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.comment-actions .danger-button {
+  border-color: #9a3835;
+  background: #762d2a;
+}
+
+.comment-actions .danger-button:hover:not(:disabled) {
+  background: #943b37;
 }

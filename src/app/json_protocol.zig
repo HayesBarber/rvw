@@ -65,6 +65,15 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
         const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
         return .{ .create_comment = .{ .body = body, .target = target } };
     }
+    if (std.mem.eql(u8, operation, "edit_comment")) {
+        const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
+        const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
+        return .{ .edit_comment = .{ .comment_id = comment_id, .body = body } };
+    }
+    if (std.mem.eql(u8, operation, "delete_comment")) {
+        const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
+        return .{ .delete_comment = .{ .comment_id = comment_id } };
+    }
     if (std.mem.eql(u8, operation, "log")) {
         const level = parseLogLevel(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse
             return error.MalformedRequest;
@@ -147,4 +156,27 @@ fn encodeEnvelopeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
         .ok = false,
         .@"error" = .{ .code = code, .message = model.errorMessage(code) },
     }, .{});
+}
+
+test "comment mutation requests decode IDs and edited bodies" {
+    var parsed_edit = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"edit_comment\",\"commentId\":\"comment-7\",\"body\":\"revised\"}",
+        .{},
+    );
+    defer parsed_edit.deinit();
+    const edit = try decodeRequestValue(parsed_edit.value);
+    try std.testing.expectEqualStrings("comment-7", edit.edit_comment.comment_id);
+    try std.testing.expectEqualStrings("revised", edit.edit_comment.body);
+
+    var parsed_delete = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"delete_comment\",\"commentId\":\"comment-7\"}",
+        .{},
+    );
+    defer parsed_delete.deinit();
+    const delete = try decodeRequestValue(parsed_delete.value);
+    try std.testing.expectEqualStrings("comment-7", delete.delete_comment.comment_id);
 }

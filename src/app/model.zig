@@ -198,6 +198,11 @@ pub const Request = union(enum) {
         body: []const u8,
         target: CommentTarget,
     },
+    edit_comment: struct {
+        comment_id: []const u8,
+        body: []const u8,
+    },
+    delete_comment: struct { comment_id: []const u8 },
     log: struct {
         level: log.Level,
         message: []const u8,
@@ -210,6 +215,10 @@ pub const CopyCommentsResult = struct {
     commentCount: usize,
 };
 
+pub const DeleteCommentResult = struct {
+    commentId: []const u8,
+};
+
 pub const Response = union(enum) {
     configuration: config.Snapshot,
     diff_overview: DiffOverview,
@@ -218,6 +227,7 @@ pub const Response = union(enum) {
     file_diff: FileDiff,
     comments: []const Comment,
     comment: Comment,
+    delete_comment_result: DeleteCommentResult,
     copy_comments_result: CopyCommentsResult,
     log: struct {},
 };
@@ -226,6 +236,8 @@ pub const AppError = error{
     UnknownDiff,
     UnknownFile,
     InvalidComment,
+    InvalidCommentId,
+    UnknownComment,
     InvalidLogEntry,
     NoComments,
 };
@@ -235,6 +247,9 @@ pub const ErrorCode = enum {
     unknown_operation,
     unknown_diff,
     unknown_file,
+    invalid_comment,
+    invalid_comment_id,
+    unknown_comment,
     no_comments,
     clipboard_unavailable,
     internal_error,
@@ -244,7 +259,9 @@ pub fn errorCode(err: anyerror) ErrorCode {
     return switch (err) {
         error.UnknownDiff => .unknown_diff,
         error.UnknownFile => .unknown_file,
-        error.InvalidComment => .malformed_request,
+        error.InvalidComment => .invalid_comment,
+        error.InvalidCommentId => .invalid_comment_id,
+        error.UnknownComment => .unknown_comment,
         error.InvalidLogEntry => .malformed_request,
         error.NoComments => .no_comments,
         error.ClipboardCommandFailed,
@@ -262,6 +279,9 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .unknown_operation => "Unknown operation",
         .unknown_diff => "Unknown diff",
         .unknown_file => "Unknown file",
+        .invalid_comment => "Comment body or target is invalid",
+        .invalid_comment_id => "Comment ID is invalid",
+        .unknown_comment => "Comment was not found",
         .no_comments => "No review comments to copy",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",
         .internal_error => "Internal error",

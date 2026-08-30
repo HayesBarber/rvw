@@ -69,9 +69,54 @@ pub const MemoryProvider = struct {
         return self.comments[0..self.comment_count];
     }
 
+    fn editComment(
+        context: *anyopaque,
+        io: Io,
+        comment_id: []const u8,
+        body: []const u8,
+    ) !model.Comment {
+        const self: *MemoryProvider = @ptrCast(@alignCast(context));
+        self.mutex.lockUncancelable(io);
+        defer self.mutex.unlock(io);
+
+        for (self.comments[0..self.comment_count]) |*comment| {
+            if (!std.mem.eql(u8, comment.id, comment_id)) continue;
+            const owned_body = try self.allocator.dupe(u8, body);
+            self.allocator.free(comment.body);
+            comment.body = owned_body;
+            return comment.*;
+        }
+        return error.UnknownComment;
+    }
+
+    fn deleteComment(context: *anyopaque, io: Io, comment_id: []const u8) !void {
+        const self: *MemoryProvider = @ptrCast(@alignCast(context));
+        self.mutex.lockUncancelable(io);
+        defer self.mutex.unlock(io);
+
+        for (self.comments[0..self.comment_count], 0..) |comment, index| {
+            if (!std.mem.eql(u8, comment.id, comment_id)) continue;
+            self.allocator.free(comment.id);
+            self.allocator.free(comment.body);
+            freeTarget(self.allocator, comment.target);
+            if (index + 1 < self.comment_count) {
+                std.mem.copyForwards(
+                    model.Comment,
+                    self.comments[index .. self.comment_count - 1],
+                    self.comments[index + 1 .. self.comment_count],
+                );
+            }
+            self.comment_count -= 1;
+            return;
+        }
+        return error.UnknownComment;
+    }
+
     const vtable: comment_provider.CommentProvider.VTable = .{
         .createComment = createComment,
         .getComments = getComments,
+        .editComment = editComment,
+        .deleteComment = deleteComment,
     };
 };
 
@@ -94,4 +139,45 @@ fn freeTarget(allocator: Allocator, target: model.CommentTarget) void {
         .file => |details| details.path,
         .line => |details| details.path,
     });
+}
+
+test "editing and deleting comments preserve identity and isolate stale IDs" {
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var provider = MemoryProvider.init(std.testing.allocator);
+    defer provider.deinit();
+    const comments = provider.interface();
+
+    const first = try comments.createComment(threaded.io(), "first", .{ .line = .{
+        .path = "src/main.zig",
+        .side = .new,
+        .startLine = 3,
+        .endLine = 4,
+    } });
+    const second = try comments.createComment(threaded.io(), "second", .{ .file = .{
+        .path = "README.md",
+    } });
+    const first_id = try std.testing.allocator.dupe(u8, first.id);
+    defer std.testing.allocator.free(first_id);
+
+    const edited = try comments.editComment(threaded.io(), first.id, "updated");
+    try std.testing.expectEqualStrings(first_id, edited.id);
+    try std.testing.expectEqualStrings("updated", edited.body);
+    try std.testing.expectEqualStrings("src/main.zig", edited.target.line.path);
+    try std.testing.expectEqual(@as(usize, 3), edited.target.line.startLine);
+    try std.testing.expectEqual(@as(usize, 4), edited.target.line.endLine);
+
+    try std.testing.expectError(
+        error.UnknownComment,
+        comments.editComment(threaded.io(), "missing", "unchanged"),
+    );
+    try comments.deleteComment(threaded.io(), first_id);
+    try std.testing.expectError(
+        error.UnknownComment,
+        comments.deleteComment(threaded.io(), first_id),
+    );
+    const remaining = try comments.getComments(threaded.io());
+    try std.testing.expectEqual(@as(usize, 1), remaining.len);
+    try std.testing.expectEqualStrings(second.id, remaining[0].id);
+    try std.testing.expectEqualStrings("second", remaining[0].body);
 }

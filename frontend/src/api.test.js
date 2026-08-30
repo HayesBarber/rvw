@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getConfiguration } from './api.js'
+import {
+  deleteComment,
+  editComment,
+  getConfiguration,
+} from './api.js'
 
 const configurationSnapshot = {
   configuration: {
@@ -53,6 +57,68 @@ test('configuration uses the equivalent HTTP endpoint in development', async () 
     assert.equal(requests.length, 1)
     assert.equal(requests[0].url, '/api/configuration')
     assert.equal(requests[0].options.headers.Accept, 'application/json')
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
+
+test('comment mutations use equivalent native bridge requests', async () => {
+  const requests = []
+  globalThis.window = {
+    webkit: {
+      messageHandlers: {
+        native: {
+          postMessage(request) {
+            requests.push(request)
+            return Promise.resolve(request.type === 'edit_comment'
+              ? { id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } }
+              : { commentId: request.commentId })
+          },
+        },
+      },
+    },
+  }
+
+  try {
+    assert.equal((await editComment('comment-1', 'updated')).body, 'updated')
+    assert.deepEqual(await deleteComment('comment-1'), { commentId: 'comment-1' })
+    assert.deepEqual(requests, [
+      { type: 'edit_comment', commentId: 'comment-1', body: 'updated' },
+      { type: 'delete_comment', commentId: 'comment-1' },
+    ])
+  } finally {
+    delete globalThis.window
+  }
+})
+
+test('comment mutations use ID-addressed HTTP endpoints and methods', async () => {
+  const requests = []
+  globalThis.window = {}
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options })
+    const request = JSON.parse(options.body)
+    return {
+      ok: true,
+      status: 200,
+      json: async () => request.type === 'edit_comment'
+        ? { id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } }
+        : { commentId: request.commentId },
+    }
+  }
+
+  try {
+    await editComment('comment/1', 'updated')
+    await deleteComment('comment/1')
+    assert.deepEqual(requests.map(({ url, options }) => [url, options.method]), [
+      ['/api/comments/comment%2F1', 'PATCH'],
+      ['/api/comments/comment%2F1', 'DELETE'],
+    ])
+    assert.deepEqual(JSON.parse(requests[0].options.body), {
+      type: 'edit_comment',
+      commentId: 'comment/1',
+      body: 'updated',
+    })
   } finally {
     delete globalThis.fetch
     delete globalThis.window

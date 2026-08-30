@@ -140,6 +140,18 @@ export default function App() {
     return comment
   }
 
+  async function handleEditComment(commentId, body, beforeCommit) {
+    const comment = await commentsRequest.edit(commentId, body, beforeCommit)
+    copyRequest.reset()
+    return comment
+  }
+
+  async function handleDeleteComment(commentId, beforeCommit) {
+    const result = await commentsRequest.remove(commentId, beforeCommit)
+    copyRequest.reset()
+    return result
+  }
+
   const handleCopyComments = useCallback(() => {
     if (
       commentsRequest.data.length === 0 ||
@@ -382,6 +394,8 @@ export default function App() {
             error={fileError}
             comments={comments}
             onCreateComment={handleCreateComment}
+            onEditComment={handleEditComment}
+            onDeleteComment={handleDeleteComment}
             registerActionAdapter={registerDiffPaneActions}
           />
         </div>
