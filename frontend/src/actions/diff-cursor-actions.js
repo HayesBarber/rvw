@@ -156,6 +156,56 @@ export function moveDiffCursor(rows, cursor, offset, count = 1) {
   return cursorForRow(rows[finalIndex], cursor?.side)
 }
 
+function editorViewportHeight(instance) {
+  const viewport = instance?.getEditorViewport?.()
+  if (!viewport) return 0
+  return viewport.nodeType === 9
+    ? viewport.documentElement.clientHeight
+    : viewport.clientHeight
+}
+
+function positionedCursorForRow(instance, row, preferredSide) {
+  const cursor = cursorForRow(row, preferredSide)
+  if (!cursor) return null
+
+  const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
+  if (!position || position.height <= 0 || !Number.isFinite(position.top)) return null
+  return { cursor, center: position.top + position.height / 2 }
+}
+
+/** Move to the rendered row nearest half a live editor viewport away. */
+export function moveDiffCursorByPage(instance, rows, cursor, direction, count = 1) {
+  if (rows.length === 0 || (direction !== -1 && direction !== 1)) return null
+
+  const currentIndex = rowIndexForCursor(rows, cursor)
+  if (currentIndex === -1) return cursorForRow(rows[0], cursor?.side)
+
+  const viewportHeight = editorViewportHeight(instance)
+  const current = positionedCursorForRow(instance, rows[currentIndex], cursor?.side)
+  if (viewportHeight <= 0 || !current) return null
+
+  const targetCenter = current.center
+    + direction * viewportHeight / 2 * normalizedCount(count)
+  let closest = null
+
+  for (
+    let index = currentIndex + direction;
+    index >= 0 && index < rows.length;
+    index += direction
+  ) {
+    const positioned = positionedCursorForRow(instance, rows[index], cursor?.side)
+    if (!positioned) continue
+
+    const distance = Math.abs(positioned.center - targetCenter)
+    if (closest && distance > closest.distance) break
+    if (!closest || distance <= closest.distance) {
+      closest = { ...positioned, distance }
+    }
+  }
+
+  return closest?.cursor ?? cursor
+}
+
 export function scrollDiffCursorIntoView(instance, node, cursor) {
   const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
   const viewport = instance?.getEditorViewport?.()
@@ -217,6 +267,7 @@ export function centerDiffCursor(instance, node, cursor) {
 export function createDiffCursorActionAdapter({
   getRows,
   getCursor,
+  getInstance,
   activateCursor,
   centerCursor,
 }) {
@@ -227,10 +278,19 @@ export function createDiffCursorActionAdapter({
     offset,
     count,
   ))
+  const movePage = (direction, count) => activate(moveDiffCursorByPage(
+    getInstance?.(),
+    getRows(),
+    getCursor(),
+    direction,
+    count,
+  ))
 
   return Object.freeze({
     [ApplicationAction.CURSOR_UP]: (count) => move(-1, count),
     [ApplicationAction.CURSOR_DOWN]: (count) => move(1, count),
+    [ApplicationAction.CURSOR_PAGE_UP]: (count) => movePage(-1, count),
+    [ApplicationAction.CURSOR_PAGE_DOWN]: (count) => movePage(1, count),
     [ApplicationAction.CURSOR_FIRST]: () => activate(cursorForRow(getRows()[0])),
     [ApplicationAction.CURSOR_LAST]: () => {
       const rows = getRows()

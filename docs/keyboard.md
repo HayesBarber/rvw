@@ -8,6 +8,8 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | --- | --- | --- |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree or diff cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree or diff cursor down. |
+| `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. Supports counts. |
+| `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. Supports counts. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |

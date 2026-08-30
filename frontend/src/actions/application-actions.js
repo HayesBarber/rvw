@@ -10,6 +10,8 @@ export const ActionScope = Object.freeze({
 export const ApplicationAction = Object.freeze({
   CURSOR_UP: 'cursor.up',
   CURSOR_DOWN: 'cursor.down',
+  CURSOR_PAGE_UP: 'cursor.page.up',
+  CURSOR_PAGE_DOWN: 'cursor.page.down',
   CURSOR_FIRST: 'cursor.first',
   CURSOR_LAST: 'cursor.last',
   CURSOR_CENTER: 'cursor.center',
@@ -31,6 +33,8 @@ export const ApplicationAction = Object.freeze({
 const actionDefinitions = [
   [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, 'Move the active cursor up.'],
   [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down.'],
+  [ApplicationAction.CURSOR_PAGE_UP, ActionScope.ACTIVE_SURFACE, 'Move the active cursor up by half a viewport.'],
+  [ApplicationAction.CURSOR_PAGE_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down by half a viewport.'],
   [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the first item.'],
   [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the last item.'],
   [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, 'Center the active cursor in its viewport.'],
@@ -73,6 +77,8 @@ export const defaultNormalKeymap = Object.freeze({
     keySequence('j'),
     keySequence('<Down>'),
   ),
+  [ApplicationAction.CURSOR_PAGE_UP]: actionBindings(keySequence('<C-u>')),
+  [ApplicationAction.CURSOR_PAGE_DOWN]: actionBindings(keySequence('<C-d>')),
   [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
   [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
   [ApplicationAction.CURSOR_CENTER]: actionBindings(keySequence('z', 'z')),

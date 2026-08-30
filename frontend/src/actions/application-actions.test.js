@@ -51,6 +51,8 @@ test('every default binding references a known action and compiles for Normal mo
 test('the default keymap includes navigation, pane, mode, and global bindings', () => {
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_UP], [['k'], ['<Up>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_DOWN], [['j'], ['<Down>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_PAGE_UP], [['<C-u>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_PAGE_DOWN], [['<C-d>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_FIRST], [['g', 'g']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_LAST], [['G']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_CENTER], [['z', 'z']])
