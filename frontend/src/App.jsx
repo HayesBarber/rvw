@@ -203,6 +203,14 @@ export default function App() {
   )
 
   const globalActions = useMemo(() => ({
+    [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
+      dispatchWorkspace({ type: 'file_tree_resized', steps: count })
+      return true
+    },
+    [ApplicationAction.TREE_SIZE_DECREASE]: (count) => {
+      dispatchWorkspace({ type: 'file_tree_resized', steps: -count })
+      return true
+    },
     [ApplicationAction.FOCUS_FILE_TREE]: () => (
       focusSurface(ActiveSurface.FILE_TREE)
     ),
@@ -277,6 +285,7 @@ export default function App() {
       <main
         className="review-shell"
         data-active-surface={workspace.activeSurface}
+        style={{ '--file-tree-width': `${workspace.fileTreeWidth}px` }}
       >
       <section
         ref={fileTreePaneRef}
