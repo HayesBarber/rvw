@@ -124,7 +124,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
             fatalError("Unable to find the frontend")
         }
 
-        let bridge = NativeBridge(core: core)
+        let nativeHost = NativeHost {
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+        let bridge = NativeBridge(core: core, nativeHost: nativeHost)
         let assets = AssetHandler(root: resources)
         let controller = WKUserContentController()
         controller.addScriptMessageHandler(bridge, contentWorld: .page, name: "native")
@@ -159,6 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard let core else { return }
+        self.core = nil
         rvw_core_destroy(core)
     }
 
@@ -189,9 +196,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
 final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
     private let core: OpaquePointer
+    private let nativeHost: NativeHost
 
-    init(core: OpaquePointer) {
+    init(core: OpaquePointer, nativeHost: NativeHost) {
         self.core = core
+        self.nativeHost = nativeHost
     }
 
     func userContentController(
@@ -199,6 +208,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
         didReceive message: WKScriptMessage,
         replyHandler: @escaping (Any?, String?) -> Void
     ) {
+        if let response = nativeHost.handle(message.body) {
+            replyHandler(response, nil)
+            return
+        }
+
         do {
             let request = try JSONSerialization.data(withJSONObject: message.body)
             let response = request.withUnsafeBytes { bytes in

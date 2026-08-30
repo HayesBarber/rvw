@@ -6,6 +6,7 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
+| `application.close` | `q` | Close rvw through the native application host. In HTTP development mode, this action is a safe no-op. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree or diff cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree or diff cursor down. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |

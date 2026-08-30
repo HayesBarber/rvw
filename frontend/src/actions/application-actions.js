@@ -8,6 +8,7 @@ export const ActionScope = Object.freeze({
 })
 
 export const ApplicationAction = Object.freeze({
+  CLOSE_APPLICATION: 'application.close',
   CURSOR_UP: 'cursor.up',
   CURSOR_DOWN: 'cursor.down',
   CURSOR_FIRST: 'cursor.first',
@@ -29,6 +30,7 @@ export const ApplicationAction = Object.freeze({
 })
 
 const actionDefinitions = [
+  [ApplicationAction.CLOSE_APPLICATION, ActionScope.GLOBAL, 'Close the application.'],
   [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, 'Move the active cursor up.'],
   [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down.'],
   [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the first item.'],
@@ -65,6 +67,7 @@ export const DEFAULT_LEADER_KEY = '<Space>'
 
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
+  [ApplicationAction.CLOSE_APPLICATION]: actionBindings(keySequence('q')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
     keySequence('<Up>'),

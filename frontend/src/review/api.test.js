@@ -2,10 +2,72 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  closeApplication,
   deleteComment,
   editComment,
   getConfiguration,
 } from './api.js'
+
+test('application close is sent only through the native host boundary', async () => {
+  const requests = []
+  globalThis.window = {
+    webkit: {
+      messageHandlers: {
+        native: {
+          postMessage(request) {
+            requests.push(request)
+            return Promise.resolve({ closing: true })
+          },
+        },
+      },
+    },
+  }
+
+  try {
+    assert.equal(closeApplication(), true)
+    assert.deepEqual(requests, [{ type: 'application_close' }])
+  } finally {
+    delete globalThis.window
+  }
+})
+
+test('application close is a safe no-op in HTTP development mode', () => {
+  let fetchCalls = 0
+  globalThis.window = {}
+  globalThis.fetch = () => {
+    fetchCalls += 1
+    throw new Error('development server should not receive application close')
+  }
+
+  try {
+    assert.equal(closeApplication(), false)
+    assert.equal(fetchCalls, 0)
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
+
+test('application close does not throw when the native host is exiting', async () => {
+  globalThis.window = {
+    webkit: {
+      messageHandlers: {
+        native: {
+          postMessage() {
+            return Promise.reject(new Error('process exited'))
+          },
+        },
+      },
+    },
+  }
+
+  try {
+    assert.equal(closeApplication(), true)
+    await Promise.resolve()
+  } finally {
+    delete globalThis.window
+  }
+})
 
 const configurationSnapshot = {
   configuration: {

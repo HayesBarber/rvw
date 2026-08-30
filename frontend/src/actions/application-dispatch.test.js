@@ -14,6 +14,10 @@ test('global actions receive counts and must explicitly report handled', () => {
     getActiveSurface: () => ActiveSurface.FILE_TREE,
     getSurfaceActions: () => null,
     globalActions: {
+      [ApplicationAction.CLOSE_APPLICATION]: () => {
+        calls.push('close')
+        return true
+      },
       [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
         calls.push(count)
         return true
@@ -22,8 +26,9 @@ test('global actions receive counts and must explicitly report handled', () => {
     },
   })
 
+  assert.equal(dispatch(ApplicationAction.CLOSE_APPLICATION), true)
   assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER, 3), true)
-  assert.deepEqual(calls, [3])
+  assert.deepEqual(calls, ['close', 3])
   assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
   assert.equal(dispatch('unknown.action'), false)
 })
