@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   attachVimKeyboardCapture,
+  isNormalizedVimKey,
+  keyboardEventToKey,
   shouldCaptureKeyboardEvent,
 } from './keyboard.js'
 
@@ -26,6 +28,56 @@ function keyboardEvent(target) {
     isComposing: false,
   }
 }
+
+test('normalized keys match the canonical keyboard-event notation', () => {
+  for (const key of [
+    'j',
+    'G',
+    '<Enter>',
+    '<C-p>',
+    '<C-M-D-S-Up>',
+    '<C-->',
+  ]) {
+    assert.equal(isNormalizedVimKey(key), true, key)
+  }
+  for (const key of [
+    ' ',
+    '<leader>',
+    '<enter>',
+    '<Control-p>',
+    '<S-C-p>',
+    '<C-P>',
+    '<C-C-p>',
+  ]) {
+    assert.equal(isNormalizedVimKey(key), false, key)
+  }
+})
+
+test('keyboard events emit the shared canonical named and modifier notation', () => {
+  assert.equal(keyboardEventToKey({
+    key: 'ArrowUp',
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    shiftKey: false,
+  }), '<Up>')
+  assert.equal(keyboardEventToKey({
+    key: 'P',
+    code: 'KeyP',
+    ctrlKey: true,
+    altKey: false,
+    metaKey: true,
+    shiftKey: true,
+  }), '<C-D-S-p>')
+  assert.equal(keyboardEventToKey({
+    key: 'G',
+    code: 'KeyG',
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    shiftKey: true,
+  }), 'G')
+})
 
 test('native editing controls, dialogs, and ignored subtrees opt out', () => {
   const dialog = element('SECTION', { attributes: { role: 'dialog' } })

@@ -9,7 +9,6 @@ import {
   compileApplicationKeymap,
   defaultApplicationBindings,
   defaultNormalKeymap,
-  isNormalizedApplicationKey,
 } from './application-actions.js'
 import { VimController, VimMode } from './vim/machine.js'
 
@@ -84,30 +83,6 @@ test('leader placeholders compile to a concrete key without mutating the keymap'
   assert.deepEqual(keymap, {
     [ApplicationAction.COPY_COMMENTS]: [[LEADER_KEY, 'y']],
   })
-})
-
-test('configured keys use the canonical keyboard-event notation', () => {
-  for (const key of [
-    'j',
-    'G',
-    '<leader>',
-    '<Enter>',
-    '<C-p>',
-    '<C-M-D-S-Up>',
-    '<C-->',
-  ]) {
-    assert.equal(isNormalizedApplicationKey(key), true, key)
-  }
-  for (const key of [
-    ' ',
-    '<enter>',
-    '<Control-p>',
-    '<S-C-p>',
-    '<C-P>',
-    '<C-C-p>',
-  ]) {
-    assert.equal(isNormalizedApplicationKey(key), false, key)
-  }
 })
 
 test('compiled bindings preserve counts and multi-key sequences', () => {
