@@ -1,8 +1,8 @@
 const std = @import("std");
 
-pub const interface = @import("log/interface.zig");
-pub const file = @import("log/file.zig");
-pub const stderr = @import("log/stderr.zig");
+pub const interface = @import("interface.zig");
+pub const file = @import("file.zig");
+pub const stderr = @import("stderr.zig");
 
 pub const maximum_message_size = interface.maximum_message_size;
 pub const Level = interface.Level;

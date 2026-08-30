@@ -1,5 +1,5 @@
-pub const interface = @import("config/interface.zig");
-pub const loader = @import("config/loader.zig");
+pub const interface = @import("interface.zig");
+pub const loader = @import("loader.zig");
 
 pub const DiagnosticCode = interface.DiagnosticCode;
 pub const Diagnostic = interface.Diagnostic;

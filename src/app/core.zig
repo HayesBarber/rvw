@@ -1,10 +1,10 @@
 const std = @import("std");
-const config = @import("../config.zig");
+const config = @import("../config/config.zig");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
-const log = @import("../log.zig");
-const output = @import("../output.zig");
-const provider_module = @import("../provider.zig");
+const log = @import("../log/log.zig");
+const output = @import("../output/output.zig");
+const provider_module = @import("../provider/provider.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
