@@ -1,6 +1,6 @@
 const std = @import("std");
-const config = @import("../config.zig");
-const log = @import("../log.zig");
+const config = @import("../config/config.zig");
+const log = @import("../log/log.zig");
 
 /// Emits one wide startup event for every entry point. Configuration fallback
 /// details are fields on that event instead of additional warning events.

@@ -1,6 +1,6 @@
 const std = @import("std");
-const config = @import("../config.zig");
-const log = @import("../log.zig");
+const config = @import("../config/config.zig");
+const log = @import("../log/log.zig");
 
 pub const FileStatus = enum {
     modified,
