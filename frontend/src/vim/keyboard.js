@@ -85,12 +85,20 @@ function eventTarget(event) {
   return path[0] ?? event.target
 }
 
+function isClipboardShortcut(event) {
+  const hasPrimaryModifier = event.metaKey !== event.ctrlKey
+  if (!hasPrimaryModifier || event.altKey || event.shiftKey) return false
+  const key = printableKey(event)
+  return key === 'c' || key === 'v'
+}
+
 /**
  * Text-editing controls opt out by default. A descendant can explicitly opt in
  * with data-vim-capture; any subtree can opt out with data-vim-ignore.
  */
 export function shouldCaptureKeyboardEvent(event) {
   if (event.defaultPrevented || event.isComposing) return false
+  if (isClipboardShortcut(event)) return false
 
   let target = eventTarget(event)
   while (target) {
@@ -131,7 +139,10 @@ export function attachVimKeyboardCapture({
   }
 
   const onKeyDown = (event) => {
-    if (!shouldCapture(event)) return
+    if (!shouldCapture(event)) {
+      if (isClipboardShortcut(event)) dispatch({ type: 'reset' })
+      return
+    }
     const key = keyboardEventToKey(event)
     if (!key) return
 

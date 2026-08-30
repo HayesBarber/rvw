@@ -108,6 +108,27 @@ test('data-vim-capture explicitly opts a descendant back in', () => {
   assert.equal(shouldCaptureKeyboardEvent(keyboardEvent(target)), true)
 })
 
+test('platform copy and paste always remain native clipboard shortcuts', () => {
+  const target = element('BODY')
+  const event = (key) => ({
+    ...keyboardEvent(target),
+    key,
+    code: `Key${key.toUpperCase()}`,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: true,
+    shiftKey: false,
+  })
+
+  assert.equal(shouldCaptureKeyboardEvent(event('c')), false)
+  assert.equal(shouldCaptureKeyboardEvent(event('v')), false)
+  assert.equal(shouldCaptureKeyboardEvent({
+    ...event('c'),
+    ctrlKey: true,
+    metaKey: false,
+  }), false)
+})
+
 test('keyboard capture prevents browser behavior only for handled input', () => {
   let listener = null
   let handled = false
@@ -154,4 +175,47 @@ test('keyboard capture prevents browser behavior only for handled input', () => 
 
   dispose()
   assert.equal(listener, null)
+})
+
+test('clipboard shortcuts clear pending Vim input without preventing WebKit behavior', () => {
+  let listener = null
+  const dispatched = []
+  const target = {
+    addEventListener: (_type, nextListener) => {
+      listener = nextListener
+    },
+    removeEventListener: () => {},
+  }
+  attachVimKeyboardCapture({
+    target,
+    dispatch: (input) => {
+      dispatched.push(input)
+      return { handled: true }
+    },
+  })
+  const event = {
+    key: 'c',
+    code: 'KeyC',
+    ctrlKey: false,
+    altKey: false,
+    metaKey: true,
+    shiftKey: false,
+    defaultPrevented: false,
+    isComposing: false,
+    target: element('BODY'),
+    preventDefaultCalls: 0,
+    stopPropagationCalls: 0,
+    preventDefault() {
+      this.preventDefaultCalls += 1
+    },
+    stopPropagation() {
+      this.stopPropagationCalls += 1
+    },
+  }
+
+  listener(event)
+
+  assert.deepEqual(dispatched, [{ type: 'reset' }])
+  assert.equal(event.preventDefaultCalls, 0)
+  assert.equal(event.stopPropagationCalls, 0)
 })

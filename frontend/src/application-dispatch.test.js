@@ -28,6 +28,30 @@ test('global actions receive counts and must explicitly report handled', () => {
   assert.equal(dispatch('unknown.action'), false)
 })
 
+test('file-tree resize actions remain global on either review surface', () => {
+  let activeSurface = ActiveSurface.FILE_TREE
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => activeSurface,
+    getSurfaceActions: () => null,
+    globalActions: {
+      [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
+        calls.push(['increase', count])
+        return true
+      },
+      [ApplicationAction.TREE_SIZE_DECREASE]: (count) => {
+        calls.push(['decrease', count])
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.TREE_SIZE_INCREASE, 3), true)
+  activeSurface = ActiveSurface.DIFF_PANE
+  assert.equal(dispatch(ApplicationAction.TREE_SIZE_DECREASE, 2), true)
+  assert.deepEqual(calls, [['increase', 3], ['decrease', 2]])
+})
+
 test('active-surface actions route only to the authoritative surface adapter', () => {
   let activeSurface = ActiveSurface.FILE_TREE
   const calls = []

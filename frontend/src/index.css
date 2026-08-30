@@ -37,7 +37,7 @@ textarea {
 
 .review-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: var(--file-tree-width, 320px) minmax(0, 1fr);
   width: 100%;
   min-width: 960px;
   min-height: 0;

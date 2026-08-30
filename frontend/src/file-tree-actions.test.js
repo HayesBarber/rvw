@@ -50,6 +50,35 @@ test('activation opens files without changing selection during focus movement', 
   assert.deepEqual(model.getSelectedPaths(), [])
 })
 
+test('centering scrolls the focused item without focusing, selecting, or opening', (t) => {
+  const model = createTree()
+  t.after(() => model.cleanUp())
+  const opened = []
+  const scrollRequests = []
+  model.focusPath('src/view.js')
+  model.scrollToPath = (path, options) => scrollRequests.push([path, options])
+  const actions = createFileTreeActionAdapter(model, (path) => opened.push(path))
+
+  assert.equal(actions[ApplicationAction.CURSOR_CENTER](), true)
+  assert.equal(model.getFocusedPath(), 'src/view.js')
+  assert.deepEqual(model.getSelectedPaths(), [])
+  assert.deepEqual(opened, [])
+  assert.deepEqual(scrollRequests, [[
+    'src/view.js',
+    { focus: false, offset: 'center' },
+  ]])
+})
+
+test('centering an empty file tree is a safe no-op', (t) => {
+  const model = createTree([])
+  t.after(() => model.cleanUp())
+  const actions = createFileTreeActionAdapter(model, () => {
+    throw new Error('empty trees must not open a file')
+  })
+
+  assert.equal(actions[ApplicationAction.CURSOR_CENTER](), false)
+})
+
 test('directory actions toggle, collapse, expand, and move to the parent', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())

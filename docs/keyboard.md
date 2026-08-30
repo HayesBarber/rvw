@@ -10,9 +10,12 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree or diff cursor down. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
+| `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file or toggle the focused directory. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |
+| `tree.size.increase` | `<C-w> >` | Widen the file-tree pane by one step. Supports counts. |
+| `tree.size.decrease` | `<C-w> <` | Narrow the file-tree pane by one step. Supports counts. |
 | `focus.file_tree` | `g t` | Focus the file tree. |
 | `focus.diff_pane` | `g d` | Focus the diff pane. |
 | `tree_mode.changes` | `g c` | Show changed files. |
