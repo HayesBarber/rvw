@@ -7,14 +7,14 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
 | `application.close` | `q` | Close rvw through the native application host. In HTTP development mode, this action is a safe no-op. |
-| `cursor.up` | `k`, `<Up>` | Move the active file-tree or diff cursor up. |
-| `cursor.down` | `j`, `<Down>` | Move the active file-tree or diff cursor down. |
+| `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
+| `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |
 | `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. Supports counts. |
 | `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. Supports counts. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
-| `file_tree.item.activate` | `<Enter>` | Open the focused file or toggle the focused directory. |
+| `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |
 | `tree.size.increase` | `<C-w> >` | Widen the file-tree pane by one step. Supports counts. |
@@ -32,7 +32,11 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-`<Esc>` clears a pending count or multi-key sequence. An unmatched key after a pending sequence also clears that pending input without running an action.
+The file finder opens with its search input focused. Press `<Esc>` once to move
+focus to the result list and enable its Vim bindings without changing the
+query, then press `<Esc>` again to close the finder. Outside that transition,
+`<Esc>` clears a pending count or multi-key sequence. An unmatched key after a
+pending sequence also clears that pending input without running an action.
 
 ## User configuration
 

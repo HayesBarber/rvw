@@ -41,13 +41,14 @@ export function createSurfaceActionRegistry() {
 /**
  * Creates the single application-level semantic action dispatcher.
  *
- * Global actions are resolved centrally. Contextual actions are offered only
- * to the adapter for the active workspace surface, with surface-specific
- * actions additionally requiring that matching surface to be active.
+ * An active overlay receives all actions first so commands cannot leak to the
+ * workspace behind it. Otherwise, global actions are resolved centrally and
+ * contextual actions are offered only to the active workspace surface.
  */
 export function createApplicationDispatcher({
   getActiveSurface,
   getSurfaceActions,
+  getOverlayActions = () => null,
   globalActions = {},
 }) {
   if (typeof getActiveSurface !== 'function') {
@@ -56,10 +57,16 @@ export function createApplicationDispatcher({
   if (typeof getSurfaceActions !== 'function') {
     throw new TypeError('Application dispatch requires a surface-action reader')
   }
+  if (typeof getOverlayActions !== 'function') {
+    throw new TypeError('Application dispatch requires an overlay-action reader')
+  }
 
   return (action, count = 1) => {
     const definition = applicationActionCatalog[action]
     if (!definition) return false
+
+    const overlayActions = getOverlayActions()
+    if (overlayActions) return invokeAction(overlayActions, action, count)
 
     if (definition.scope === ActionScope.GLOBAL) {
       return invokeAction(globalActions, action, count)
