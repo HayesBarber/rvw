@@ -16,6 +16,7 @@ import {
 } from '../actions/diff-cursor-actions.js'
 import {
   commentAtCursor,
+  commentTargetAtCursor,
   createCommentActionAdapter,
 } from '../actions/comment-actions.js'
 import PaneStatus from './PaneStatus.jsx'
@@ -512,6 +513,14 @@ export default function DiffPane({
     setDraft(nextDraft)
   }, [activateRangeCommentContext, fileDiff, guardNextAnnotationRender, isDiff])
 
+  const beginCursorComment = useCallback((target) => {
+    guardNextAnnotationRender()
+    setDraft({
+      annotationSide: target.side === 'old' ? 'deletions' : 'additions',
+      target,
+    })
+  }, [guardNextAnnotationRender])
+
   const cancelComment = useCallback(() => {
     guardNextAnnotationRender()
     setDraft(null)
@@ -572,6 +581,12 @@ export default function DiffPane({
       centerCursor,
     }),
     ...createCommentActionAdapter({
+      getAddTarget: () => commentTargetAtCursor(
+        pathRef.current,
+        cursorRef.current,
+        cursorRowsRef.current,
+      ),
+      beginAdd: beginCursorComment,
       getComment: activeComment,
       beginEdit: beginEditComment,
       beginDelete: beginDeleteComment,
@@ -579,6 +594,7 @@ export default function DiffPane({
   }), [
     activateCursor,
     activeComment,
+    beginCursorComment,
     beginDeleteComment,
     beginEditComment,
     centerCursor,

@@ -100,6 +100,27 @@ test('file-tree actions are unhandled unless the file tree is active', () => {
   assert.equal(activations, 1)
 })
 
+test('diff-pane actions are unhandled unless the diff pane is active', () => {
+  let activeSurface = ActiveSurface.FILE_TREE
+  let additions = 0
+  const registry = createSurfaceActionRegistry()
+  registry.register(ActiveSurface.DIFF_PANE, {
+    [ApplicationAction.ADD_COMMENT]: () => {
+      additions += 1
+      return true
+    },
+  })
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => activeSurface,
+    getSurfaceActions: registry.get,
+  })
+
+  assert.equal(dispatch(ApplicationAction.ADD_COMMENT), false)
+  activeSurface = ActiveSurface.DIFF_PANE
+  assert.equal(dispatch(ApplicationAction.ADD_COMMENT), true)
+  assert.equal(additions, 1)
+})
+
 test('surface registrations clean up without removing a newer adapter', () => {
   const registry = createSurfaceActionRegistry()
   const first = {}

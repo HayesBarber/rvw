@@ -65,6 +65,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_FILES], [['g', 'f']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.EDIT_COMMENT], [['e']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'c']])
 })
