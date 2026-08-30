@@ -1,3 +1,4 @@
+// Owns state and transitions for the application workspace shell.
 export const ActiveSurface = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',

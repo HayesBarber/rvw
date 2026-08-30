@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App.jsx'
+import App from './app/App.jsx'
 import { defaultApplicationBindings } from './actions/application-actions.js'
 import './index.css'
 import { VimProvider } from './vim/index.js'

@@ -3,13 +3,13 @@ import test from 'node:test'
 import {
   ApplicationAction,
   defaultApplicationBindings,
-} from './actions/application-actions.js'
+} from '../actions/application-actions.js'
 import {
   USER_CONFIGURATION_PATH,
   loadKeyboardConfiguration,
   resolveKeyboardConfiguration,
 } from './keyboard-configuration.js'
-import { VimController } from './vim/machine.js'
+import { VimController } from '../vim/machine.js'
 
 function bindingKeys(bindings, action) {
   return bindings
