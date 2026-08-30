@@ -167,6 +167,14 @@ export default function App() {
     return true
   }, [])
 
+  const handleTreeFileSelect = useCallback((path) => {
+    dispatchWorkspace({
+      type: 'file_selected',
+      path,
+    })
+    requestAnimationFrame(() => focusSurface(ActiveSurface.DIFF_PANE))
+  }, [focusSurface])
+
   const registerFileTreeActions = useCallback(
     (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
     [surfaceActions],
@@ -292,10 +300,7 @@ export default function App() {
               files={visibleFiles}
               mode={workspace.treeMode}
               selectedPath={activePath}
-              onSelectFile={(path) => dispatchWorkspace({
-                type: 'file_selected',
-                path,
-              })}
+              onSelectFile={handleTreeFileSelect}
               registerActionAdapter={registerFileTreeActions}
             />
           )}
