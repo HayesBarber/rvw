@@ -53,6 +53,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_DOWN], [['j'], ['<Down>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_FIRST], [['g', 'g']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_LAST], [['G']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_CENTER], [['z', 'z']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.FILE_TREE_ITEM_ACTIVATE], [['<Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_COLLAPSE_OR_PARENT], [['h'], ['<Left>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_EXPAND], [['l'], ['<Right>']])

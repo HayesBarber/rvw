@@ -10,6 +10,7 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree or diff cursor down. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
+| `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file or toggle the focused directory. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |

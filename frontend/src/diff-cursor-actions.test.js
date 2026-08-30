@@ -4,6 +4,7 @@ import { parseDiffFromFile } from '@pierre/diffs'
 import { ApplicationAction } from './application-actions.js'
 import {
   DiffCursorSide,
+  centerDiffCursor,
   createDiffCursorActionAdapter,
   createDiffCursorRows,
   moveDiffCursor,
@@ -183,7 +184,7 @@ test('cursor reconciliation preserves identity and chooses the nearest same-side
   assert.equal(reconcileDiffCursor([], existing), null)
 })
 
-test('the action adapter handles first, last, repeated movement, and empty content', () => {
+test('the action adapter handles first, last, centered, repeated movement, and empty content', () => {
   let rows = [
     { index: 0, additions: 1 },
     { index: 1, additions: 2 },
@@ -191,12 +192,17 @@ test('the action adapter handles first, last, repeated movement, and empty conte
   ]
   let cursor = { lineNumber: 1, side: DiffCursorSide.ADDITIONS }
   const activated = []
+  const centered = []
   const actions = createDiffCursorActionAdapter({
     getRows: () => rows,
     getCursor: () => cursor,
     activateCursor(nextCursor) {
       cursor = nextCursor
       activated.push(nextCursor)
+      return true
+    },
+    centerCursor(nextCursor) {
+      centered.push(nextCursor)
       return true
     },
   })
@@ -210,10 +216,69 @@ test('the action adapter handles first, last, repeated movement, and empty conte
   assert.equal(actions[ApplicationAction.CURSOR_UP](20), true)
   assert.deepEqual(cursor, { lineNumber: 1, side: DiffCursorSide.ADDITIONS })
   assert.equal(activated.length, 4)
+  assert.equal(actions[ApplicationAction.CURSOR_CENTER](), true)
+  assert.deepEqual(centered, [{
+    lineNumber: 1,
+    side: DiffCursorSide.ADDITIONS,
+  }])
+  assert.equal(activated.length, 4)
 
   rows = []
+  cursor = null
   assert.equal(actions[ApplicationAction.CURSOR_DOWN](1), false)
   assert.equal(actions[ApplicationAction.CURSOR_FIRST](), false)
+  assert.equal(actions[ApplicationAction.CURSOR_CENTER](), false)
+})
+
+test('centering scrolls the side-aware diff row to the viewport midpoint', () => {
+  const scrolls = []
+  const lineRequests = []
+  const viewport = {
+    nodeType: 1,
+    scrollTop: 40,
+    scrollHeight: 600,
+    clientHeight: 100,
+    getBoundingClientRect: () => ({ top: 20 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const node = { getBoundingClientRect: () => ({ top: -30 }) }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition(lineNumber, side) {
+      lineRequests.push([lineNumber, side])
+      return { top: 180, height: 20 }
+    },
+  }
+  const cursor = { lineNumber: 12, side: DiffCursorSide.DELETIONS }
+
+  assert.equal(centerDiffCursor(instance, node, cursor), true)
+  assert.deepEqual(lineRequests, [[12, DiffCursorSide.DELETIONS]])
+  assert.deepEqual(scrolls, [{ top: 130 }])
+  assert.deepEqual(cursor, { lineNumber: 12, side: DiffCursorSide.DELETIONS })
+})
+
+test('centering is a no-op without a cursor or a scrollable viewport', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1,
+    scrollTop: 0,
+    scrollHeight: 80,
+    clientHeight: 80,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const node = { getBoundingClientRect: () => ({ top: 0 }) }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 20, height: 20 }),
+  }
+
+  assert.equal(centerDiffCursor(instance, node, null), false)
+  assert.equal(centerDiffCursor(instance, node, {
+    lineNumber: 2,
+    side: DiffCursorSide.ADDITIONS,
+  }), false)
+  assert.deepEqual(scrolls, [])
 })
 
 test('scrolling uses public line positions and keeps visible rows stationary', () => {
