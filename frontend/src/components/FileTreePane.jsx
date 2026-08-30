@@ -6,7 +6,7 @@ import {
 import {
   createFileTreeActionAdapter,
   fileTreeFocusCSS,
-} from '../file-tree-actions.js'
+} from '../actions/file-tree-actions.js'
 
 export default function FileTreePane({
   files,

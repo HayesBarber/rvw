@@ -1,3 +1,5 @@
+/** Shared review transport for native and development environments. */
+
 /**
  * @typedef {'modified' | 'added' | 'deleted' | 'renamed' | 'unchanged'} FileStatus
  */

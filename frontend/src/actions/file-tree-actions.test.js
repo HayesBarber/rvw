@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+
 import { FileTree } from '@pierre/trees'
 import { ApplicationAction } from './application-actions.js'
 import { createFileTreeActionAdapter } from './file-tree-actions.js'

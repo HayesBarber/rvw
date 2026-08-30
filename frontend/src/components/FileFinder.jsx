@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fuzzyFind } from '../fuzzy.js'
+import { fuzzyFind } from '../utils/fuzzy.js'
 
 const maximumResults = 100
 

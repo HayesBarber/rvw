@@ -1,5 +1,7 @@
 import { ApplicationAction } from './application-actions.js'
 
+// Adapts review comments to the application action vocabulary.
+
 /** Finds the line comment attached to the active diff cursor. */
 export function commentAtCursor(comments, path, cursor) {
   if (!path || !cursor) return null

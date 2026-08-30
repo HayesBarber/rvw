@@ -5,8 +5,8 @@ import {
   createSurfaceActionRegistry,
 } from './application-dispatch.js'
 import { ApplicationAction, defaultApplicationBindings } from './application-actions.js'
-import { VimController } from './vim/machine.js'
-import { ActiveSurface } from './workspace.js'
+import { VimController } from '../vim/machine.js'
+import { ActiveSurface } from '../app/workspace.js'
 
 test('global actions receive counts and must explicitly report handled', () => {
   const calls = []

@@ -1,5 +1,7 @@
 import { ApplicationAction } from './application-actions.js'
 
+// Adapts diff cursor operations to the application action vocabulary.
+
 export const DiffCursorSide = Object.freeze({
   DELETIONS: 'deletions',
   ADDITIONS: 'additions',

@@ -6,15 +6,15 @@ import {
   useRef,
   useState,
 } from 'react'
-import DiffPane from './components/DiffPane.jsx'
-import FileFinder from './components/FileFinder.jsx'
-import FileTreePane from './components/FileTreePane.jsx'
-import KeyboardStatus from './components/KeyboardStatus.jsx'
+import DiffPane from '../components/DiffPane.jsx'
+import FileFinder from '../components/FileFinder.jsx'
+import FileTreePane from '../components/FileTreePane.jsx'
+import KeyboardStatus from '../components/KeyboardStatus.jsx'
 import {
   createApplicationDispatcher,
   createSurfaceActionRegistry,
-} from './application-dispatch.js'
-import { ApplicationAction } from './application-actions.js'
+} from '../actions/application-dispatch.js'
+import { ApplicationAction } from '../actions/application-actions.js'
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
 import {
   RequestStatus,
@@ -23,14 +23,14 @@ import {
   useReviewComments,
   useReviewFile,
   useReviewOverview,
-} from './review-data.js'
+} from '../review/review-data.js'
 import {
   ActiveSurface,
   initialWorkspaceState,
   TreeMode,
   workspaceReducer,
 } from './workspace.js'
-import { useVimController, useVimState } from './vim/index.js'
+import { useVimController, useVimState } from '../vim/index.js'
 
 export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(
