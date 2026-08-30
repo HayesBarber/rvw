@@ -184,10 +184,39 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
   return true
 }
 
+/** Center the current diff cursor without changing its active row or selection. */
+export function centerDiffCursor(instance, node, cursor) {
+  if (!cursor) return false
+
+  const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
+  const viewport = instance?.getEditorViewport?.()
+  if (!position || position.height <= 0 || !viewport || !node) return false
+
+  const isDocument = viewport.nodeType === 9
+  const viewportElement = isDocument ? viewport.documentElement : viewport
+  const viewportHeight = viewportElement.clientHeight
+  if (viewportHeight <= 0 || viewportElement.scrollHeight <= viewportHeight) return false
+
+  const scrollTop = isDocument
+    ? (viewport.defaultView?.scrollY ?? 0)
+    : viewport.scrollTop
+  const viewportTop = isDocument
+    ? 0
+    : viewport.getBoundingClientRect().top
+  const nodeTop = node.getBoundingClientRect().top
+  const rowCenter = scrollTop + nodeTop - viewportTop + position.top + position.height / 2
+  const nextScrollTop = Math.max(0, rowCenter - viewportHeight / 2)
+
+  if (isDocument) viewport.defaultView?.scrollTo({ top: nextScrollTop })
+  else viewport.scrollTo({ top: nextScrollTop })
+  return true
+}
+
 export function createDiffCursorActionAdapter({
   getRows,
   getCursor,
   activateCursor,
+  centerCursor,
 }) {
   const activate = (cursor) => cursor !== null && activateCursor(cursor) === true
   const move = (offset, count) => activate(moveDiffCursor(
@@ -204,6 +233,10 @@ export function createDiffCursorActionAdapter({
     [ApplicationAction.CURSOR_LAST]: () => {
       const rows = getRows()
       return activate(cursorForRow(rows.at(-1)))
+    },
+    [ApplicationAction.CURSOR_CENTER]: () => {
+      const cursor = getCursor()
+      return cursor !== null && centerCursor(cursor) === true
     },
   })
 }

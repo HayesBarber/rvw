@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 import {
+  centerDiffCursor,
   createDiffCursorActionAdapter,
   createDiffCursorRows,
   reconcileDiffCursor,
@@ -204,11 +205,18 @@ export default function DiffPane({
     return true
   }, [])
 
+  const centerCursor = useCallback((cursor) => centerDiffCursor(
+    renderInstanceRef.current,
+    renderedFileRef.current,
+    cursor,
+  ), [])
+
   useEffect(() => registerActionAdapter(createDiffCursorActionAdapter({
     getRows: () => cursorRowsRef.current,
     getCursor: () => cursorRef.current,
     activateCursor,
-  })), [activateCursor, registerActionAdapter])
+    centerCursor,
+  })), [activateCursor, centerCursor, registerActionAdapter])
 
   const finishScrollGuard = useCallback(() => {
     const guard = scrollGuardRef.current
