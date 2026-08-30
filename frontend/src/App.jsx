@@ -9,11 +9,13 @@ import {
 import DiffPane from './components/DiffPane.jsx'
 import FileFinder from './components/FileFinder.jsx'
 import FileTreePane from './components/FileTreePane.jsx'
+import KeyboardStatus from './components/KeyboardStatus.jsx'
 import {
   createApplicationDispatcher,
   createSurfaceActionRegistry,
 } from './application-dispatch.js'
 import { ApplicationAction } from './application-actions.js'
+import { loadKeyboardConfiguration } from './keyboard-configuration.js'
 import {
   RequestStatus,
   useCopyComments,
@@ -28,7 +30,7 @@ import {
   TreeMode,
   workspaceReducer,
 } from './workspace.js'
-import { useVimController } from './vim/index.js'
+import { useVimController, useVimState } from './vim/index.js'
 
 export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(
@@ -41,9 +43,25 @@ export default function App() {
   const copyRequest = useCopyComments()
   const overview = overviewRequest.data
   const vimController = useVimController()
+  const vimState = useVimState()
+  const [configurationDiagnostic, setConfigurationDiagnostic] = useState(null)
   const fileTreePaneRef = useRef(null)
   const diffPaneRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
+
+  useEffect(() => {
+    let active = true
+
+    loadKeyboardConfiguration().then(({ bindings, diagnostic }) => {
+      if (!active) return
+      if (bindings) vimController.setBindings(bindings)
+      setConfigurationDiagnostic(diagnostic)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [vimController])
 
   useEffect(() => {
     if (!overview) return
@@ -236,18 +254,26 @@ export default function App() {
 
   if (overviewRequest.status === RequestStatus.ERROR) {
     return (
-      <main className="fatal-error">
-        Unable to load review: {overviewRequest.error}
-      </main>
+      <div className="application-shell">
+        <main className="fatal-error">
+          Unable to load review: {overviewRequest.error}
+        </main>
+        <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+      </div>
     )
   }
 
   if (!overview) {
-    return <main className="fatal-error">Loading review…</main>
+    return (
+      <div className="application-shell">
+        <main className="fatal-error">Loading review…</main>
+        <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+      </div>
+    )
   }
 
   return (
-    <>
+    <div className="application-shell">
       <main
         className="review-shell"
         data-active-surface={workspace.activeSurface}
@@ -371,6 +397,7 @@ export default function App() {
           onClose={() => dispatchWorkspace({ type: 'finder_closed' })}
         />
       )}
-    </>
+      <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+    </div>
   )
 }

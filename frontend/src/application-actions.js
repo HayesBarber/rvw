@@ -52,6 +52,54 @@ const actionBindings = (...sequences) => Object.freeze(sequences)
 export const LEADER_KEY = '<leader>'
 export const DEFAULT_LEADER_KEY = '<Space>'
 
+const namedKeyNotations = new Set([
+  'BS',
+  'Del',
+  'Down',
+  'End',
+  'Enter',
+  'Esc',
+  'Home',
+  'Left',
+  'PageDown',
+  'PageUp',
+  'Right',
+  'Space',
+  'Tab',
+  'Up',
+])
+const modifierOrder = Object.freeze(['C', 'M', 'D', 'S'])
+const modifierPrefixes = Object.freeze(
+  Array.from({ length: (1 << modifierOrder.length) - 1 }, (_, index) => (
+    `${modifierOrder.filter((_, bit) => (index + 1) & (1 << bit)).join('-')}-`
+  )).sort((left, right) => right.length - left.length),
+)
+
+function isControlCharacter(key) {
+  const code = key.charCodeAt(0)
+  return code <= 0x1f || code === 0x7f
+}
+
+/** Returns whether a configured key matches keyboardEventToKey output. */
+export function isNormalizedApplicationKey(key) {
+  if (key === LEADER_KEY) return true
+  if (typeof key !== 'string' || key.length === 0) return false
+
+  if (key.length === 1) {
+    return key !== ' ' && !isControlCharacter(key)
+  }
+
+  if (!key.startsWith('<') || !key.endsWith('>')) return false
+  const notation = key.slice(1, -1)
+  if (namedKeyNotations.has(notation)) return true
+  const prefix = modifierPrefixes.find((candidate) => notation.startsWith(candidate))
+  if (!prefix) return false
+  const base = notation.slice(prefix.length)
+  if (namedKeyNotations.has(base)) return true
+  return base.length === 1 && base === base.toLowerCase() &&
+    !isControlCharacter(base) && base !== ' '
+}
+
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_UP]: actionBindings(
@@ -102,6 +150,13 @@ function validateKeymap(keymap) {
       }
       if (sequence.some((key) => typeof key !== 'string' || key.length === 0)) {
         throw new TypeError(`Application action ${action} keys must be non-empty strings`)
+      }
+      for (const key of sequence) {
+        if (!isNormalizedApplicationKey(key)) {
+          throw new TypeError(
+            `Application action ${action} key ${JSON.stringify(key)} is not normalized Vim notation`,
+          )
+        }
       }
     }
   }
