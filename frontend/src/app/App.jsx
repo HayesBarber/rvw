@@ -48,6 +48,7 @@ export default function App() {
   const [configurationDiagnostic, setConfigurationDiagnostic] = useState(null)
   const fileTreePaneRef = useRef(null)
   const diffPaneRef = useRef(null)
+  const finderActionsRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
 
   useEffect(() => {
@@ -214,6 +215,12 @@ export default function App() {
     (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
     [surfaceActions],
   )
+  const registerFinderActions = useCallback((adapter) => {
+    finderActionsRef.current = adapter
+    return () => {
+      if (finderActionsRef.current === adapter) finderActionsRef.current = null
+    }
+  }, [])
 
   const globalActions = useMemo(() => ({
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
@@ -255,20 +262,29 @@ export default function App() {
     const dispatchApplicationAction = createApplicationDispatcher({
       getActiveSurface: () => workspace.activeSurface,
       getSurfaceActions: surfaceActions.get,
+      getOverlayActions: () => workspace.finderOpen
+        ? finderActionsRef.current
+        : null,
       globalActions,
     })
     return vimController.subscribeCommands((command) => (
       dispatchApplicationAction(command.command, command.count)
     ))
-  }, [globalActions, surfaceActions, vimController, workspace.activeSurface])
+  }, [
+    globalActions,
+    surfaceActions,
+    vimController,
+    workspace.activeSurface,
+    workspace.finderOpen,
+  ])
 
-  function handleFinderOpen(path) {
+  const handleFinderOpen = useCallback((path) => {
     dispatchWorkspace({
       type: 'finder_file_opened',
       path,
       changed: changedPaths.has(path),
     })
-  }
+  }, [changedPaths])
 
   const activateSurface = (surface) => {
     dispatchWorkspace({ type: 'surface_activated', surface })
@@ -420,6 +436,7 @@ export default function App() {
           onRetry={allFilesRequest.load}
           onOpen={handleFinderOpen}
           onClose={() => dispatchWorkspace({ type: 'finder_closed' })}
+          registerActionAdapter={registerFinderActions}
         />
       )}
       <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />

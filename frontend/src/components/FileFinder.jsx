@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createFileFinderActionAdapter, moveFileFinderSelection } from '../actions/file-finder-actions.js'
 import { fuzzyFind } from '../utils/fuzzy.js'
 
 const maximumResults = 100
@@ -12,11 +13,20 @@ function splitPath(path) {
   }
 }
 
-export default function FileFinder({ files, status, error, onRetry, onOpen, onClose }) {
+export default function FileFinder({
+  files,
+  status,
+  error,
+  onRetry,
+  onOpen,
+  onClose,
+  registerActionAdapter,
+}) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef(null)
   const dialogRef = useRef(null)
+  const listRef = useRef(null)
   const previousFocusRef = useRef(null)
   const paths = useMemo(() => files.map((file) => file.path), [files])
   const results = useMemo(
@@ -26,6 +36,18 @@ export default function FileFinder({ files, status, error, onRetry, onOpen, onCl
   const selectedIndex = results.length === 0
     ? -1
     : Math.min(activeIndex, results.length - 1)
+
+  const actionAdapter = useMemo(() => createFileFinderActionAdapter({
+    getResults: () => results,
+    getActiveIndex: () => selectedIndex,
+    setActiveIndex,
+    onOpen,
+  }), [onOpen, results, selectedIndex])
+
+  useEffect(() => registerActionAdapter(actionAdapter), [
+    actionAdapter,
+    registerActionAdapter,
+  ])
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement
@@ -43,15 +65,18 @@ export default function FileFinder({ files, status, error, onRetry, onOpen, onCl
   function handleInputKeyDown(event) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setActiveIndex(results.length === 0 ? 0 : (selectedIndex + 1) % results.length)
+      setActiveIndex(moveFileFinderSelection(results.length, selectedIndex, 1))
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setActiveIndex(results.length === 0
-        ? 0
-        : (selectedIndex - 1 + results.length) % results.length)
+      setActiveIndex(moveFileFinderSelection(results.length, selectedIndex, -1))
     } else if (event.key === 'Enter' && selectedIndex >= 0) {
       event.preventDefault()
       onOpen(results[selectedIndex])
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (listRef.current) listRef.current.focus({ preventScroll: true })
+      else dialogRef.current?.focus({ preventScroll: true })
     }
   }
 
@@ -69,7 +94,14 @@ export default function FileFinder({ files, status, error, onRetry, onOpen, onCl
     if (focusable.length === 0) return
     const first = focusable[0]
     const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
+    if (
+      document.activeElement === dialogRef.current ||
+      document.activeElement === listRef.current
+    ) {
+      event.preventDefault()
+      const nextFocus = event.shiftKey ? last : first
+      nextFocus.focus()
+    } else if (event.shiftKey && document.activeElement === first) {
       event.preventDefault()
       last.focus()
     } else if (!event.shiftKey && document.activeElement === last) {
@@ -96,6 +128,8 @@ export default function FileFinder({ files, status, error, onRetry, onOpen, onCl
         role="dialog"
         aria-modal="true"
         aria-labelledby="file-finder-title"
+        tabIndex={-1}
+        data-vim-capture
         onKeyDown={handleDialogKeyDown}
       >
         <header className="file-finder-header">
@@ -141,7 +175,14 @@ export default function FileFinder({ files, status, error, onRetry, onOpen, onCl
             <p className="file-finder-status">No files match “{query}”.</p>
           )}
           {ready && results.length > 0 && (
-            <ul id="file-finder-results" className="file-finder-results" role="listbox">
+            <ul
+              ref={listRef}
+              id="file-finder-results"
+              className="file-finder-results"
+              role="listbox"
+              tabIndex={-1}
+              aria-activedescendant={activeDescendant}
+            >
               {results.map((path, index) => {
                 const parts = splitPath(path)
                 return (

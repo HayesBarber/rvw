@@ -84,6 +84,35 @@ test('active-surface actions route only to the authoritative surface adapter', (
   assert.deepEqual(calls, [['tree', 4], ['diff', 2]])
 })
 
+test('an active overlay receives actions without leaking them to the workspace', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({
+      [ApplicationAction.CURSOR_DOWN]: () => {
+        calls.push('surface')
+        return true
+      },
+    }),
+    getOverlayActions: () => ({
+      [ApplicationAction.CURSOR_DOWN]: (count) => {
+        calls.push(['overlay', count])
+        return true
+      },
+    }),
+    globalActions: {
+      [ApplicationAction.OPEN_FILE_FINDER]: () => {
+        calls.push('global')
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 3), true)
+  assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER), false)
+  assert.deepEqual(calls, [['overlay', 3]])
+})
+
 test('file-tree actions are unhandled unless the file tree is active', () => {
   let activeSurface = ActiveSurface.DIFF_PANE
   let activations = 0
