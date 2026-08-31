@@ -79,21 +79,13 @@ export function useApplicationActions({
       return true
     },
     [ApplicationAction.FOCUS_FILE_TREE]: () => (
-      workspace.activeSurface === ActiveSurface.DIFF_PANE &&
       focusSurface(ActiveSurface.FILE_TREE)
     ),
     [ApplicationAction.FOCUS_DIFF_PANE]: () => (
-      workspace.activeSurface === ActiveSurface.FILE_TREE &&
       focusSurface(ActiveSurface.DIFF_PANE)
     ),
-    [ApplicationAction.SHOW_CHANGES]: () => (
-      workspace.activeSurface === ActiveSurface.FILE_TREE &&
-      changeTreeMode(TreeMode.CHANGES)
-    ),
-    [ApplicationAction.SHOW_FILES]: () => (
-      workspace.activeSurface === ActiveSurface.FILE_TREE &&
-      changeTreeMode(TreeMode.FILES)
-    ),
+    [ApplicationAction.SHOW_CHANGES]: () => changeTreeMode(TreeMode.CHANGES),
+    [ApplicationAction.SHOW_FILES]: () => changeTreeMode(TreeMode.FILES),
     [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
     [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => navigateFile(-1, count),
     [ApplicationAction.OPEN_FILE_FINDER]: () => {
@@ -116,7 +108,6 @@ export function useApplicationActions({
     openFileFinder,
     openKeymapReference,
     reviewAvailable,
-    workspace.activeSurface,
   ])
 
   useEffect(() => {
@@ -130,7 +121,10 @@ export function useApplicationActions({
       globalActions,
     })
     return vimController.subscribeCommands((command) => (
-      dispatchApplicationAction(command.command, command.count)
+      dispatchApplicationAction(
+        command.args?.actions ?? command.command,
+        command.count,
+      )
     ))
   }, [
     globalActions,

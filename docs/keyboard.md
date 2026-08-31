@@ -71,23 +71,6 @@ This complete example replaces four actions, disables one action, and leaves eve
 
 An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the action. An action absent from the file retains all of its defaults. `<leader>` expands to `<Space>`.
 
-## Migration from the provisional V1 keymap
-
-The approved V1 defaults replace every provisional binding listed below:
-
-| Action identifier | Provisional keys | Approved keys |
-| --- | --- | --- |
-| `tree.size.increase` | `<C-w> >` | `>` |
-| `tree.size.decrease` | `<C-w> <` | `<` |
-| `focus.file_tree` | `g t` | `<leader> o` when the diff pane is active |
-| `focus.diff_pane` | `g d` | `<leader> o` when the file tree is active |
-| `tree_mode.changes` | `g c` | `c` in the file tree |
-| `tree_mode.files` | `g f` | `f` in the file tree |
-| `file_finder.open` | `<C-p>`, `<D-p>` | `<C-p>`, `<D-p>`, or `<leader> f` |
-| `comments.delete` | `d c` | `d d` |
-
-The new `keymap_reference.open` action defaults to `?`. User overrides continue to replace defaults action by action, so existing configuration remains authoritative until migrated.
-
 ## Key notation
 
 - Printable keys use the character produced by the keyboard, such as `j`, `G`, `/`, or `0`. Letter case is significant.

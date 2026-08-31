@@ -14,7 +14,7 @@ import { VimController } from '../vim/machine.js'
 function bindingKeys(bindings, action) {
   return bindings
     .filter((binding) => (
-      binding.command === action || binding.commands?.includes(action)
+      binding.command === action || binding.args?.actions?.includes(action)
     ))
     .map((binding) => binding.keys)
 }

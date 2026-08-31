@@ -80,11 +80,26 @@ const actionDefinitions = [
   [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Delete the comment in the active context.'],
 ]
 
+// These narrow only shared-key resolution. Direct semantic dispatch remains
+// valid according to the action's scope, including idempotent focus actions.
+const bindingSurfaceOverrides = Object.freeze({
+  [ApplicationAction.FOCUS_FILE_TREE]: ActionScope.DIFF_PANE,
+  [ApplicationAction.FOCUS_DIFF_PANE]: ActionScope.FILE_TREE,
+  [ApplicationAction.SHOW_CHANGES]: ActionScope.FILE_TREE,
+  [ApplicationAction.SHOW_FILES]: ActionScope.FILE_TREE,
+})
+
 /** Stable application actions indexed by their user-configurable identifier. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
   actionDefinitions.map(([id, scope, group, description]) => [
     id,
-    Object.freeze({ id, scope, group, description }),
+    Object.freeze({
+      id,
+      scope,
+      group,
+      description,
+      bindingSurface: bindingSurfaceOverrides[id] ?? null,
+    }),
   ]),
 ))
 
@@ -144,15 +159,32 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'd')),
 })
 
-const contextualDuplicateSets = Object.freeze([
-  new Set([ApplicationAction.FOCUS_FILE_TREE, ApplicationAction.FOCUS_DIFF_PANE]),
-  new Set([ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT]),
+const workspaceSurfaces = Object.freeze([
+  ActionScope.FILE_TREE,
+  ActionScope.DIFF_PANE,
 ])
 
-function isContextualDuplicate(actions) {
-  return contextualDuplicateSets.some((allowed) => (
-    actions.length === allowed.size && actions.every((action) => allowed.has(action))
-  ))
+function actionBindingSurfaces(action) {
+  const definition = applicationActionCatalog[action]
+  if (!definition) return []
+  if (definition.bindingSurface) return [definition.bindingSurface]
+  if (workspaceSurfaces.includes(definition.scope)) return [definition.scope]
+  return workspaceSurfaces
+}
+
+export function applicationActionSupportsBindingSurface(action, surface) {
+  return actionBindingSurfaces(action).includes(surface)
+}
+
+function haveDisjointBindingSurfaces(actions) {
+  const claimedSurfaces = new Set()
+  for (const action of actions) {
+    for (const surface of actionBindingSurfaces(action)) {
+      if (claimedSurfaces.has(surface)) return false
+      claimedSurfaces.add(surface)
+    }
+  }
+  return true
 }
 
 function validateKeymap(keymap) {
@@ -213,15 +245,19 @@ export function compileApplicationKeymap(
   }
 
   const bindings = [...groupedBindings.values()].map(({ keys, actions }) => {
-    if (actions.length > 1 && !isContextualDuplicate(actions)) {
+    if (actions.length > 1 && !haveDisjointBindingSurfaces(actions)) {
       throw new TypeError(`Duplicate Vim binding for normal: ${keys.join(' ')}`)
     }
+    const contextualActions = Object.freeze(actions)
     return Object.freeze({
       mode: VimMode.NORMAL,
       keys,
-      ...(actions.length === 1
-        ? { command: actions[0] }
-        : { commands: Object.freeze(actions) }),
+      command: actions[0],
+      // The generic Vim machine emits one command. The application dispatcher
+      // owns the surface-specific alternatives attached to that command.
+      ...(actions.length > 1
+        ? { args: Object.freeze({ actions: contextualActions }) }
+        : {}),
     })
   })
 

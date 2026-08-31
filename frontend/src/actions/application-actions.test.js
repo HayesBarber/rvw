@@ -6,6 +6,7 @@ import {
   ApplicationAction,
   DEFAULT_LEADER_KEY,
   LEADER_KEY,
+  applicationActionSupportsBindingSurface,
   applicationActionCatalog,
   compileApplicationKeymap,
   defaultApplicationBindings,
@@ -26,6 +27,11 @@ test('the action catalog is frozen, enumerable, and documented', () => {
     assert.equal(definition.id, action)
     assert(Object.values(ActionScope).includes(definition.scope))
     assert(Object.values(ActionGroup).includes(definition.group))
+    assert(
+      definition.bindingSurface === null ||
+      definition.bindingSurface === ActionScope.FILE_TREE ||
+      definition.bindingSurface === ActionScope.DIFF_PANE,
+    )
     assert.match(definition.description, /\S/)
   }
 })
@@ -40,8 +46,9 @@ test('every default binding references a known action and compiles for Normal mo
 
   for (const binding of defaultApplicationBindings) {
     assert.equal(binding.mode, VimMode.NORMAL)
-    for (const command of binding.commands ?? [binding.command]) {
-      assert(Object.hasOwn(applicationActionCatalog, command))
+    assert(Object.hasOwn(applicationActionCatalog, binding.command))
+    for (const action of binding.args?.actions ?? []) {
+      assert(Object.hasOwn(applicationActionCatalog, action))
     }
     assert(Object.isFrozen(binding))
     assert(Object.isFrozen(binding.keys))
@@ -81,22 +88,39 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'd']])
 })
 
-test('approved contextual duplicates offer semantic actions until one handles', () => {
-  const controller = new VimController({ bindings: defaultApplicationBindings })
-  const offered = []
-  controller.subscribeCommands((command) => {
-    offered.push(command.command)
-    return command.command === ApplicationAction.ADD_COMMENT
+test('contextual bindings stay in the application layer', () => {
+  const commentBinding = defaultApplicationBindings.find((binding) => (
+    binding.keys.length === 1 && binding.keys[0] === 'c'
+  ))
+  assert.deepEqual(commentBinding, {
+    mode: VimMode.NORMAL,
+    keys: ['c'],
+    command: ApplicationAction.SHOW_CHANGES,
+    args: {
+      actions: [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT],
+    },
   })
-
-  const result = controller.dispatch({ type: 'key', key: 'c' })
-
-  assert.equal(result.handled, true)
-  assert.equal(result.command.command, ApplicationAction.ADD_COMMENT)
-  assert.deepEqual(offered, [
-    ApplicationAction.SHOW_CHANGES,
-    ApplicationAction.ADD_COMMENT,
-  ])
+  assert.equal(
+    applicationActionSupportsBindingSurface(
+      ApplicationAction.SHOW_CHANGES,
+      ActionScope.FILE_TREE,
+    ),
+    true,
+  )
+  assert.equal(
+    applicationActionSupportsBindingSurface(
+      ApplicationAction.SHOW_CHANGES,
+      ActionScope.DIFF_PANE,
+    ),
+    false,
+  )
+  assert.equal(
+    applicationActionSupportsBindingSurface(
+      ApplicationAction.ADD_COMMENT,
+      ActionScope.DIFF_PANE,
+    ),
+    true,
+  )
 })
 
 test('leader placeholders compile to a concrete key without mutating the keymap', () => {

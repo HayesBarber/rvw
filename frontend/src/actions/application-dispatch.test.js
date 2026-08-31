@@ -226,7 +226,6 @@ test('contextual duplicate keys resolve against the active surface', () => {
       : null,
     globalActions: {
       [ApplicationAction.SHOW_CHANGES]: () => {
-        if (activeSurface !== ActiveSurface.FILE_TREE) return false
         calls.push('changes')
         return true
       },
@@ -234,11 +233,29 @@ test('contextual duplicate keys resolve against the active surface', () => {
   })
   const controller = new VimController({ bindings: defaultApplicationBindings })
   controller.subscribeCommands((command) => (
-    dispatch(command.command, command.count)
+    dispatch(command.args?.actions ?? command.command, command.count)
   ))
 
   assert.equal(controller.dispatch({ type: 'key', key: 'c' }).handled, true)
   activeSurface = ActiveSurface.DIFF_PANE
   assert.equal(controller.dispatch({ type: 'key', key: 'c' }).handled, true)
   assert.deepEqual(calls, ['changes', 'comment'])
+})
+
+test('a directly dispatched focus action remains idempotent', () => {
+  let focusCalls = 0
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => null,
+    globalActions: {
+      [ApplicationAction.FOCUS_FILE_TREE]: () => {
+        focusCalls += 1
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.FOCUS_FILE_TREE), true)
+  assert.equal(dispatch(ApplicationAction.FOCUS_FILE_TREE), true)
+  assert.equal(focusCalls, 2)
 })
