@@ -24,7 +24,6 @@ export default function App() {
   const vimController = useVimController()
   const vimState = useVimState()
   const configurationDiagnostic = useKeyboardConfiguration(vimController)
-  const review = useReviewSession({ workspace, dispatchWorkspace })
   const {
     activePath,
     allFilesRequest,
@@ -47,7 +46,7 @@ export default function App() {
     selectFile,
     changeTreeMode: handleTreeModeChange,
     visibleFiles,
-  } = review
+  } = useReviewSession({ workspace, dispatchWorkspace })
   const copyMessage = copyRequestMessage(copyRequest)
   const {
     activateSurface,
