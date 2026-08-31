@@ -23,6 +23,8 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `focus.diff_pane` | `g d` | Focus the diff pane. |
 | `tree_mode.changes` | `g c` | Show changed files. |
 | `tree_mode.files` | `g f` | Show all repository files. |
+| `file.open.next` | `] b` | Open the next file in the current tree mode. Supports counts and stops at the last file. |
+| `file.open.previous` | `[ b` | Open the previous file in the current tree mode. Supports counts and stops at the first file. |
 | `file_finder.open` | `<C-p>`, `<D-p>` | Open the file finder. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |

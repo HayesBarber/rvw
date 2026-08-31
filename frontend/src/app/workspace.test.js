@@ -103,3 +103,21 @@ test('workspace transitions keep a single authoritative active surface', () => {
   assert.equal(finderSelection.activeSurface, ActiveSurface.DIFF_PANE)
   assert.equal(finderSelection.selectedPath, 'src/main.zig')
 })
+
+test('file selection preserves the active tree mode and surface', () => {
+  const filesModeDiffActive = {
+    ...initialWorkspaceState,
+    treeMode: TreeMode.FILES,
+    activeSurface: ActiveSurface.DIFF_PANE,
+    selectedPath: 'README.md',
+  }
+
+  const selected = workspaceReducer(filesModeDiffActive, {
+    type: 'file_selected',
+    path: 'src/main.zig',
+  })
+
+  assert.equal(selected.selectedPath, 'src/main.zig')
+  assert.equal(selected.treeMode, TreeMode.FILES)
+  assert.equal(selected.activeSurface, ActiveSurface.DIFF_PANE)
+})

@@ -15,6 +15,7 @@ export function useApplicationActions({
   reviewAvailable,
   changeTreeMode,
   copyComments,
+  navigateFile,
   openFileFinder,
   selectFile,
 }) {
@@ -86,6 +87,8 @@ export function useApplicationActions({
     [ApplicationAction.SHOW_FILES]: () => (
       changeTreeMode(TreeMode.FILES)
     ),
+    [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
+    [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => navigateFile(-1, count),
     [ApplicationAction.OPEN_FILE_FINDER]: () => {
       if (!reviewAvailable) return false
       openFileFinder()
@@ -97,6 +100,7 @@ export function useApplicationActions({
     copyComments,
     dispatchWorkspace,
     focusSurface,
+    navigateFile,
     openFileFinder,
     reviewAvailable,
   ])

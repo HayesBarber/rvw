@@ -66,6 +66,8 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_DIFF_PANE], [['g', 'd']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_CHANGES], [['g', 'c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_FILES], [['g', 'f']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_NEXT_FILE], [[']', 'b']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_PREVIOUS_FILE], [['[', 'b']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
@@ -116,6 +118,17 @@ test('compiled bindings preserve counts and multi-key sequences', () => {
     args: undefined,
     count: 1,
     keys: ['g', 'g'],
+    mode: VimMode.NORMAL,
+  })
+
+  assert.equal(controller.dispatch({ type: 'key', key: '3' }).command, null)
+  assert.equal(controller.dispatch({ type: 'key', key: ']' }).command, null)
+  assert.deepEqual(controller.dispatch({ type: 'key', key: 'b' }).command, {
+    type: 'command',
+    command: ApplicationAction.OPEN_NEXT_FILE,
+    args: undefined,
+    count: 3,
+    keys: [']', 'b'],
     mode: VimMode.NORMAL,
   })
 })

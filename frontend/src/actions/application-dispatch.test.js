@@ -57,6 +57,30 @@ test('file-tree resize actions remain global on either review surface', () => {
   assert.deepEqual(calls, [['increase', 3], ['decrease', 2]])
 })
 
+test('file navigation actions remain global and preserve Vim counts', () => {
+  let activeSurface = ActiveSurface.FILE_TREE
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => activeSurface,
+    getSurfaceActions: () => null,
+    globalActions: {
+      [ApplicationAction.OPEN_NEXT_FILE]: (count) => {
+        calls.push(['next', count])
+        return true
+      },
+      [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => {
+        calls.push(['previous', count])
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.OPEN_NEXT_FILE, 3), true)
+  activeSurface = ActiveSurface.DIFF_PANE
+  assert.equal(dispatch(ApplicationAction.OPEN_PREVIOUS_FILE, 2), true)
+  assert.deepEqual(calls, [['next', 3], ['previous', 2]])
+})
+
 test('active-surface actions route only to the authoritative surface adapter', () => {
   let activeSurface = ActiveSurface.FILE_TREE
   const calls = []
