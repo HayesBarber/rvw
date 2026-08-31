@@ -1,6 +1,7 @@
-import { useReducer } from 'react'
+import { useCallback, useReducer, useRef } from 'react'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
+import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeyboardStatus from '../components/KeyboardStatus.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
@@ -22,6 +23,10 @@ export default function App() {
     workspaceReducer,
     initialWorkspaceState,
   )
+  const reviewShellRef = useRef(null)
+  const resizeFileTree = useCallback((width) => {
+    dispatchWorkspace({ type: 'file_tree_width_set', width })
+  }, [])
   const vimController = useVimController()
   const vimState = useVimState()
   const keyboardConfiguration = useKeyboardConfiguration(vimController)
@@ -106,6 +111,7 @@ export default function App() {
   return (
     <div className="application-shell">
       <main
+        ref={reviewShellRef}
         className="review-shell"
         data-active-surface={workspace.activeSurface}
         style={{ '--file-tree-width': `${workspace.fileTreeWidth}px` }}
@@ -168,6 +174,12 @@ export default function App() {
           )}
         </div>
       </section>
+
+      <FileTreeDivider
+        shellRef={reviewShellRef}
+        width={workspace.fileTreeWidth}
+        onResize={resizeFileTree}
+      />
 
       <section
         ref={diffPaneRef}

@@ -37,7 +37,7 @@ textarea {
 
 .review-shell {
   display: grid;
-  grid-template-columns: var(--file-tree-width, 320px) minmax(0, 1fr);
+  grid-template-columns: var(--file-tree-width, 320px) 5px minmax(0, 1fr);
   width: 100%;
   min-width: 960px;
   min-height: 0;
@@ -104,8 +104,36 @@ textarea {
 }
 
 .tree-pane {
+  border-right: 0;
   color: #adadb1;
   background: #141415;
+}
+
+.file-tree-divider {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.file-tree-divider::after {
+  position: absolute;
+  inset: 0 2px;
+  background: #303033;
+  content: '';
+}
+
+.file-tree-divider:hover::after,
+.file-tree-divider[data-resizing]::after {
+  background: #8fb0ff;
+}
+
+.review-shell:has(.file-tree-divider[data-resizing]),
+.review-shell:has(.file-tree-divider[data-resizing]) * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .tree-pane > .pane-header {

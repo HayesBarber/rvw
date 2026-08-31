@@ -14,32 +14,74 @@ test('file-tree width starts at the existing layout width', () => {
   assert.equal(initialWorkspaceState.fileTreeWidth, FILE_TREE_WIDTH.INITIAL)
 })
 
-test('file-tree resize scales by counts and clamps to usable bounds', () => {
+test('file-tree Vim resize scales by counts with only a defensive upper bound', () => {
+  assert.equal(FILE_TREE_WIDTH.VIM_MAX, 17_000)
+
   const widened = workspaceReducer(initialWorkspaceState, {
     type: 'file_tree_resized',
     steps: 2,
   })
   assert.equal(widened.fileTreeWidth, 400)
 
-  const maximum = workspaceReducer(widened, {
+  const large = workspaceReducer(widened, {
     type: 'file_tree_resized',
     steps: 100,
   })
-  assert.equal(maximum.fileTreeWidth, FILE_TREE_WIDTH.MAX)
-  assert.equal(workspaceReducer(maximum, {
+  assert.equal(large.fileTreeWidth, 4400)
+
+  const defensiveMaximum = workspaceReducer(large, {
+    type: 'file_tree_resized',
+    steps: 1000,
+  })
+  assert.equal(defensiveMaximum.fileTreeWidth, FILE_TREE_WIDTH.VIM_MAX)
+  assert.equal(workspaceReducer(defensiveMaximum, {
     type: 'file_tree_resized',
     steps: 1,
-  }), maximum)
+  }), defensiveMaximum)
 
-  const minimum = workspaceReducer(maximum, {
+  const decreased = workspaceReducer(defensiveMaximum, {
+    type: 'file_tree_resized',
+    steps: -400,
+  })
+  assert.equal(decreased.fileTreeWidth, 1000)
+  const physicalMinimum = workspaceReducer(decreased, {
     type: 'file_tree_resized',
     steps: -100,
   })
-  assert.equal(minimum.fileTreeWidth, FILE_TREE_WIDTH.MIN)
-  assert.equal(workspaceReducer(minimum, {
+  assert.equal(physicalMinimum.fileTreeWidth, 0)
+  assert.equal(workspaceReducer(physicalMinimum, {
     type: 'file_tree_resized',
     steps: -1,
-  }), minimum)
+  }), physicalMinimum)
+})
+
+test('pointer resize stores continuous widths without an artificial maximum', () => {
+  const resized = workspaceReducer(initialWorkspaceState, {
+    type: 'file_tree_width_set',
+    width: 517.25,
+  })
+  assert.equal(resized.fileTreeWidth, 517.25)
+
+  const unbounded = workspaceReducer(resized, {
+    type: 'file_tree_width_set',
+    width: 5000,
+  })
+  assert.equal(unbounded.fileTreeWidth, 5000)
+
+  const zero = workspaceReducer(unbounded, {
+    type: 'file_tree_width_set',
+    width: -25,
+  })
+  assert.equal(zero.fileTreeWidth, 0)
+})
+
+test('invalid pointer widths are a safe no-op', () => {
+  for (const width of [undefined, Number.NaN, Number.POSITIVE_INFINITY, '320']) {
+    assert.equal(workspaceReducer(initialWorkspaceState, {
+      type: 'file_tree_width_set',
+      width,
+    }), initialWorkspaceState)
+  }
 })
 
 test('file-tree width survives normal workspace transitions', () => {
