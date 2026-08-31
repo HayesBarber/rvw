@@ -300,6 +300,36 @@ test "loader reads and serializes the user configuration file" {
     );
 }
 
+test "loader follows a symbolic link to the user configuration file" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const home = try temporary.dir.realPathFileAlloc(std.testing.io, ".", std.testing.allocator);
+    defer std.testing.allocator.free(home);
+    try temporary.dir.createDirPath(std.testing.io, ".config/rvw");
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = "linked-config.json",
+        .data =
+        \\{"keybindings":{"normal":{"focus.file_tree":[["g","t"]]}}}
+        ,
+    });
+    try temporary.dir.symLink(
+        std.testing.io,
+        "../../linked-config.json",
+        relative_configuration_path,
+        .{},
+    );
+
+    var loaded = try load(std.testing.allocator, std.testing.io, .{ .home = home });
+    defer loaded.deinit();
+    try std.testing.expect(loaded.snapshot.diagnostic == null);
+    const normal = loaded.snapshot.configuration.object
+        .get("keybindings").?.object
+        .get("normal").?.object;
+    const sequence = normal.get("focus.file_tree").?.array.items[0].array.items;
+    try std.testing.expectEqualStrings("g", sequence[0].string);
+    try std.testing.expectEqualStrings("t", sequence[1].string);
+}
+
 test "loader reports malformed JSON and invalid schema without failing" {
     var temporary = std.testing.tmpDir(.{});
     defer temporary.cleanup();
