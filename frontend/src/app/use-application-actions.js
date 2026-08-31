@@ -47,14 +47,31 @@ export function useApplicationActions({
     requestAnimationFrame(() => focusSurface(ActiveSurface.DIFF_PANE))
   }, [focusSurface, selectFile])
 
-  const registerFileTreeActions = useCallback(
-    (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
-    [surfaceActions],
-  )
-  const registerDiffPaneActions = useCallback(
-    (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
-    [surfaceActions],
-  )
+  const fileTreeActions = useMemo(() => ({
+    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
+      focusSurface(ActiveSurface.DIFF_PANE)
+    ),
+    [ApplicationAction.SHOW_CHANGES]: () => changeTreeMode(TreeMode.CHANGES),
+    [ApplicationAction.SHOW_FILES]: () => changeTreeMode(TreeMode.FILES),
+  }), [changeTreeMode, focusSurface])
+  const diffPaneActions = useMemo(() => ({
+    [ApplicationAction.FOCUS_FILE_TREE]: () => (
+      focusSurface(ActiveSurface.FILE_TREE)
+    ),
+  }), [focusSurface])
+
+  const registerFileTreeActions = useCallback((adapter) => (
+    surfaceActions.register(ActiveSurface.FILE_TREE, {
+      ...adapter,
+      ...fileTreeActions,
+    })
+  ), [fileTreeActions, surfaceActions])
+  const registerDiffPaneActions = useCallback((adapter) => (
+    surfaceActions.register(ActiveSurface.DIFF_PANE, {
+      ...adapter,
+      ...diffPaneActions,
+    })
+  ), [diffPaneActions, surfaceActions])
   const registerFinderActions = useCallback((adapter) => {
     finderActionsRef.current = adapter
     return () => {
@@ -78,14 +95,6 @@ export function useApplicationActions({
       dispatchWorkspace({ type: 'file_tree_resized', steps: -count })
       return true
     },
-    [ApplicationAction.FOCUS_FILE_TREE]: () => (
-      focusSurface(ActiveSurface.FILE_TREE)
-    ),
-    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
-      focusSurface(ActiveSurface.DIFF_PANE)
-    ),
-    [ApplicationAction.SHOW_CHANGES]: () => changeTreeMode(TreeMode.CHANGES),
-    [ApplicationAction.SHOW_FILES]: () => changeTreeMode(TreeMode.FILES),
     [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
     [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => navigateFile(-1, count),
     [ApplicationAction.OPEN_FILE_FINDER]: () => {
@@ -100,10 +109,8 @@ export function useApplicationActions({
     },
     [ApplicationAction.COPY_COMMENTS]: copyComments,
   }), [
-    changeTreeMode,
     copyComments,
     dispatchWorkspace,
-    focusSurface,
     navigateFile,
     openFileFinder,
     openKeymapReference,

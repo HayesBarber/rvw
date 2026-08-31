@@ -6,7 +6,6 @@ import {
   ApplicationAction,
   DEFAULT_LEADER_KEY,
   LEADER_KEY,
-  applicationActionSupportsBindingSurface,
   applicationActionCatalog,
   compileApplicationKeymap,
   defaultApplicationBindings,
@@ -27,11 +26,6 @@ test('the action catalog is frozen, enumerable, and documented', () => {
     assert.equal(definition.id, action)
     assert(Object.values(ActionScope).includes(definition.scope))
     assert(Object.values(ActionGroup).includes(definition.group))
-    assert(
-      definition.bindingSurface === null ||
-      definition.bindingSurface === ActionScope.FILE_TREE ||
-      definition.bindingSurface === ActionScope.DIFF_PANE,
-    )
     assert.match(definition.description, /\S/)
   }
 })
@@ -88,7 +82,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'd']])
 })
 
-test('contextual bindings stay in the application layer', () => {
+test('contextual bindings are inferred from action scopes', () => {
   const commentBinding = defaultApplicationBindings.find((binding) => (
     binding.keys.length === 1 && binding.keys[0] === 'c'
   ))
@@ -101,26 +95,38 @@ test('contextual bindings stay in the application layer', () => {
     },
   })
   assert.equal(
-    applicationActionSupportsBindingSurface(
-      ApplicationAction.SHOW_CHANGES,
-      ActionScope.FILE_TREE,
-    ),
-    true,
+    applicationActionCatalog[ApplicationAction.SHOW_CHANGES].scope,
+    ActionScope.FILE_TREE,
   )
   assert.equal(
-    applicationActionSupportsBindingSurface(
-      ApplicationAction.SHOW_CHANGES,
-      ActionScope.DIFF_PANE,
-    ),
-    false,
+    applicationActionCatalog[ApplicationAction.ADD_COMMENT].scope,
+    ActionScope.DIFF_PANE,
   )
   assert.equal(
-    applicationActionSupportsBindingSurface(
-      ApplicationAction.ADD_COMMENT,
-      ActionScope.DIFF_PANE,
-    ),
-    true,
+    applicationActionCatalog[ApplicationAction.FOCUS_FILE_TREE].scope,
+    ActionScope.DIFF_PANE,
   )
+  assert.equal(
+    applicationActionCatalog[ApplicationAction.FOCUS_DIFF_PANE].scope,
+    ActionScope.FILE_TREE,
+  )
+})
+
+test('user-configured duplicate keys compile for disjoint surface scopes', () => {
+  assert.deepEqual(compileApplicationKeymap({
+    [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: [['x']],
+    [ApplicationAction.ADD_FILE_COMMENT]: [['x']],
+  }), [{
+    mode: VimMode.NORMAL,
+    keys: ['x'],
+    command: ApplicationAction.TREE_COLLAPSE_OR_PARENT,
+    args: {
+      actions: [
+        ApplicationAction.TREE_COLLAPSE_OR_PARENT,
+        ApplicationAction.ADD_FILE_COMMENT,
+      ],
+    },
+  }])
 })
 
 test('leader placeholders compile to a concrete key without mutating the keymap', () => {

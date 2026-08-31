@@ -46,6 +46,7 @@ export function compileBindings(bindings = []) {
     if (binding.command !== undefined && typeof binding.command !== 'string') {
       throw new TypeError('Vim binding commands must be strings')
     }
+
     let mode = byMode.get(binding.mode)
     if (!mode) {
       mode = { exact: new Map(), prefixes: new Set() }

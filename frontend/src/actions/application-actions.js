@@ -66,10 +66,10 @@ const actionDefinitions = [
   [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Expand the focused tree item.'],
   [ApplicationAction.TREE_SIZE_INCREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Widen the file-tree pane.'],
   [ApplicationAction.TREE_SIZE_DECREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Narrow the file-tree pane.'],
-  [ApplicationAction.FOCUS_FILE_TREE, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Focus the file tree.'],
-  [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Focus the diff pane.'],
-  [ApplicationAction.SHOW_CHANGES, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Show changed files in the file tree.'],
-  [ApplicationAction.SHOW_FILES, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Show all repository files in the file tree.'],
+  [ApplicationAction.FOCUS_FILE_TREE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Focus the file tree.'],
+  [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.FILE_TREE, ActionGroup.APPLICATION, 'Focus the diff pane.'],
+  [ApplicationAction.SHOW_CHANGES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show changed files in the file tree.'],
+  [ApplicationAction.SHOW_FILES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show all repository files in the file tree.'],
   [ApplicationAction.OPEN_NEXT_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the next file in the active file-tree mode.'],
   [ApplicationAction.OPEN_PREVIOUS_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the previous file in the active file-tree mode.'],
   [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Open the file finder.'],
@@ -80,15 +80,6 @@ const actionDefinitions = [
   [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Delete the comment in the active context.'],
 ]
 
-// These narrow only shared-key resolution. Direct semantic dispatch remains
-// valid according to the action's scope, including idempotent focus actions.
-const bindingSurfaceOverrides = Object.freeze({
-  [ApplicationAction.FOCUS_FILE_TREE]: ActionScope.DIFF_PANE,
-  [ApplicationAction.FOCUS_DIFF_PANE]: ActionScope.FILE_TREE,
-  [ApplicationAction.SHOW_CHANGES]: ActionScope.FILE_TREE,
-  [ApplicationAction.SHOW_FILES]: ActionScope.FILE_TREE,
-})
-
 /** Stable application actions indexed by their user-configurable identifier. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
   actionDefinitions.map(([id, scope, group, description]) => [
@@ -98,7 +89,6 @@ export const applicationActionCatalog = Object.freeze(Object.fromEntries(
       scope,
       group,
       description,
-      bindingSurface: bindingSurfaceOverrides[id] ?? null,
     }),
   ]),
 ))
@@ -167,13 +157,8 @@ const workspaceSurfaces = Object.freeze([
 function actionBindingSurfaces(action) {
   const definition = applicationActionCatalog[action]
   if (!definition) return []
-  if (definition.bindingSurface) return [definition.bindingSurface]
   if (workspaceSurfaces.includes(definition.scope)) return [definition.scope]
   return workspaceSurfaces
-}
-
-export function applicationActionSupportsBindingSurface(action, surface) {
-  return actionBindingSurfaces(action).includes(surface)
 }
 
 function haveDisjointBindingSurfaces(actions) {
