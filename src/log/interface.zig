@@ -67,3 +67,21 @@ fn writeFallback(allocator: Allocator, io: Io, event: Event, err: anyerror) void
     }
     std.log.err("application log sink failed: {t}", .{err});
 }
+
+test "encoded events omit absent optional context" {
+    const encoded = try encodeEvent(std.testing.allocator, std.testing.io, .{
+        .level = .info,
+        .source = .backend,
+        .message = "application started",
+    });
+    defer std.testing.allocator.free(encoded);
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, encoded, .{});
+    defer parsed.deinit();
+
+    const object = parsed.value.object;
+    try std.testing.expectEqualStrings("info", object.get("level").?.string);
+    try std.testing.expectEqualStrings("backend", object.get("source").?.string);
+    try std.testing.expectEqualStrings("application started", object.get("message").?.string);
+    try std.testing.expect(object.get("timestamp") != null);
+    try std.testing.expect(object.get("context") == null);
+}
