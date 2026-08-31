@@ -100,16 +100,34 @@ fn addMacApp(
         "-framework", "AppKit",
         "-framework", "WebKit",
     });
-    swift.addFileArg(b.path("macos/main.swift"));
-    swift.addFileArg(b.path("macos/native_host.swift"));
+    for ([_][]const u8{
+        "macos/main.swift",
+        "macos/launch_configuration.swift",
+        "macos/application_menu.swift",
+        "macos/native_host.swift",
+        "macos/native_bridge.swift",
+        "macos/bundled_assets.swift",
+        "macos/asset_handler.swift",
+        "macos/navigation_policy.swift",
+        "macos/application_controller.swift",
+    }) |source| swift.addFileArg(b.path(source));
     swift.step.dependOn(&library.step);
     swift.addFileArg(library.getEmittedBin());
     swift.addArg("-o");
     const executable = swift.addOutputFileArg("Rvw");
 
     const swift_tests = b.addSystemCommand(&.{ "xcrun", "swiftc" });
-    swift_tests.addFileArg(b.path("macos/native_host.swift"));
-    swift_tests.addFileArg(b.path("macos/native_host_tests.swift"));
+    for ([_][]const u8{
+        "macos/launch_configuration.swift",
+        "macos/native_host.swift",
+        "macos/bundled_assets.swift",
+        "macos/navigation_policy.swift",
+        "macos/test_support.swift",
+        "macos/launch_configuration_tests.swift",
+        "macos/bundled_assets_tests.swift",
+        "macos/navigation_policy_tests.swift",
+        "macos/native_host_tests.swift",
+    }) |source| swift_tests.addFileArg(b.path(source));
     swift_tests.addArg("-o");
     const swift_test_executable = swift_tests.addOutputFileArg("NativeHostTests");
     const run_swift_tests = b.addSystemCommand(&.{"/usr/bin/env"});
