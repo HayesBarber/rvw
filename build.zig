@@ -122,12 +122,12 @@ fn addMacApp(
         "macos/native_host.swift",
         "macos/bundled_assets.swift",
         "macos/navigation_policy.swift",
+        "macos/test_support.swift",
+        "macos/launch_configuration_tests.swift",
+        "macos/bundled_assets_tests.swift",
+        "macos/navigation_policy_tests.swift",
+        "macos/native_host_tests.swift",
     }) |source| swift_tests.addFileArg(b.path(source));
-    swift_tests.addFileArg(b.path("macos/test_support.swift"));
-    swift_tests.addFileArg(b.path("macos/launch_configuration_tests.swift"));
-    swift_tests.addFileArg(b.path("macos/bundled_assets_tests.swift"));
-    swift_tests.addFileArg(b.path("macos/navigation_policy_tests.swift"));
-    swift_tests.addFileArg(b.path("macos/native_host_tests.swift"));
     swift_tests.addArg("-o");
     const swift_test_executable = swift_tests.addOutputFileArg("NativeHostTests");
     const run_swift_tests = b.addSystemCommand(&.{"/usr/bin/env"});
