@@ -17,4 +17,5 @@ test {
     _ = @import("app/core.zig");
     _ = @import("app/json_protocol.zig");
     _ = @import("provider/comment/memory.zig");
+    _ = @import("provider/diff/git.zig");
 }
