@@ -4,13 +4,13 @@ pub const interface = @import("interface.zig");
 pub const file = @import("file.zig");
 pub const stderr = @import("stderr.zig");
 
-pub const maximum_message_size = interface.maximum_message_size;
 pub const Level = interface.Level;
 pub const Source = interface.Source;
 pub const Event = interface.Event;
 pub const Logger = interface.Logger;
 pub const Environment = file.Environment;
 pub const FileLogger = file.FileLogger;
+pub const maximum_file_count = file.maximum_file_count;
 pub const encodeEvent = interface.encodeEvent;
 pub const stderrLogger = stderr.logger;
 

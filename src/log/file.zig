@@ -3,6 +3,10 @@ const log_interface = @import("interface.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
+const filename_prefix = "rvw-";
+const filename_suffix = ".jsonl";
+
+pub const maximum_file_count: usize = 10;
 
 pub const Environment = struct {
     home: ?[]const u8 = null,
@@ -38,8 +42,9 @@ pub const FileLogger = struct {
 
     pub fn initInDirectory(allocator: Allocator, io: Io, directory: []const u8) !FileLogger {
         try Io.Dir.cwd().createDirPath(io, directory);
+        try pruneLogFiles(allocator, io, directory, maximum_file_count - 1);
         const timestamp = Io.Timestamp.now(io, .real).toNanoseconds();
-        const filename = try std.fmt.allocPrint(allocator, "rvw-{d}.jsonl", .{timestamp});
+        const filename = try logFilename(allocator, timestamp);
         defer allocator.free(filename);
         const path = try std.fs.path.join(allocator, &.{ directory, filename });
         errdefer allocator.free(path);
@@ -113,6 +118,49 @@ pub const FileLogger = struct {
     const vtable: log_interface.Logger.VTable = .{ .write = write };
 };
 
+fn pruneLogFiles(
+    allocator: Allocator,
+    io: Io,
+    directory: []const u8,
+    retained_count: usize,
+) !void {
+    var dir = try Io.Dir.openDirAbsolute(io, directory, .{ .iterate = true });
+    defer dir.close(io);
+
+    var timestamps: std.ArrayList(i128) = .empty;
+    defer timestamps.deinit(allocator);
+    var iterator = dir.iterate();
+    while (try iterator.next(io)) |entry| {
+        if (entry.kind != .file) continue;
+        const timestamp = parseLogTimestamp(entry.name) orelse continue;
+        try timestamps.append(allocator, timestamp);
+    }
+    if (timestamps.items.len <= retained_count) return;
+
+    std.mem.sortUnstable(i128, timestamps.items, {}, std.sort.asc(i128));
+    for (timestamps.items[0 .. timestamps.items.len - retained_count]) |timestamp| {
+        const filename = try logFilename(allocator, timestamp);
+        defer allocator.free(filename);
+        try dir.deleteFile(io, filename);
+    }
+}
+
+fn parseLogTimestamp(filename: []const u8) ?i128 {
+    if (!std.mem.startsWith(u8, filename, filename_prefix) or
+        !std.mem.endsWith(u8, filename, filename_suffix)) return null;
+    const value = filename[filename_prefix.len .. filename.len - filename_suffix.len];
+    if (value.len == 0) return null;
+    return std.fmt.parseInt(i128, value, 10) catch null;
+}
+
+fn logFilename(allocator: Allocator, timestamp: i128) Allocator.Error![]u8 {
+    return std.fmt.allocPrint(
+        allocator,
+        filename_prefix ++ "{d}" ++ filename_suffix,
+        .{timestamp},
+    );
+}
+
 fn preferredDirectory(allocator: Allocator, environment: Environment) !?[]u8 {
     return switch (@import("builtin").os.tag) {
         .macos => if (environment.home) |home|
@@ -127,4 +175,76 @@ fn preferredDirectory(allocator: Allocator, environment: Environment) !?[]u8 {
             null,
         else => null,
     };
+}
+
+test "file logger retains only the newest launch files" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const directory = try temporary.dir.realPathFileAlloc(
+        std.testing.io,
+        ".",
+        std.testing.allocator,
+    );
+    defer std.testing.allocator.free(directory);
+
+    for (1..13) |timestamp| {
+        const filename = try std.fmt.allocPrint(
+            std.testing.allocator,
+            "rvw-{d}.jsonl",
+            .{timestamp},
+        );
+        defer std.testing.allocator.free(filename);
+        try temporary.dir.writeFile(std.testing.io, .{ .sub_path = filename, .data = "" });
+    }
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = "rvw-not-a-timestamp.jsonl",
+        .data = "unrelated",
+    });
+
+    var logger = try FileLogger.initInDirectory(
+        std.testing.allocator,
+        std.testing.io,
+        directory,
+    );
+    logger.deinit();
+
+    var log_count: usize = 0;
+    var iterator = temporary.dir.iterate();
+    while (try iterator.next(std.testing.io)) |entry| {
+        if (parseLogTimestamp(entry.name) != null) log_count += 1;
+    }
+    try std.testing.expectEqual(maximum_file_count, log_count);
+    try std.testing.expectError(
+        error.FileNotFound,
+        temporary.dir.statFile(std.testing.io, "rvw-1.jsonl", .{}),
+    );
+    _ = try temporary.dir.statFile(std.testing.io, "rvw-12.jsonl", .{});
+    _ = try temporary.dir.statFile(std.testing.io, "rvw-not-a-timestamp.jsonl", .{});
+}
+
+test "file logger falls back when the preferred directory is unavailable" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const root = try temporary.dir.realPathFileAlloc(
+        std.testing.io,
+        ".",
+        std.testing.allocator,
+    );
+    defer std.testing.allocator.free(root);
+    const blocked = try std.fs.path.join(std.testing.allocator, &.{ root, "blocked" });
+    defer std.testing.allocator.free(blocked);
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = "blocked",
+        .data = "not a directory",
+    });
+    const fallback = try std.fs.path.join(std.testing.allocator, &.{ root, "fallback" });
+    defer std.testing.allocator.free(fallback);
+
+    var logger = try FileLogger.init(std.testing.allocator, std.testing.io, .{
+        .home = blocked,
+        .xdg_state_home = blocked,
+        .temporary_directory = fallback,
+    });
+    defer logger.deinit();
+    try std.testing.expect(std.mem.startsWith(u8, logger.path, fallback));
 }

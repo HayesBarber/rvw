@@ -3,8 +3,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
-pub const maximum_message_size = 16 * 1024;
-
 pub const Level = enum {
     debug,
     info,
@@ -23,7 +21,6 @@ pub const Level = enum {
 
 pub const Source = enum {
     backend,
-    frontend,
 };
 
 pub const Event = struct {
@@ -31,7 +28,6 @@ pub const Event = struct {
     source: Source,
     message: []const u8,
     context: ?std.json.Value = null,
-    metrics: ?std.json.Value = null,
 };
 
 pub const Logger = struct {
@@ -59,8 +55,7 @@ pub fn encodeEvent(allocator: Allocator, io: Io, event: Event) ![]u8 {
         .source = event.source,
         .message = event.message,
         .context = event.context,
-        .metrics = event.metrics,
-    }, .{ .emit_null_optional_fields = true });
+    }, .{ .emit_null_optional_fields = false });
 }
 
 fn writeFallback(allocator: Allocator, io: Io, event: Event, err: anyerror) void {
@@ -71,4 +66,22 @@ fn writeFallback(allocator: Allocator, io: Io, event: Event, err: anyerror) void
         Io.File.stderr().writeStreamingAll(io, "\n") catch {};
     }
     std.log.err("application log sink failed: {t}", .{err});
+}
+
+test "encoded events omit absent optional context" {
+    const encoded = try encodeEvent(std.testing.allocator, std.testing.io, .{
+        .level = .info,
+        .source = .backend,
+        .message = "application started",
+    });
+    defer std.testing.allocator.free(encoded);
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, encoded, .{});
+    defer parsed.deinit();
+
+    const object = parsed.value.object;
+    try std.testing.expectEqualStrings("info", object.get("level").?.string);
+    try std.testing.expectEqualStrings("backend", object.get("source").?.string);
+    try std.testing.expectEqualStrings("application started", object.get("message").?.string);
+    try std.testing.expect(object.get("timestamp") != null);
+    try std.testing.expect(object.get("context") == null);
 }
