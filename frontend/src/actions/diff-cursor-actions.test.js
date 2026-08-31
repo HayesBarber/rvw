@@ -12,6 +12,7 @@ import {
   moveDiffCursorByPage,
   reconcileDiffCursor,
   scrollDiffCursorIntoView,
+  syncDiffCursorPresentation,
 } from './diff-cursor-actions.js'
 
 function diffInstance(oldContents, newContents, renderable = () => true) {
@@ -246,6 +247,25 @@ test('cursor reconciliation preserves identity and chooses the nearest same-side
     side: DiffCursorSide.ADDITIONS,
   })
   assert.equal(reconcileDiffCursor([], existing), null)
+})
+
+test('diff cursor presentation follows visibility without changing its location', () => {
+  const writes = []
+  const instance = {
+    setEditorActiveLine: (...args) => writes.push(args),
+  }
+  const cursor = { lineNumber: 8, side: DiffCursorSide.DELETIONS }
+
+  assert.equal(syncDiffCursorPresentation(instance, cursor, true), true)
+  assert.equal(syncDiffCursorPresentation(instance, cursor, false), false)
+  assert.equal(syncDiffCursorPresentation(instance, null, true), false)
+  assert.equal(syncDiffCursorPresentation(null, cursor, true), false)
+  assert.deepEqual(writes, [
+    [8, { side: DiffCursorSide.DELETIONS }],
+    [null],
+    [null],
+  ])
+  assert.deepEqual(cursor, { lineNumber: 8, side: DiffCursorSide.DELETIONS })
 })
 
 test('the action adapter handles first, last, centered, repeated movement, and empty content', () => {

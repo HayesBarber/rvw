@@ -3,11 +3,23 @@ import test from 'node:test'
 
 import { FileTree } from '@pierre/trees'
 import { ApplicationAction } from './application-actions.js'
-import { createFileTreeActionAdapter } from './file-tree-actions.js'
+import {
+  createFileTreeActionAdapter,
+  fileTreeFocusCSS,
+} from './file-tree-actions.js'
 
 function createTree(paths = ['README.md', 'src/index.js', 'src/view.js']) {
   return new FileTree({ initialExpansion: 'open', paths })
 }
+
+test('file-tree cursor styling is gated by the host visibility state', () => {
+  assert.equal(
+    fileTreeFocusCSS.match(
+      /:host\(\[data-cursor-visible='true'\]\)/g,
+    )?.length,
+    2,
+  )
+})
 
 test('cursor actions move focus with counts and request nearest scrolling', (t) => {
   const model = createTree()
