@@ -44,8 +44,8 @@ pending sequence also clears that pending input without running an action.
 Press `?` to open the keyboard reference. It is grouped by purpose and reads
 from the effective keymap, so valid user replacements and disabled actions are
 shown exactly as installed. While the reference is open, workspace commands
-are blocked. Press `<Esc>` to close it and restore focus to the prior workspace
-context.
+are blocked. Use `j` and `k` to scroll the reference. Press `<Esc>` to close it
+and restore focus to the prior workspace context.
 
 ## User configuration
 

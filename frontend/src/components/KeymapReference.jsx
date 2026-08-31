@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { createKeymapReference } from '../actions/keymap-reference.js'
+import {
+  createKeymapReference,
+  keymapReferenceScrollDelta,
+} from '../actions/keymap-reference.js'
 
 function sequenceLabel(sequence) {
   return sequence.join(' ')
@@ -7,6 +10,7 @@ function sequenceLabel(sequence) {
 
 export default function KeymapReference({ keymap, onClose }) {
   const dialogRef = useRef(null)
+  const bodyRef = useRef(null)
   const previousFocusRef = useRef(null)
   const groups = useMemo(() => createKeymapReference(keymap), [keymap])
 
@@ -21,6 +25,15 @@ export default function KeymapReference({ keymap, onClose }) {
       event.preventDefault()
       event.stopPropagation()
       onClose()
+      return
+    }
+    const scrollDelta = event.altKey || event.ctrlKey || event.metaKey
+      ? null
+      : keymapReferenceScrollDelta(event.key)
+    if (scrollDelta !== null) {
+      event.preventDefault()
+      event.stopPropagation()
+      bodyRef.current?.scrollBy({ top: scrollDelta })
       return
     }
     if (event.key === 'Tab') {
@@ -55,13 +68,13 @@ export default function KeymapReference({ keymap, onClose }) {
         <header className="keymap-reference-header">
           <div>
             <h2 id="keymap-reference-title">Keyboard reference</h2>
-            <p>Bindings currently in effect. Press Esc to close.</p>
+            <p>Bindings currently in effect. Press j/k to scroll or Esc to close.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close keyboard reference">
             Close
           </button>
         </header>
-        <div className="keymap-reference-body">
+        <div ref={bodyRef} className="keymap-reference-body">
           {groups.map((group) => (
             <section className="keymap-reference-group" key={group.id}>
               <h3>{group.label}</h3>

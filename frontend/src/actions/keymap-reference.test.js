@@ -5,7 +5,11 @@ import {
   applicationActionCatalog,
   defaultNormalKeymap,
 } from './application-actions.js'
-import { createKeymapReference } from './keymap-reference.js'
+import {
+  KEYMAP_REFERENCE_SCROLL_STEP,
+  createKeymapReference,
+  keymapReferenceScrollDelta,
+} from './keymap-reference.js'
 
 test('the keymap reference groups catalog descriptions and effective bindings', () => {
   const keymap = {
@@ -31,4 +35,11 @@ test('the keymap reference groups catalog descriptions and effective bindings', 
     byId[ApplicationAction.CURSOR_UP].description,
     applicationActionCatalog[ApplicationAction.CURSOR_UP].description,
   )
+})
+
+test('plain j and k map to one reference scroll step', () => {
+  assert.equal(keymapReferenceScrollDelta('j'), KEYMAP_REFERENCE_SCROLL_STEP)
+  assert.equal(keymapReferenceScrollDelta('k'), -KEYMAP_REFERENCE_SCROLL_STEP)
+  assert.equal(keymapReferenceScrollDelta('J'), null)
+  assert.equal(keymapReferenceScrollDelta('<Down>'), null)
 })
