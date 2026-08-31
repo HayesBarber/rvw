@@ -11,8 +11,6 @@ export const TreeMode = Object.freeze({
 
 export const FILE_TREE_WIDTH = Object.freeze({
   INITIAL: 320,
-  MIN: 200,
-  MAX: 480,
   STEP: 40,
 })
 
@@ -56,12 +54,16 @@ export function workspaceReducer(state, action) {
     case 'file_tree_resized': {
       const steps = Number.isSafeInteger(action.steps) ? action.steps : 0
       const fileTreeWidth = Math.max(
-        FILE_TREE_WIDTH.MIN,
-        Math.min(
-          FILE_TREE_WIDTH.MAX,
-          state.fileTreeWidth + steps * FILE_TREE_WIDTH.STEP,
-        ),
+        0,
+        state.fileTreeWidth + steps * FILE_TREE_WIDTH.STEP,
       )
+      return fileTreeWidth === state.fileTreeWidth
+        ? state
+        : { ...state, fileTreeWidth }
+    }
+    case 'file_tree_width_set': {
+      if (!Number.isFinite(action.width)) return state
+      const fileTreeWidth = Math.max(0, action.width)
       return fileTreeWidth === state.fileTreeWidth
         ? state
         : { ...state, fileTreeWidth }
