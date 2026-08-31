@@ -116,3 +116,110 @@ test {
     _ = @import("git/content.zig");
     _ = @import("git/process.zig");
 }
+
+test "Git provider builds a deterministic working-tree review from a temporary repository" {
+    const TestRepository = @import("../../testing/repository.zig").Repository;
+    var fixture = try TestRepository.init(std.testing.allocator);
+    defer fixture.deinit();
+
+    try fixture.write("deleted.txt", "removed\n");
+    try fixture.write("modified.txt", "before\n");
+    try fixture.commit("initial snapshot");
+    try fixture.temporary.dir.deleteFile(std.testing.io, "deleted.txt");
+    try fixture.write("modified.txt", "after\n");
+    try fixture.write("untracked.txt", "one\ntwo\n");
+
+    var provider = try GitProvider.init(
+        std.testing.allocator,
+        std.testing.io,
+        fixture.root,
+        null,
+    );
+    defer provider.deinit();
+    const diffs = provider.interface();
+    const overview = try diffs.getDiffOverview(std.testing.io);
+
+    try std.testing.expect(std.mem.startsWith(u8, overview.id, "working-tree:"));
+    try std.testing.expectEqualStrings(std.fs.path.basename(fixture.root), overview.repository.name);
+    try std.testing.expectEqualStrings("deleted.txt", overview.initialPath.?);
+    try std.testing.expectEqual(@as(usize, 3), overview.files.len);
+    try expectSummary(overview.files[0], "deleted.txt", .deleted, 0, 1);
+    try expectSummary(overview.files[1], "modified.txt", .modified, 1, 1);
+    try expectSummary(overview.files[2], "untracked.txt", .added, 2, 0);
+
+    const deleted = try diffs.getFileDiff(std.testing.io, overview.id, "deleted.txt");
+    try std.testing.expectEqualStrings("removed\n", deleted.content.diff.oldFile.?.contents);
+    try std.testing.expect(deleted.content.diff.newFile == null);
+
+    const modified = try diffs.getFileDiff(std.testing.io, overview.id, "modified.txt");
+    try std.testing.expectEqualStrings("before\n", modified.content.diff.oldFile.?.contents);
+    try std.testing.expectEqualStrings("after\n", modified.content.diff.newFile.?.contents);
+
+    const untracked = try diffs.getFileDiff(std.testing.io, overview.id, "untracked.txt");
+    try std.testing.expect(untracked.content.diff.oldFile == null);
+    try std.testing.expectEqualStrings("one\ntwo\n", untracked.content.diff.newFile.?.contents);
+    try std.testing.expectError(
+        error.UnknownDiff,
+        diffs.getFileDiff(std.testing.io, "stale-diff", "modified.txt"),
+    );
+    try std.testing.expectError(
+        error.UnknownFile,
+        diffs.getFileDiff(std.testing.io, overview.id, "missing.txt"),
+    );
+}
+
+test "Git provider resolves explicit commit ranges independently of the working tree" {
+    const TestRepository = @import("../../testing/repository.zig").Repository;
+    var fixture = try TestRepository.init(std.testing.allocator);
+    defer fixture.deinit();
+
+    try fixture.write("renamed.txt", "base\n");
+    try fixture.commit("base snapshot");
+    const base = try fixture.revision("HEAD");
+    defer std.testing.allocator.free(base);
+
+    try fixture.git(&.{ "mv", "renamed.txt", "current.txt" });
+    try fixture.write("current.txt", "base\nhead\n");
+    try fixture.commit("head snapshot");
+    const head = try fixture.revision("HEAD");
+    defer std.testing.allocator.free(head);
+    try fixture.write("current.txt", "uncommitted content must not leak\n");
+
+    const range = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, head });
+    defer std.testing.allocator.free(range);
+    var provider = try GitProvider.init(
+        std.testing.allocator,
+        std.testing.io,
+        fixture.root,
+        range,
+    );
+    defer provider.deinit();
+    const diffs = provider.interface();
+    const overview = try diffs.getDiffOverview(std.testing.io);
+
+    try std.testing.expectEqualStrings(range, overview.id);
+    try std.testing.expectEqualStrings(base, overview.source.commit_range.base);
+    try std.testing.expectEqualStrings(head, overview.source.commit_range.head);
+    try std.testing.expectEqual(@as(usize, 1), overview.files.len);
+    try std.testing.expectEqual(model.FileStatus.renamed, overview.files[0].status);
+    try std.testing.expectEqualStrings("renamed.txt", overview.files[0].previousPath.?);
+    try std.testing.expectEqualStrings("current.txt", overview.files[0].path);
+
+    const renamed = try diffs.getFileDiff(std.testing.io, overview.id, "current.txt");
+    try std.testing.expectEqualStrings("renamed.txt", renamed.previousPath.?);
+    try std.testing.expectEqualStrings("base\n", renamed.content.diff.oldFile.?.contents);
+    try std.testing.expectEqualStrings("base\nhead\n", renamed.content.diff.newFile.?.contents);
+}
+
+fn expectSummary(
+    summary: model.FileSummary,
+    path: []const u8,
+    status: model.FileStatus,
+    additions: ?usize,
+    deletions: ?usize,
+) !void {
+    try std.testing.expectEqualStrings(path, summary.path);
+    try std.testing.expectEqual(status, summary.status);
+    try std.testing.expectEqual(additions, summary.additions);
+    try std.testing.expectEqual(deletions, summary.deletions);
+}

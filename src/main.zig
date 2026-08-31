@@ -167,3 +167,121 @@ fn launchArguments(
     }
     return buffer[0..7];
 }
+
+test "CLI parsing preserves directory, range, help, and positional-only arguments" {
+    const defaults = (try parseArgs(&.{"rvw"})).launch;
+    try std.testing.expectEqualStrings(".", defaults.directory);
+    try std.testing.expect(defaults.range == null);
+
+    const explicit = (try parseArgs(&.{
+        "rvw",
+        "--range",
+        "main..feature",
+        "repository",
+    })).launch;
+    try std.testing.expectEqualStrings("repository", explicit.directory);
+    try std.testing.expectEqualStrings("main..feature", explicit.range.?);
+
+    const positional = (try parseArgs(&.{ "rvw", "--", "-review" })).launch;
+    try std.testing.expectEqualStrings("-review", positional.directory);
+
+    try std.testing.expect((try parseArgs(&.{ "rvw", "--help" })) == .help);
+    try std.testing.expect((try parseArgs(&.{ "rvw", "repository", "-h" })) == .help);
+}
+
+test "CLI parsing rejects ambiguous and incomplete launch arguments" {
+    const Case = struct {
+        arguments: []const []const u8,
+        expected: ParseError,
+    };
+    const cases = [_]Case{
+        .{ .arguments = &.{ "rvw", "one", "two" }, .expected = error.DuplicateDirectory },
+        .{ .arguments = &.{ "rvw", "-r", "a..b", "--range", "b..c" }, .expected = error.DuplicateRange },
+        .{ .arguments = &.{ "rvw", "--range" }, .expected = error.MissingRange },
+        .{ .arguments = &.{ "rvw", "--range", "" }, .expected = error.EmptyRange },
+        .{ .arguments = &.{ "rvw", "--unknown" }, .expected = error.UnknownArgument },
+    };
+    for (cases) |case| {
+        try std.testing.expectError(case.expected, parseArgs(case.arguments));
+        try std.testing.expect(parseErrorMessage(case.expected).len > 0);
+    }
+}
+
+test "CLI canonicalizes directories and rejects files" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    try temporary.dir.createDirPath(std.testing.io, "repository");
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = "not-a-directory",
+        .data = "file",
+    });
+
+    const canonical = try canonicalizeDirectory(
+        std.testing.io,
+        std.testing.allocator,
+        temporary.dir,
+        "repository",
+    );
+    defer std.testing.allocator.free(canonical);
+    try std.testing.expect(std.fs.path.isAbsolute(canonical));
+    try std.testing.expectError(
+        error.NotDirectory,
+        canonicalizeDirectory(
+            std.testing.io,
+            std.testing.allocator,
+            temporary.dir,
+            "not-a-directory",
+        ),
+    );
+}
+
+test "CLI launch arguments target the containing app and forward the optional range" {
+    try std.testing.expectEqualStrings(
+        "/Applications/Rvw.app",
+        try appBundlePath("/Applications/Rvw.app/Contents/MacOS"),
+    );
+    try std.testing.expectError(error.InvalidBundleLayout, appBundlePath("Rvw"));
+
+    var without_range_buffer: [9][]const u8 = undefined;
+    const without_range = launchArguments(
+        &without_range_buffer,
+        "/Applications/Rvw.app",
+        "/tmp/repository",
+        null,
+    );
+    try expectArguments(&.{
+        "/usr/bin/open",
+        "-n",
+        "/Applications/Rvw.app",
+        "--args",
+        "--rvw-cli-launch",
+        "--directory",
+        "/tmp/repository",
+    }, without_range);
+
+    var range_buffer: [9][]const u8 = undefined;
+    const with_range = launchArguments(
+        &range_buffer,
+        "/Applications/Rvw.app",
+        "/tmp/repository",
+        "main..feature",
+    );
+    try expectArguments(&.{
+        "/usr/bin/open",
+        "-n",
+        "/Applications/Rvw.app",
+        "--args",
+        "--rvw-cli-launch",
+        "--directory",
+        "/tmp/repository",
+        "--range",
+        "main..feature",
+    }, with_range);
+}
+
+fn expectArguments(expected: []const []const u8, actual: []const []const u8) !void {
+    try std.testing.expectEqual(expected.len, actual.len);
+    for (expected, actual) |expected_argument, actual_argument| {
+        try std.testing.expectEqualStrings(expected_argument, actual_argument);
+    }
+}
