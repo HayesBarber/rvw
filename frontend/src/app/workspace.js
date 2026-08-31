@@ -12,6 +12,7 @@ export const TreeMode = Object.freeze({
 export const FILE_TREE_WIDTH = Object.freeze({
   INITIAL: 320,
   STEP: 40,
+  VIM_MAX: 16_384,
 })
 
 export const initialWorkspaceState = Object.freeze({
@@ -55,7 +56,10 @@ export function workspaceReducer(state, action) {
       const steps = Number.isSafeInteger(action.steps) ? action.steps : 0
       const fileTreeWidth = Math.max(
         0,
-        state.fileTreeWidth + steps * FILE_TREE_WIDTH.STEP,
+        Math.min(
+          FILE_TREE_WIDTH.VIM_MAX,
+          state.fileTreeWidth + steps * FILE_TREE_WIDTH.STEP,
+        ),
       )
       return fileTreeWidth === state.fileTreeWidth
         ? state
