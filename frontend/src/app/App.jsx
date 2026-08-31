@@ -62,10 +62,14 @@ export default function App() {
     addFileComment: handleAddFileComment,
     diffPaneRef,
     fileTreePaneRef,
+    focusDiffPane,
+    focusFileTree,
     registerDiffPaneActions,
     registerFileTreeActions,
     registerFinderActions,
     selectTreeFile: handleTreeFileSelect,
+    showChanges,
+    showFiles,
   } = useApplicationActions({
     workspace,
     dispatchWorkspace,
@@ -154,8 +158,11 @@ export default function App() {
               files={visibleFiles}
               isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
               mode={workspace.treeMode}
+              onFocusDiffPane={focusDiffPane}
               selectedPath={activePath}
               onSelectFile={handleTreeFileSelect}
+              onShowChanges={showChanges}
+              onShowFiles={showFiles}
               registerActionAdapter={registerFileTreeActions}
             />
           )}
@@ -222,6 +229,7 @@ export default function App() {
             onCreateComment={handleCreateComment}
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
+            onFocusFileTree={focusFileTree}
             registerActionAdapter={registerDiffPaneActions}
           />
         </div>

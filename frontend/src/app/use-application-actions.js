@@ -50,31 +50,31 @@ export function useApplicationActions({
     requestAnimationFrame(() => focusSurface(ActiveSurface.DIFF_PANE))
   }, [focusSurface, selectFile])
 
-  const fileTreeActions = useMemo(() => ({
-    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
-      focusSurface(ActiveSurface.DIFF_PANE)
-    ),
-    [ApplicationAction.SHOW_CHANGES]: () => changeTreeMode(TreeMode.CHANGES),
-    [ApplicationAction.SHOW_FILES]: () => changeTreeMode(TreeMode.FILES),
-  }), [changeTreeMode, focusSurface])
-  const diffPaneActions = useMemo(() => ({
-    [ApplicationAction.FOCUS_FILE_TREE]: () => (
-      focusSurface(ActiveSurface.FILE_TREE)
-    ),
-  }), [focusSurface])
+  const focusFileTree = useCallback(
+    () => focusSurface(ActiveSurface.FILE_TREE),
+    [focusSurface],
+  )
+  const focusDiffPane = useCallback(
+    () => focusSurface(ActiveSurface.DIFF_PANE),
+    [focusSurface],
+  )
+  const showChanges = useCallback(
+    () => changeTreeMode(TreeMode.CHANGES),
+    [changeTreeMode],
+  )
+  const showFiles = useCallback(
+    () => changeTreeMode(TreeMode.FILES),
+    [changeTreeMode],
+  )
 
-  const registerFileTreeActions = useCallback((adapter) => (
-    surfaceActions.register(ActiveSurface.FILE_TREE, {
-      ...adapter,
-      ...fileTreeActions,
-    })
-  ), [fileTreeActions, surfaceActions])
-  const registerDiffPaneActions = useCallback((adapter) => (
-    surfaceActions.register(ActiveSurface.DIFF_PANE, {
-      ...adapter,
-      ...diffPaneActions,
-    })
-  ), [diffPaneActions, surfaceActions])
+  const registerFileTreeActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
+    [surfaceActions],
+  )
+  const registerDiffPaneActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
+    [surfaceActions],
+  )
   const registerFinderActions = useCallback((adapter) => {
     finderActionsRef.current = adapter
     return () => {
@@ -148,9 +148,13 @@ export function useApplicationActions({
     addFileComment,
     diffPaneRef,
     fileTreePaneRef,
+    focusDiffPane,
+    focusFileTree,
     registerDiffPaneActions,
     registerFileTreeActions,
     registerFinderActions,
     selectTreeFile,
+    showChanges,
+    showFiles,
   }
 }
