@@ -12,7 +12,7 @@ export const TreeMode = Object.freeze({
 export const FILE_TREE_WIDTH = Object.freeze({
   INITIAL: 320,
   STEP: 40,
-  VIM_MAX: 16_384,
+  VIM_MAX: 17_000,
 })
 
 export const initialWorkspaceState = Object.freeze({

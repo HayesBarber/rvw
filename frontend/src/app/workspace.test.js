@@ -15,6 +15,8 @@ test('file-tree width starts at the existing layout width', () => {
 })
 
 test('file-tree Vim resize scales by counts with only a defensive upper bound', () => {
+  assert.equal(FILE_TREE_WIDTH.VIM_MAX, 17_000)
+
   const widened = workspaceReducer(initialWorkspaceState, {
     type: 'file_tree_resized',
     steps: 2,
@@ -37,12 +39,12 @@ test('file-tree Vim resize scales by counts with only a defensive upper bound', 
     steps: 1,
   }), defensiveMaximum)
 
-  const zero = workspaceReducer(defensiveMaximum, {
+  const decreased = workspaceReducer(defensiveMaximum, {
     type: 'file_tree_resized',
     steps: -400,
   })
-  assert.equal(zero.fileTreeWidth, 384)
-  const physicalMinimum = workspaceReducer(zero, {
+  assert.equal(decreased.fileTreeWidth, 1000)
+  const physicalMinimum = workspaceReducer(decreased, {
     type: 'file_tree_resized',
     steps: -100,
   })
