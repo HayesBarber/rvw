@@ -125,6 +125,8 @@ fn launch(
     directory: []const u8,
     range: ?[]const u8,
 ) !void {
+    // Zig resolves the running executable through symlinks here. A CLI invoked
+    // as /usr/local/bin/rvw therefore finds rvw-cli inside the installed app.
     const executable_dir = try std.process.executableDirPathAlloc(io, allocator);
     const bundle_path = try appBundlePath(executable_dir);
     var buffer: [9][]const u8 = undefined;
