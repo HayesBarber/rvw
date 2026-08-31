@@ -297,20 +297,12 @@ textarea {
 }
 
 .file-finder-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 12px 14px 8px;
 }
 
 .file-finder-header h2 {
   margin: 0;
   font-size: 0.9rem;
-}
-
-.file-finder-header span {
-  color: #77777d;
-  font-size: 0.72rem;
 }
 
 .file-finder-input {
@@ -449,12 +441,6 @@ textarea {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
-}
-
-.comment-actions span {
-  margin-right: auto;
-  color: #737378;
-  font-size: 0.7rem;
 }
 
 .comment-actions button {

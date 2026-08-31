@@ -1,5 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+import {
+  CommentKeyboardAction,
+  commentKeyboardAction,
+} from './comment-keyboard.js'
+
 export default function CommentEditor({ comment, onCancel, onSave }) {
   const [body, setBody] = useState(comment.body)
   const [error, setError] = useState(null)
@@ -30,10 +35,11 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
   }
 
   function handleKeyDown(event) {
-    if (event.key === 'Escape' && !saving) {
+    const action = commentKeyboardAction(event, saving)
+    if (action === CommentKeyboardAction.CANCEL) {
       event.preventDefault()
       onCancel()
-    } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
     }
@@ -58,7 +64,6 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
       />
       {error && <p className="comment-error" role="alert">{error}</p>}
       <div className="comment-actions">
-        <span>⌘↵ to save</span>
         <button type="button" disabled={saving} onClick={onCancel}>Cancel</button>
         <button type="submit" disabled={saving || body.trim().length === 0}>
           {saving ? 'Saving…' : 'Save'}

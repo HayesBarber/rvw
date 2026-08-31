@@ -172,7 +172,7 @@ export default function App() {
               className="file-finder-button"
               type="button"
               aria-keyshortcuts="Meta+P Control+P"
-              title="Find file (⌘P / Ctrl+P)"
+              title="Find file"
               onClick={openFileFinder}
             >
               Find file

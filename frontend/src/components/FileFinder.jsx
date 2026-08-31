@@ -134,7 +134,6 @@ export default function FileFinder({
       >
         <header className="file-finder-header">
           <h2 id="file-finder-title">Find a file</h2>
-          <span aria-hidden="true">⌘P / Ctrl+P</span>
         </header>
         <label className="visually-hidden" htmlFor="file-finder-input">
           Search repository files

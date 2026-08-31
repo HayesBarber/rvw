@@ -1,6 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { commentTargetLabel } from './comment-annotations.js'
+import {
+  CommentKeyboardAction,
+  commentKeyboardAction,
+} from './comment-keyboard.js'
 
 export default function CommentComposer({ target, onCancel, onCreate }) {
   const [body, setBody] = useState('')
@@ -45,10 +49,11 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
   }
 
   function handleKeyDown(event) {
-    if (event.key === 'Escape' && !saving) {
+    const action = commentKeyboardAction(event, saving)
+    if (action === CommentKeyboardAction.CANCEL) {
       event.preventDefault()
       onCancel()
-    } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
     }
@@ -76,7 +81,6 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
       />
       {error && <p className="comment-error" role="alert">{error}</p>}
       <div className="comment-actions">
-        <span>⌘↵ to submit</span>
         <button type="button" disabled={saving} onClick={onCancel}>
           Cancel
         </button>
