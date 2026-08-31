@@ -41,6 +41,15 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_tests.step);
 
+    const cli_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(cli_tests).step);
+
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
     dev.addArtifactArg(server);
@@ -105,6 +114,7 @@ fn addMacApp(
         "macos/launch_configuration.swift",
         "macos/application_menu.swift",
         "macos/native_host.swift",
+        "macos/native_request_router.swift",
         "macos/native_bridge.swift",
         "macos/bundled_assets.swift",
         "macos/asset_handler.swift",
@@ -120,6 +130,7 @@ fn addMacApp(
     for ([_][]const u8{
         "macos/launch_configuration.swift",
         "macos/native_host.swift",
+        "macos/native_request_router.swift",
         "macos/bundled_assets.swift",
         "macos/navigation_policy.swift",
         "macos/test_support.swift",
@@ -127,6 +138,7 @@ fn addMacApp(
         "macos/bundled_assets_tests.swift",
         "macos/navigation_policy_tests.swift",
         "macos/native_host_tests.swift",
+        "macos/native_request_router_tests.swift",
     }) |source| swift_tests.addFileArg(b.path(source));
     swift_tests.addArg("-o");
     const swift_test_executable = swift_tests.addOutputFileArg("NativeHostTests");

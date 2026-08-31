@@ -29,4 +29,15 @@ enum BundledAssets {
         default: "application/octet-stream"
         }
     }
+
+    static func load(path: String, under root: URL) throws -> (url: URL, mimeType: String, data: Data) {
+        guard let url = fileURL(forPath: path, under: root) else {
+            throw URLError(.noPermissionsToReadFile)
+        }
+        return (
+            url,
+            mimeType(forExtension: url.pathExtension),
+            try Data(contentsOf: url)
+        )
+    }
 }

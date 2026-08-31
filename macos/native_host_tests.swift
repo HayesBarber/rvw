@@ -31,5 +31,6 @@ struct NativeHostTests {
         testBundledAssets()
         testNavigationPolicy()
         testNativeHost()
+        testNativeRequestRouter()
     }
 }

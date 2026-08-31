@@ -79,12 +79,12 @@ final class NativeCore {
 }
 
 final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
-    private let core: NativeCore
-    private let nativeHost: NativeHost
+    private let router: NativeRequestRouter
 
     init(core: NativeCore, nativeHost: NativeHost) {
-        self.core = core
-        self.nativeHost = nativeHost
+        router = NativeRequestRouter(nativeHost: nativeHost) { messageBody in
+            try core.dispatch(messageBody)
+        }
     }
 
     func userContentController(
@@ -92,13 +92,8 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
         didReceive message: WKScriptMessage,
         replyHandler: @escaping (Any?, String?) -> Void
     ) {
-        if let response = nativeHost.handle(message.body) {
-            replyHandler(response, nil)
-            return
-        }
-
         do {
-            replyHandler(try core.dispatch(message.body), nil)
+            replyHandler(try router.handle(message.body), nil)
         } catch {
             replyHandler(nil, error.localizedDescription)
         }

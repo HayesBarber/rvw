@@ -16,9 +16,26 @@ func testLaunchConfiguration() {
     }
 
     switch LaunchConfiguration.parse(
-        arguments: ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "extra"]
+        arguments: ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository"]
     ) {
-    case .invalid: break
-    default: fatalError("trailing launch arguments should be rejected")
+    case let .configuration(configuration):
+        expect(configuration.range == nil, "working-tree launches should omit the range")
+    default:
+        fatalError("working-tree CLI launch arguments should be accepted")
+    }
+
+    let invalidArguments = [
+        ["Rvw", "--rvw-cli-launch"],
+        ["Rvw", "--rvw-cli-launch", "--directory"],
+        ["Rvw", "--rvw-cli-launch", "--directory", ""],
+        ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--range"],
+        ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--range", ""],
+        ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "extra"],
+    ]
+    for invalid in invalidArguments {
+        switch LaunchConfiguration.parse(arguments: invalid) {
+        case .invalid: break
+        default: fatalError("incomplete or trailing launch arguments should be rejected")
+        }
     }
 }

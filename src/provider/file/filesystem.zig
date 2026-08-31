@@ -25,11 +25,12 @@ pub const FilesystemProvider = struct {
         };
         errdefer root.close(io);
 
+        const files = try enumerateFiles(arena.allocator(), io, root);
         return .{
             .arena = arena,
             .root = root,
             .io = io,
-            .files = try enumerateFiles(arena.allocator(), io, root),
+            .files = files,
         };
     }
 
@@ -154,4 +155,94 @@ fn unavailable(reason: model.UnavailableReason) model.FileContent {
 
 fn lessThanPath(_: void, left: []const u8, right: []const u8) bool {
     return std.mem.lessThan(u8, left, right);
+}
+
+test "filesystem provider lists repository files without traversing Git or symlinks" {
+    const TestRepository = @import("../../testing/repository.zig").Repository;
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+
+    try repository.write(".gitignore", "ignored.cache\n");
+    try repository.write(".hidden", "hidden\n");
+    try repository.write("ignored.cache", "local cache\n");
+    try repository.write("nested/file.txt", "nested\n");
+    try repository.temporary.dir.symLink(
+        std.testing.io,
+        "nested/file.txt",
+        "linked-file",
+        .{},
+    );
+    try repository.temporary.dir.symLink(
+        std.testing.io,
+        "nested",
+        "linked-directory",
+        .{ .is_directory = true },
+    );
+
+    var provider = try FilesystemProvider.init(
+        std.testing.allocator,
+        std.testing.io,
+        repository.root,
+    );
+    defer provider.deinit();
+    const files = try provider.interface().getFiles(std.testing.io);
+
+    const expected = [_][]const u8{
+        ".gitignore",
+        ".hidden",
+        "ignored.cache",
+        "linked-directory",
+        "linked-file",
+        "nested/file.txt",
+    };
+    try std.testing.expectEqual(expected.len, files.len);
+    for (expected, files) |expected_path, actual_path| {
+        try std.testing.expectEqualStrings(expected_path, actual_path);
+    }
+    try std.testing.expect(!containsPath(files, ".git/HEAD"));
+    try std.testing.expect(!containsPath(files, "linked-directory/file.txt"));
+}
+
+test "filesystem provider reads known text and rejects unsafe or unavailable content" {
+    const TestRepository = @import("../../testing/repository.zig").Repository;
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+
+    try repository.write("nested/text.txt", "review me\n");
+    try repository.write("binary.dat", "before\x00after");
+    try repository.write("invalid.txt", "\xff");
+    try repository.temporary.dir.symLink(
+        std.testing.io,
+        "nested/text.txt",
+        "linked-text",
+        .{},
+    );
+
+    var provider = try FilesystemProvider.init(
+        std.testing.allocator,
+        std.testing.io,
+        repository.root,
+    );
+    defer provider.deinit();
+    const files = provider.interface();
+
+    const text = (try files.getFile(std.testing.io, "nested/text.txt")).file.file;
+    try std.testing.expectEqualStrings("nested/text.txt", text.name);
+    try std.testing.expectEqualStrings("review me\n", text.contents);
+    try std.testing.expectEqual(
+        model.UnavailableReason.binary,
+        (try files.getFile(std.testing.io, "binary.dat")).unavailable.reason,
+    );
+    try std.testing.expectEqual(
+        model.UnavailableReason.invalid_utf8,
+        (try files.getFile(std.testing.io, "invalid.txt")).unavailable.reason,
+    );
+    try std.testing.expectEqual(
+        model.UnavailableReason.symlink,
+        (try files.getFile(std.testing.io, "linked-text")).unavailable.reason,
+    );
+
+    for ([_][]const u8{ "", "missing.txt", "../nested/text.txt", "/nested/text.txt" }) |path| {
+        try std.testing.expectError(error.UnknownFile, files.getFile(std.testing.io, path));
+    }
 }

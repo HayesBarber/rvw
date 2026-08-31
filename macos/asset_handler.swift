@@ -16,21 +16,16 @@ final class AssetHandler: NSObject, WKURLSchemeHandler {
             task.didFailWithError(URLError(.badURL))
             return
         }
-        guard let fileURL = BundledAssets.fileURL(forPath: requestURL.path, under: root) else {
-            task.didFailWithError(URLError(.noPermissionsToReadFile))
-            return
-        }
-
         do {
-            let data = try Data(contentsOf: fileURL)
+            let asset = try BundledAssets.load(path: requestURL.path, under: root)
             let response = URLResponse(
                 url: requestURL,
-                mimeType: BundledAssets.mimeType(forExtension: fileURL.pathExtension),
-                expectedContentLength: data.count,
+                mimeType: asset.mimeType,
+                expectedContentLength: asset.data.count,
                 textEncodingName: nil
             )
             task.didReceive(response)
-            task.didReceive(data)
+            task.didReceive(asset.data)
             task.didFinish()
         } catch {
             task.didFailWithError(error)
