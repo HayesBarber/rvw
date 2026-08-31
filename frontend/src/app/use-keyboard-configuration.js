@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
+import { defaultNormalKeymap } from '../actions/application-actions.js'
 
 export function useKeyboardConfiguration(vimController) {
-  const [diagnostic, setDiagnostic] = useState(null)
+  const [state, setState] = useState({
+    diagnostic: null,
+    keymap: defaultNormalKeymap,
+  })
 
   useEffect(() => {
     let active = true
@@ -13,7 +17,10 @@ export function useKeyboardConfiguration(vimController) {
       if (configuration.bindings) {
         vimController.setBindings(configuration.bindings)
       }
-      setDiagnostic(configuration.diagnostic)
+      setState((current) => ({
+        diagnostic: configuration.diagnostic,
+        keymap: configuration.keymap ?? current.keymap,
+      }))
     })
 
     return () => {
@@ -21,5 +28,5 @@ export function useKeyboardConfiguration(vimController) {
     }
   }, [vimController])
 
-  return diagnostic
+  return state
 }

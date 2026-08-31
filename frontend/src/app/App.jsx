@@ -3,6 +3,7 @@ import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeyboardStatus from '../components/KeyboardStatus.jsx'
+import KeymapReference from '../components/KeymapReference.jsx'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { useReviewSession } from '../review/review-session.js'
@@ -23,7 +24,8 @@ export default function App() {
   )
   const vimController = useVimController()
   const vimState = useVimState()
-  const configurationDiagnostic = useKeyboardConfiguration(vimController)
+  const keyboardConfiguration = useKeyboardConfiguration(vimController)
+  const configurationDiagnostic = keyboardConfiguration.diagnostic
   const {
     activePath,
     allFilesRequest,
@@ -49,6 +51,12 @@ export default function App() {
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace })
   const copyMessage = copyRequestMessage(copyRequest)
+  const closeKeymapReference = () => {
+    dispatchWorkspace({ type: 'keymap_reference_closed' })
+  }
+  const openKeymapReference = () => {
+    dispatchWorkspace({ type: 'keymap_reference_opened' })
+  }
   const {
     activateSurface,
     addFileComment: handleAddFileComment,
@@ -67,6 +75,7 @@ export default function App() {
     copyComments: handleCopyComments,
     navigateFile,
     openFileFinder,
+    openKeymapReference,
     selectFile,
   })
 
@@ -227,6 +236,12 @@ export default function App() {
           onOpen={handleFinderOpen}
           onClose={closeFileFinder}
           registerActionAdapter={registerFinderActions}
+        />
+      )}
+      {workspace.keymapReferenceOpen && (
+        <KeymapReference
+          keymap={keyboardConfiguration.keymap}
+          onClose={closeKeymapReference}
         />
       )}
       <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />

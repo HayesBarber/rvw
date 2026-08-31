@@ -275,6 +275,144 @@ textarea {
   border: 0;
 }
 
+.keymap-reference-backdrop {
+  position: fixed;
+  z-index: 110;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgb(0 0 0 / 74%);
+}
+
+.keymap-reference-dialog {
+  display: flex;
+  width: min(920px, calc(100vw - 64px));
+  max-height: min(780px, calc(100vh - 64px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #414145;
+  border-radius: 10px;
+  outline: none;
+  background: #141415;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 60%);
+  color: #fafafa;
+}
+
+.keymap-reference-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #303033;
+}
+
+.keymap-reference-header h2,
+.keymap-reference-header p,
+.keymap-reference-group h3,
+.keymap-reference-group dl,
+.keymap-reference-group dd {
+  margin: 0;
+}
+
+.keymap-reference-header h2 {
+  font-size: 1rem;
+}
+
+.keymap-reference-header p {
+  margin-top: 4px;
+  color: #adadb1;
+  font-size: 0.75rem;
+}
+
+.keymap-reference-header button {
+  padding: 5px 10px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.keymap-reference-header button:hover,
+.keymap-reference-header button:focus-visible {
+  border-color: #6686d5;
+  background: #29375b;
+}
+
+.keymap-reference-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  padding: 20px;
+  overflow: auto;
+}
+
+.keymap-reference-group h3 {
+  padding-bottom: 7px;
+  border-bottom: 1px solid #303033;
+  color: #8fb0ff;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.keymap-reference-action {
+  display: grid;
+  grid-template-columns: minmax(118px, 0.8fr) minmax(0, 2fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #242426;
+}
+
+.keymap-reference-action dt {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.keymap-reference-action kbd {
+  padding: 2px 6px;
+  border: 1px solid #414145;
+  border-bottom-color: #66666c;
+  border-radius: 4px;
+  background: #202022;
+  color: #fafafa;
+  font: 0.7rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.keymap-reference-action dd {
+  min-width: 0;
+}
+
+.keymap-reference-action dd strong,
+.keymap-reference-action dd span {
+  display: block;
+}
+
+.keymap-reference-action dd strong {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.keymap-reference-action dd span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #77777d;
+  font: 0.65rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-overflow: ellipsis;
+}
+
+.keymap-reference-disabled {
+  color: #77777d;
+  font-size: 0.7rem;
+  font-style: italic;
+}
+
 .file-finder-backdrop {
   position: fixed;
   z-index: 100;

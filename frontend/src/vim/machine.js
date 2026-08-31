@@ -28,7 +28,7 @@ function initialState(mode) {
  * Creates an immutable keymap index. Bindings describe semantic commands; they
  * deliberately do not know about React components or browser events.
  *
- * @param {{ mode: string, keys: string[], command?: string, args?: unknown, nextMode?: string }[]} bindings
+ * @param {{ mode: string, keys: string[], command?: string, commands?: string[], args?: unknown, nextMode?: string }[]} bindings
  */
 export function compileBindings(bindings = []) {
   const byMode = new Map()
@@ -46,6 +46,17 @@ export function compileBindings(bindings = []) {
     if (binding.command !== undefined && typeof binding.command !== 'string') {
       throw new TypeError('Vim binding commands must be strings')
     }
+    if (
+      binding.commands !== undefined &&
+      (!Array.isArray(binding.commands) ||
+        binding.commands.length === 0 ||
+        binding.commands.some((command) => typeof command !== 'string'))
+    ) {
+      throw new TypeError('Vim binding command candidates must be non-empty strings')
+    }
+    if (binding.command !== undefined && binding.commands !== undefined) {
+      throw new TypeError('Vim bindings cannot define both command and command candidates')
+    }
 
     let mode = byMode.get(binding.mode)
     if (!mode) {
@@ -57,7 +68,13 @@ export function compileBindings(bindings = []) {
     if (mode.exact.has(key)) {
       throw new TypeError(`Duplicate Vim binding for ${binding.mode}: ${binding.keys.join(' ')}`)
     }
-    mode.exact.set(key, Object.freeze({ ...binding, keys: Object.freeze([...binding.keys]) }))
+    mode.exact.set(key, Object.freeze({
+      ...binding,
+      keys: Object.freeze([...binding.keys]),
+      ...(binding.commands
+        ? { commands: Object.freeze([...binding.commands]) }
+        : {}),
+    }))
 
     for (let length = 1; length < binding.keys.length; length += 1) {
       mode.prefixes.add(sequenceKey(binding.keys.slice(0, length)))
@@ -87,8 +104,8 @@ function isCountKey(state, key) {
 
 /**
  * Pure state transition used by the controller and unit tests.
- * One input can complete at most one binding, so the result contains one
- * command or null rather than a command collection.
+ * One input can complete at most one binding. A command record can carry
+ * ordered semantic candidates for the controller to offer until one handles.
  *
  * @param {{ mode: string, count: string, pendingKeys: readonly string[] }} state
  * @param {{ type: 'key', key: string } | { type: 'reset' } | { type: 'set_mode', mode: string }} input
@@ -134,10 +151,14 @@ export function transitionVimState(state, input, bindings) {
 
   if (binding) {
     const count = state.count === '' ? 1 : Number.parseInt(state.count, 10)
-    const command = binding.command
+    const candidateCommands = binding.commands ?? (
+      binding.command ? [binding.command] : []
+    )
+    const command = candidateCommands.length > 0
       ? Object.freeze({
           type: 'command',
-          command: binding.command,
+          command: candidateCommands[0],
+          ...(binding.commands ? { candidates: binding.commands } : {}),
           args: binding.args,
           count,
           keys: binding.keys,
@@ -203,9 +224,29 @@ export class VimController {
     if (!result.command) return result
 
     let handled = false
-    for (const listener of this.commandListeners) {
-      if (listener(result.command) === true) handled = true
+    let handledCommand = result.command
+    const candidates = result.command.candidates ?? [result.command.command]
+    for (const candidate of candidates) {
+      const command = candidate === result.command.command
+        ? result.command
+        : Object.freeze({ ...result.command, command: candidate })
+      for (const listener of this.commandListeners) {
+        if (listener(command) === true) {
+          handled = true
+          handledCommand = command
+          break
+        }
+      }
+      if (handled) break
     }
-    return handled === result.handled ? result : { ...result, handled }
+    let deliveredCommand = handledCommand
+    if (handledCommand.candidates !== undefined) {
+      const singleCommand = { ...handledCommand }
+      delete singleCommand.candidates
+      deliveredCommand = Object.freeze(singleCommand)
+    }
+    return handled === result.handled && deliveredCommand === result.command
+      ? result
+      : { ...result, handled, command: deliveredCommand }
   }
 }

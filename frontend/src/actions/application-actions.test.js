@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  ActionGroup,
   ActionScope,
   ApplicationAction,
   DEFAULT_LEADER_KEY,
@@ -24,6 +25,7 @@ test('the action catalog is frozen, enumerable, and documented', () => {
     assert(Object.isFrozen(definition))
     assert.equal(definition.id, action)
     assert(Object.values(ActionScope).includes(definition.scope))
+    assert(Object.values(ActionGroup).includes(definition.group))
     assert.match(definition.description, /\S/)
   }
 })
@@ -38,7 +40,9 @@ test('every default binding references a known action and compiles for Normal mo
 
   for (const binding of defaultApplicationBindings) {
     assert.equal(binding.mode, VimMode.NORMAL)
-    assert(Object.hasOwn(applicationActionCatalog, binding.command))
+    for (const command of binding.commands ?? [binding.command]) {
+      assert(Object.hasOwn(applicationActionCatalog, command))
+    }
     assert(Object.isFrozen(binding))
     assert(Object.isFrozen(binding.keys))
   }
@@ -50,6 +54,7 @@ test('every default binding references a known action and compiles for Normal mo
 
 test('the default keymap includes navigation, pane, mode, and global bindings', () => {
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CLOSE_APPLICATION], [['q']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_KEYMAP_REFERENCE], [['?']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_UP], [['k'], ['<Up>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_DOWN], [['j'], ['<Down>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_PAGE_UP], [['<C-u>']])
@@ -60,20 +65,38 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.FILE_TREE_ITEM_ACTIVATE], [['<Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_COLLAPSE_OR_PARENT], [['h'], ['<Left>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_EXPAND], [['l'], ['<Right>']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_SIZE_INCREASE], [['<C-w>', '>']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_SIZE_DECREASE], [['<C-w>', '<']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_FILE_TREE], [['g', 't']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_DIFF_PANE], [['g', 'd']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_CHANGES], [['g', 'c']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_FILES], [['g', 'f']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_SIZE_INCREASE], [['>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_SIZE_DECREASE], [['<']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_FILE_TREE], [['<leader>', 'o']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FOCUS_DIFF_PANE], [['<leader>', 'o']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_CHANGES], [['c']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.SHOW_FILES], [['f']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_NEXT_FILE], [[']', 'b']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_PREVIOUS_FILE], [['[', 'b']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>'], ['<leader>', 'f']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_FILE_COMMENT], [['C']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.EDIT_COMMENT], [['e']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'c']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'd']])
+})
+
+test('approved contextual duplicates offer semantic actions until one handles', () => {
+  const controller = new VimController({ bindings: defaultApplicationBindings })
+  const offered = []
+  controller.subscribeCommands((command) => {
+    offered.push(command.command)
+    return command.command === ApplicationAction.ADD_COMMENT
+  })
+
+  const result = controller.dispatch({ type: 'key', key: 'c' })
+
+  assert.equal(result.handled, true)
+  assert.equal(result.command.command, ApplicationAction.ADD_COMMENT)
+  assert.deepEqual(offered, [
+    ApplicationAction.SHOW_CHANGES,
+    ApplicationAction.ADD_COMMENT,
+  ])
 })
 
 test('leader placeholders compile to a concrete key without mutating the keymap', () => {

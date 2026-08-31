@@ -8,6 +8,8 @@ import {
 import { closeApplication } from '../review/api.js'
 import { ActiveSurface, TreeMode } from './workspace.js'
 
+const blockingOverlayActions = Object.freeze({})
+
 export function useApplicationActions({
   workspace,
   dispatchWorkspace,
@@ -17,6 +19,7 @@ export function useApplicationActions({
   copyComments,
   navigateFile,
   openFileFinder,
+  openKeymapReference,
   selectFile,
 }) {
   const fileTreePaneRef = useRef(null)
@@ -76,15 +79,19 @@ export function useApplicationActions({
       return true
     },
     [ApplicationAction.FOCUS_FILE_TREE]: () => (
+      workspace.activeSurface === ActiveSurface.DIFF_PANE &&
       focusSurface(ActiveSurface.FILE_TREE)
     ),
     [ApplicationAction.FOCUS_DIFF_PANE]: () => (
+      workspace.activeSurface === ActiveSurface.FILE_TREE &&
       focusSurface(ActiveSurface.DIFF_PANE)
     ),
     [ApplicationAction.SHOW_CHANGES]: () => (
+      workspace.activeSurface === ActiveSurface.FILE_TREE &&
       changeTreeMode(TreeMode.CHANGES)
     ),
     [ApplicationAction.SHOW_FILES]: () => (
+      workspace.activeSurface === ActiveSurface.FILE_TREE &&
       changeTreeMode(TreeMode.FILES)
     ),
     [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
@@ -92,6 +99,11 @@ export function useApplicationActions({
     [ApplicationAction.OPEN_FILE_FINDER]: () => {
       if (!reviewAvailable) return false
       openFileFinder()
+      return true
+    },
+    [ApplicationAction.OPEN_KEYMAP_REFERENCE]: () => {
+      if (!reviewAvailable) return false
+      openKeymapReference()
       return true
     },
     [ApplicationAction.COPY_COMMENTS]: copyComments,
@@ -102,16 +114,19 @@ export function useApplicationActions({
     focusSurface,
     navigateFile,
     openFileFinder,
+    openKeymapReference,
     reviewAvailable,
+    workspace.activeSurface,
   ])
 
   useEffect(() => {
     const dispatchApplicationAction = createApplicationDispatcher({
       getActiveSurface: () => workspace.activeSurface,
       getSurfaceActions: surfaceActions.get,
-      getOverlayActions: () => workspace.finderOpen
-        ? finderActionsRef.current
-        : null,
+      getOverlayActions: () => {
+        if (workspace.keymapReferenceOpen) return blockingOverlayActions
+        return workspace.finderOpen ? finderActionsRef.current : null
+      },
       globalActions,
     })
     return vimController.subscribeCommands((command) => (
@@ -123,6 +138,7 @@ export function useApplicationActions({
     vimController,
     workspace.activeSurface,
     workspace.finderOpen,
+    workspace.keymapReferenceOpen,
   ])
 
   return {

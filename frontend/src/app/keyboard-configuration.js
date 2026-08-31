@@ -66,6 +66,7 @@ export function resolveKeyboardConfiguration(snapshot) {
   if (!isObject(snapshot)) {
     return {
       bindings: null,
+      keymap: null,
       diagnostic: frontendDiagnostic(
         'invalid_keybindings',
         'configuration service returned an invalid snapshot',
@@ -74,19 +75,20 @@ export function resolveKeyboardConfiguration(snapshot) {
   }
 
   if (snapshot.diagnostic) {
-    return { bindings: null, diagnostic: snapshot.diagnostic }
+    return { bindings: null, keymap: null, diagnostic: snapshot.diagnostic }
   }
 
   try {
+    const keymap = configuredNormalKeymap(snapshot.configuration)
     return {
-      bindings: compileApplicationKeymap(
-        configuredNormalKeymap(snapshot.configuration),
-      ),
+      bindings: compileApplicationKeymap(keymap),
+      keymap,
       diagnostic: null,
     }
   } catch (error) {
     return {
       bindings: null,
+      keymap: null,
       diagnostic: frontendDiagnostic('invalid_keybindings', error.message),
     }
   }
@@ -99,6 +101,7 @@ export async function loadKeyboardConfiguration(loadSnapshot = getConfiguration)
   } catch (error) {
     return {
       bindings: null,
+      keymap: null,
       diagnostic: frontendDiagnostic(
         'configuration_unavailable',
         `unable to load user configuration: ${error.message}`,

@@ -121,3 +121,21 @@ test('file selection preserves the active tree mode and surface', () => {
   assert.equal(selected.treeMode, TreeMode.FILES)
   assert.equal(selected.activeSurface, ActiveSurface.DIFF_PANE)
 })
+
+test('keyboard reference visibility is idempotent and preserves workspace context', () => {
+  const opened = workspaceReducer(initialWorkspaceState, {
+    type: 'keymap_reference_opened',
+  })
+  assert.equal(opened.keymapReferenceOpen, true)
+  assert.equal(opened.activeSurface, initialWorkspaceState.activeSurface)
+  assert.equal(workspaceReducer(opened, {
+    type: 'keymap_reference_opened',
+  }), opened)
+
+  const closed = workspaceReducer(opened, { type: 'keymap_reference_closed' })
+  assert.equal(closed.keymapReferenceOpen, false)
+  assert.equal(closed.activeSurface, initialWorkspaceState.activeSurface)
+  assert.equal(workspaceReducer(closed, {
+    type: 'keymap_reference_closed',
+  }), closed)
+})
