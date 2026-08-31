@@ -7,6 +7,19 @@ export const DiffCursorSide = Object.freeze({
   ADDITIONS: 'additions',
 })
 
+/** Show the stored cursor only while the diff is the active workspace surface. */
+export function syncDiffCursorPresentation(instance, cursor, visible) {
+  if (!instance) return false
+
+  if (!visible || !cursor) {
+    instance.setEditorActiveLine(null)
+    return false
+  }
+
+  instance.setEditorActiveLine(cursor.lineNumber, { side: cursor.side })
+  return true
+}
+
 function normalizedCount(count) {
   return Number.isSafeInteger(count) && count > 0 ? count : 1
 }

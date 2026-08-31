@@ -141,6 +141,7 @@ export default function App() {
             <FileTreePane
               key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}`}
               files={visibleFiles}
+              isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
               mode={workspace.treeMode}
               selectedPath={activePath}
               onSelectFile={handleTreeFileSelect}
@@ -203,6 +204,7 @@ export default function App() {
           <DiffPane
             key={activePath ?? 'no-file'}
             fileDiff={fileDiff}
+            isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             loading={fileLoading}
             error={fileError}
             comments={comments}

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import {
   centerDiffCursor,
   createDiffCursorRows,
   reconcileDiffCursor,
   scrollDiffCursorIntoView,
+  syncDiffCursorPresentation,
 } from '../../actions/diff-cursor-actions.js'
 import {
   commentAtCursor,
@@ -12,7 +13,7 @@ import {
 } from '../../actions/comment-actions.js'
 import { normalizeCommentRange } from './comment-annotations.js'
 
-export default function useDiffCursor({ comments, fileDiff }) {
+export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const renderedFileRef = useRef(null)
   const renderInstanceRef = useRef(null)
   const cursorRowsRef = useRef([])
@@ -21,6 +22,7 @@ export default function useDiffCursor({ comments, fileDiff }) {
   const activeCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
+  const cursorVisibleRef = useRef(isCursorVisible)
 
   useEffect(() => {
     commentsRef.current = comments
@@ -42,10 +44,19 @@ export default function useDiffCursor({ comments, fileDiff }) {
       pathRef.current,
       cursor,
     )?.id ?? null
-    instance.setEditorActiveLine(cursor.lineNumber, { side: cursor.side })
+    syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
     if (scroll) scrollDiffCursorIntoView(instance, node, cursor)
     return true
   }, [])
+
+  useLayoutEffect(() => {
+    cursorVisibleRef.current = isCursorVisible
+    syncDiffCursorPresentation(
+      renderInstanceRef.current,
+      cursorRef.current,
+      isCursorVisible,
+    )
+  }, [isCursorVisible])
 
   const centerCursor = useCallback((cursor) => centerDiffCursor(
     renderInstanceRef.current,
@@ -81,9 +92,9 @@ export default function useDiffCursor({ comments, fileDiff }) {
     const cursor = reconcileDiffCursor(rows, cursorRef.current)
     cursorRowsRef.current = rows
     cursorRef.current = cursor
-    if (cursor) activateCursor(cursor, false)
+    syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
     finishScrollGuard()
-  }, [activateCursor, finishScrollGuard])
+  }, [finishScrollGuard])
 
   const guardNextAnnotationRender = useCallback(() => {
     if (scrollGuardRef.current) return

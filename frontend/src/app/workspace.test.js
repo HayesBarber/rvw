@@ -77,3 +77,29 @@ test('invalid resize steps are a safe no-op', () => {
     }), initialWorkspaceState)
   }
 })
+
+test('workspace transitions keep a single authoritative active surface', () => {
+  const diffActive = workspaceReducer(initialWorkspaceState, {
+    type: 'surface_activated',
+    surface: ActiveSurface.DIFF_PANE,
+  })
+  assert.equal(diffActive.activeSurface, ActiveSurface.DIFF_PANE)
+  assert.equal(workspaceReducer(diffActive, {
+    type: 'surface_activated',
+    surface: ActiveSurface.DIFF_PANE,
+  }), diffActive)
+
+  const treeActive = workspaceReducer(diffActive, {
+    type: 'surface_activated',
+    surface: ActiveSurface.FILE_TREE,
+  })
+  assert.equal(treeActive.activeSurface, ActiveSurface.FILE_TREE)
+
+  const finderSelection = workspaceReducer(treeActive, {
+    type: 'finder_file_opened',
+    path: 'src/main.zig',
+    changed: true,
+  })
+  assert.equal(finderSelection.activeSurface, ActiveSurface.DIFF_PANE)
+  assert.equal(finderSelection.selectedPath, 'src/main.zig')
+})

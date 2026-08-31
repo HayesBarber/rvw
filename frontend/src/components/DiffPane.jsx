@@ -17,6 +17,7 @@ const unavailableDescriptions = {
 
 export default function DiffPane({
   fileDiff,
+  isCursorVisible,
   loading,
   error,
   comments,
@@ -25,7 +26,7 @@ export default function DiffPane({
   onDeleteComment,
   registerActionAdapter,
 }) {
-  const cursor = useDiffCursor({ comments, fileDiff })
+  const cursor = useDiffCursor({ comments, fileDiff, isCursorVisible })
   const commentReview = useDiffComments({
     comments,
     cursor,

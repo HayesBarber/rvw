@@ -3,12 +3,13 @@ import { ApplicationAction } from './application-actions.js'
 // Adapts file tree operations to the application action vocabulary.
 
 export const fileTreeFocusCSS = `
-  [data-type='item'][tabindex='0'] {
+  :host([data-cursor-visible='true']) [data-type='item'][tabindex='0'] {
     box-shadow: inset 0 0 0 var(--trees-focus-ring-width)
       var(--trees-focus-ring-color);
   }
 
-  [data-type='item'][tabindex='0']:not([data-item-selected='true']) {
+  :host([data-cursor-visible='true'])
+    [data-type='item'][tabindex='0']:not([data-item-selected='true']) {
     background-color: var(--trees-bg-muted);
     --truncate-marker-background-overlay-color: var(--trees-bg-muted);
   }

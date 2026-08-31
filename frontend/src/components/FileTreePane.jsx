@@ -10,6 +10,7 @@ import {
 
 export default function FileTreePane({
   files,
+  isCursorVisible,
   mode,
   selectedPath,
   onSelectFile,
@@ -77,5 +78,11 @@ export default function FileTreePane({
     }
   }, [filePaths, model, selectedPath])
 
-  return <FileTree model={model} className="file-tree" />
+  return (
+    <FileTree
+      model={model}
+      className="file-tree"
+      data-cursor-visible={isCursorVisible ? 'true' : undefined}
+    />
+  )
 }
