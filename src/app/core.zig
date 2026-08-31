@@ -51,6 +51,16 @@ pub const Core = struct {
     }
 
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
+        const operation = operationName(request);
+        return self.dispatchRequest(request) catch |err| {
+            if (shouldLogRequestFailure(err)) {
+                logRequestFailed(self.logger, self.io, operation, err);
+            }
+            return err;
+        };
+    }
+
+    fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .get_configuration => .{ .configuration = self.configuration },
             .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
@@ -99,6 +109,58 @@ pub const Core = struct {
     }
 };
 
+fn operationName(request: model.Request) []const u8 {
+    return switch (request) {
+        .get_configuration => "get_configuration",
+        .get_diff_overview => "get_diff_overview",
+        .get_files => "get_files",
+        .get_file => "get_file",
+        .get_file_diff => "get_file_diff",
+        .get_comments => "get_comments",
+        .copy_comments_as_markdown => "copy_comments_as_markdown",
+        .create_comment => "create_comment",
+        .edit_comment => "edit_comment",
+        .delete_comment => "delete_comment",
+    };
+}
+
+fn shouldLogRequestFailure(err: anyerror) bool {
+    return switch (model.errorCode(err)) {
+        .clipboard_unavailable, .internal_error => true,
+        else => false,
+    };
+}
+
+fn logRequestFailed(
+    logger: log.Logger,
+    io: Io,
+    operation: []const u8,
+    err: anyerror,
+) void {
+    var context: std.json.ObjectMap = .empty;
+    defer context.deinit(logger.allocator);
+
+    context.put(logger.allocator, "operation", .{ .string = operation }) catch
+        return logRequestFailureWithoutContext(logger, io);
+    context.put(logger.allocator, "errorCode", .{ .string = @errorName(err) }) catch
+        return logRequestFailureWithoutContext(logger, io);
+
+    logger.log(io, .{
+        .level = .err,
+        .source = .backend,
+        .message = "request failed",
+        .context = .{ .object = context },
+    });
+}
+
+fn logRequestFailureWithoutContext(logger: log.Logger, io: Io) void {
+    logger.log(io, .{
+        .level = .err,
+        .source = .backend,
+        .message = "request failed",
+    });
+}
+
 fn validComment(body: []const u8, target: model.CommentTarget) bool {
     if (!validCommentBody(body)) return false;
     return switch (target) {
@@ -127,6 +189,53 @@ test "comment mutation validation rejects blank bodies and malformed IDs" {
     try std.testing.expect(validCommentId("comment-12"));
     try std.testing.expect(!validCommentId(""));
     try std.testing.expect(!validCommentId(" comment-12"));
+}
+
+test "only operational request failures are logged" {
+    try std.testing.expect(!shouldLogRequestFailure(error.InvalidComment));
+    try std.testing.expect(!shouldLogRequestFailure(error.UnknownFile));
+    try std.testing.expect(shouldLogRequestFailure(error.ClipboardWriteFailed));
+    try std.testing.expect(shouldLogRequestFailure(error.OutOfMemory));
+}
+
+test "request failure logging records only operation and error code" {
+    const Recorder = struct {
+        count: usize = 0,
+        message: ?[]const u8 = null,
+        operation: ?[]const u8 = null,
+        error_code: ?[]const u8 = null,
+
+        fn write(context: *anyopaque, _: Io, event: log.Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            self.count += 1;
+            self.message = event.message;
+            const fields = switch (event.context orelse return) {
+                .object => |object| object,
+                else => return,
+            };
+            self.operation = jsonString(fields.get("operation"));
+            self.error_code = jsonString(fields.get("errorCode"));
+        }
+
+        fn jsonString(value: ?std.json.Value) ?[]const u8 {
+            return switch (value orelse return null) {
+                .string => |string| string,
+                else => null,
+            };
+        }
+    };
+
+    var recorder: Recorder = .{};
+    logRequestFailed(.{
+        .allocator = std.testing.allocator,
+        .context = &recorder,
+        .vtable = &.{ .write = Recorder.write },
+    }, std.testing.io, "get_file", error.AccessDenied);
+
+    try std.testing.expectEqual(@as(usize, 1), recorder.count);
+    try std.testing.expectEqualStrings("request failed", recorder.message.?);
+    try std.testing.expectEqualStrings("get_file", recorder.operation.?);
+    try std.testing.expectEqualStrings("AccessDenied", recorder.error_code.?);
 }
 
 test "core edits and deletes only the requested comment with useful errors" {

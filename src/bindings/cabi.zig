@@ -40,6 +40,12 @@ pub export fn rvw_core_create(
     });
     handle.logger = handle.default_logger.interface();
     handle.git = rvw.provider.diff.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+        rvw.startup.logApplicationStartFailed(
+            handle.logger,
+            handle.threaded.io(),
+            "diff_provider",
+            err,
+        );
         handle.default_logger.deinit();
         handle.threaded.deinit();
         const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)}) catch null;
@@ -54,7 +60,14 @@ pub export fn rvw_core_create(
         handle.threaded.io(),
         directory,
     ) catch |err| {
+        rvw.startup.logApplicationStartFailed(
+            handle.logger,
+            handle.threaded.io(),
+            "file_provider",
+            err,
+        );
         handle.git.deinit();
+        handle.default_logger.deinit();
         handle.threaded.deinit();
         const message = std.fmt.allocPrint(allocator, "unable to enumerate repository files: {t}", .{err}) catch null;
         if (message) |value| {
@@ -65,7 +78,13 @@ pub export fn rvw_core_create(
     };
     handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
         .home = environmentVariable("HOME"),
-    }) catch {
+    }) catch |err| {
+        rvw.startup.logApplicationStartFailed(
+            handle.logger,
+            handle.threaded.io(),
+            "configuration",
+            err,
+        );
         handle.files.deinit();
         handle.git.deinit();
         handle.default_logger.deinit();
