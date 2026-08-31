@@ -1,31 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react'
+import { useReducer } from 'react'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeyboardStatus from '../components/KeyboardStatus.jsx'
-import {
-  createApplicationDispatcher,
-  createSurfaceActionRegistry,
-} from '../actions/application-dispatch.js'
-import { ApplicationAction } from '../actions/application-actions.js'
-import { openFileCommentTarget } from '../actions/comment-actions.js'
-import { loadKeyboardConfiguration } from './keyboard-configuration.js'
-import { closeApplication } from '../review/api.js'
-import {
-  RequestStatus,
-  useCopyComments,
-  useRepositoryFiles,
-  useReviewComments,
-  useReviewFile,
-  useReviewOverview,
-} from '../review/review-data.js'
+import { copyRequestMessage } from '../review/comment-copy-request.js'
+import { RequestStatus } from '../review/request-state.js'
+import { useReviewSession } from '../review/review-session.js'
 import {
   ActiveSurface,
   initialWorkspaceState,
@@ -33,270 +13,61 @@ import {
   workspaceReducer,
 } from './workspace.js'
 import { useVimController, useVimState } from '../vim/index.js'
+import { useApplicationActions } from './use-application-actions.js'
+import { useKeyboardConfiguration } from './use-keyboard-configuration.js'
 
 export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(
     workspaceReducer,
     initialWorkspaceState,
   )
-  const overviewRequest = useReviewOverview()
-  const allFilesRequest = useRepositoryFiles()
-  const commentsRequest = useReviewComments()
-  const copyRequest = useCopyComments()
-  const overview = overviewRequest.data
   const vimController = useVimController()
   const vimState = useVimState()
-  const [configurationDiagnostic, setConfigurationDiagnostic] = useState(null)
-  const fileTreePaneRef = useRef(null)
-  const diffPaneRef = useRef(null)
-  const finderActionsRef = useRef(null)
-  const [surfaceActions] = useState(createSurfaceActionRegistry)
-
-  useEffect(() => {
-    let active = true
-
-    loadKeyboardConfiguration().then(({ bindings, diagnostic }) => {
-      if (!active) return
-      if (bindings) vimController.setBindings(bindings)
-      setConfigurationDiagnostic(diagnostic)
-    })
-
-    return () => {
-      active = false
-    }
-  }, [vimController])
-
-  useEffect(() => {
-    if (!overview) return
-    dispatchWorkspace({
-      type: 'review_loaded',
-      initialPath: overview.initialPath,
-    })
-  }, [overview])
-
-  const changedPaths = useMemo(
-    () => new Set(overview?.files.map((file) => file.path) ?? []),
-    [overview],
-  )
-  const filesModeEntries = useMemo(() => {
-    if (!overview) return []
-    const changedByPath = new Map(overview.files.map((file) => [file.path, file]))
-    const paths = new Set(allFilesRequest.data)
-    for (const file of overview.files) paths.add(file.path)
-    return [...paths]
-      .sort((left, right) => left.localeCompare(right))
-      .map((path) => changedByPath.get(path) ?? {
-        path,
-        previousPath: null,
-        status: 'unchanged',
-        additions: null,
-        deletions: null,
-      })
-  }, [allFilesRequest.data, overview])
-  const visibleFiles = useMemo(
-    () => workspace.treeMode === TreeMode.FILES
-      ? filesModeEntries
-      : (overview?.files ?? []),
-    [filesModeEntries, overview, workspace.treeMode],
-  )
-  const activePath = useMemo(() => {
-    const visiblePaths = new Set(visibleFiles.map((file) => file.path))
-    if (workspace.selectedPath && visiblePaths.has(workspace.selectedPath)) {
-      return workspace.selectedPath
-    }
-    if (overview?.initialPath && visiblePaths.has(overview.initialPath)) {
-      return overview.initialPath
-    }
-    return visibleFiles[0]?.path ?? null
-  }, [overview, visibleFiles, workspace.selectedPath])
-
-  const openFileFinder = useCallback(() => {
-    dispatchWorkspace({ type: 'finder_opened' })
-    if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
-  }, [allFilesRequest])
-
-  const fileRequest = useReviewFile({
-    diffId: overview?.id ?? null,
-    path: activePath,
-    changed: changedPaths.has(activePath),
-  })
-
-  const fileLoading = fileRequest.status === RequestStatus.LOADING
-  const fileDiff = fileRequest.status === RequestStatus.SUCCESS
-    ? fileRequest.data
-    : null
-  const fileError = fileRequest.status === RequestStatus.ERROR
-    ? fileRequest.error
-    : null
-  const canCommentOnFile = Boolean(openFileCommentTarget(fileDiff))
-  const comments = commentsRequest.data
-  const copyMessage = (() => {
-    if (copyRequest.status === RequestStatus.LOADING) return 'Copying…'
-    if (copyRequest.status === RequestStatus.ERROR) return copyRequest.error
-    if (copyRequest.status !== RequestStatus.SUCCESS) return ''
-    const suffix = copyRequest.data.commentCount === 1 ? 'comment' : 'comments'
-    return `Copied ${copyRequest.data.commentCount} ${suffix}`
-  })()
-
-  async function handleCreateComment(body, target, beforeCommit) {
-    const comment = await commentsRequest.create(body, target, beforeCommit)
-    copyRequest.reset()
-    return comment
-  }
-
-  async function handleEditComment(commentId, body, beforeCommit) {
-    const comment = await commentsRequest.edit(commentId, body, beforeCommit)
-    copyRequest.reset()
-    return comment
-  }
-
-  async function handleDeleteComment(commentId, beforeCommit) {
-    const result = await commentsRequest.remove(commentId, beforeCommit)
-    copyRequest.reset()
-    return result
-  }
-
-  const handleCopyComments = useCallback(() => {
-    if (
-      commentsRequest.data.length === 0 ||
-      copyRequest.status === RequestStatus.LOADING
-    ) {
-      return false
-    }
-
-    copyRequest.copy().catch(() => {
-      // The request exposes its error for the existing status message.
-    })
-    return true
-  }, [commentsRequest.data.length, copyRequest])
-
-  const handleTreeModeChange = useCallback((nextMode) => {
-    if (!overview) return false
-    const nextFiles = nextMode === TreeMode.FILES
-      ? filesModeEntries
-      : overview.files
-    dispatchWorkspace({
-      type: 'tree_mode_changed',
-      mode: nextMode,
-      visiblePaths: nextFiles.map((file) => file.path),
-      initialPath: overview.initialPath,
-    })
-    if (
-      nextMode === TreeMode.FILES &&
-      allFilesRequest.status === RequestStatus.IDLE
-    ) {
-      allFilesRequest.load()
-    }
-    return true
-  }, [allFilesRequest, filesModeEntries, overview])
-
-  const focusSurface = useCallback((surface) => {
-    const pane = surface === ActiveSurface.FILE_TREE
-      ? fileTreePaneRef.current
-      : diffPaneRef.current
-    if (!pane) return false
-
-    dispatchWorkspace({ type: 'surface_activated', surface })
-    pane.focus({ preventScroll: true })
-    return true
-  }, [])
-
-  const handleTreeFileSelect = useCallback((path) => {
-    dispatchWorkspace({
-      type: 'file_selected',
-      path,
-    })
-    requestAnimationFrame(() => focusSurface(ActiveSurface.DIFF_PANE))
-  }, [focusSurface])
-
-  const registerFileTreeActions = useCallback(
-    (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
-    [surfaceActions],
-  )
-  const registerDiffPaneActions = useCallback(
-    (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
-    [surfaceActions],
-  )
-  const registerFinderActions = useCallback((adapter) => {
-    finderActionsRef.current = adapter
-    return () => {
-      if (finderActionsRef.current === adapter) finderActionsRef.current = null
-    }
-  }, [])
-
-  const handleAddFileComment = useCallback(() => {
-    const action = surfaceActions
-      .get(ActiveSurface.DIFF_PANE)?.[ApplicationAction.ADD_FILE_COMMENT]
-    return typeof action === 'function' && action()
-  }, [surfaceActions])
-
-  const globalActions = useMemo(() => ({
-    [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
-    [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
-      dispatchWorkspace({ type: 'file_tree_resized', steps: count })
-      return true
-    },
-    [ApplicationAction.TREE_SIZE_DECREASE]: (count) => {
-      dispatchWorkspace({ type: 'file_tree_resized', steps: -count })
-      return true
-    },
-    [ApplicationAction.FOCUS_FILE_TREE]: () => (
-      focusSurface(ActiveSurface.FILE_TREE)
-    ),
-    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
-      focusSurface(ActiveSurface.DIFF_PANE)
-    ),
-    [ApplicationAction.SHOW_CHANGES]: () => (
-      handleTreeModeChange(TreeMode.CHANGES)
-    ),
-    [ApplicationAction.SHOW_FILES]: () => (
-      handleTreeModeChange(TreeMode.FILES)
-    ),
-    [ApplicationAction.OPEN_FILE_FINDER]: () => {
-      if (!overview) return false
-      openFileFinder()
-      return true
-    },
-    [ApplicationAction.COPY_COMMENTS]: handleCopyComments,
-  }), [
-    focusSurface,
-    handleCopyComments,
-    handleTreeModeChange,
+  const configurationDiagnostic = useKeyboardConfiguration(vimController)
+  const review = useReviewSession({ workspace, dispatchWorkspace })
+  const {
+    activePath,
+    allFilesRequest,
+    canCommentOnFile,
+    closeFileFinder,
+    comments,
+    copyComments: handleCopyComments,
+    copyRequest,
+    createReviewComment: handleCreateComment,
+    deleteReviewComment: handleDeleteComment,
+    editReviewComment: handleEditComment,
+    fileDiff,
+    fileError,
+    fileLoading,
+    filesModeEntries,
     openFileFinder,
+    openFinderFile: handleFinderOpen,
     overview,
-  ])
-
-  useEffect(() => {
-    const dispatchApplicationAction = createApplicationDispatcher({
-      getActiveSurface: () => workspace.activeSurface,
-      getSurfaceActions: surfaceActions.get,
-      getOverlayActions: () => workspace.finderOpen
-        ? finderActionsRef.current
-        : null,
-      globalActions,
-    })
-    return vimController.subscribeCommands((command) => (
-      dispatchApplicationAction(command.command, command.count)
-    ))
-  }, [
-    globalActions,
-    surfaceActions,
+    overviewRequest,
+    selectFile,
+    changeTreeMode: handleTreeModeChange,
+    visibleFiles,
+  } = review
+  const copyMessage = copyRequestMessage(copyRequest)
+  const {
+    activateSurface,
+    addFileComment: handleAddFileComment,
+    diffPaneRef,
+    fileTreePaneRef,
+    registerDiffPaneActions,
+    registerFileTreeActions,
+    registerFinderActions,
+    selectTreeFile: handleTreeFileSelect,
+  } = useApplicationActions({
+    workspace,
+    dispatchWorkspace,
     vimController,
-    workspace.activeSurface,
-    workspace.finderOpen,
-  ])
-
-  const handleFinderOpen = useCallback((path) => {
-    dispatchWorkspace({
-      type: 'finder_file_opened',
-      path,
-      changed: changedPaths.has(path),
-    })
-  }, [changedPaths])
-
-  const activateSurface = (surface) => {
-    dispatchWorkspace({ type: 'surface_activated', surface })
-  }
+    reviewAvailable: Boolean(overview),
+    changeTreeMode: handleTreeModeChange,
+    copyComments: handleCopyComments,
+    openFileFinder,
+    selectFile,
+  })
 
   if (overviewRequest.status === RequestStatus.ERROR) {
     return (
@@ -451,7 +222,7 @@ export default function App() {
           error={allFilesRequest.error}
           onRetry={allFilesRequest.load}
           onOpen={handleFinderOpen}
-          onClose={() => dispatchWorkspace({ type: 'finder_closed' })}
+          onClose={closeFileFinder}
           registerActionAdapter={registerFinderActions}
         />
       )}

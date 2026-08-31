@@ -1,0 +1,134 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { ApplicationAction } from '../actions/application-actions.js'
+import {
+  createApplicationDispatcher,
+  createSurfaceActionRegistry,
+} from '../actions/application-dispatch.js'
+import { closeApplication } from '../review/api.js'
+import { ActiveSurface, TreeMode } from './workspace.js'
+
+export function useApplicationActions({
+  workspace,
+  dispatchWorkspace,
+  vimController,
+  reviewAvailable,
+  changeTreeMode,
+  copyComments,
+  openFileFinder,
+  selectFile,
+}) {
+  const fileTreePaneRef = useRef(null)
+  const diffPaneRef = useRef(null)
+  const finderActionsRef = useRef(null)
+  const [surfaceActions] = useState(createSurfaceActionRegistry)
+
+  const activateSurface = useCallback((surface) => {
+    dispatchWorkspace({ type: 'surface_activated', surface })
+  }, [dispatchWorkspace])
+
+  const focusSurface = useCallback((surface) => {
+    const pane = surface === ActiveSurface.FILE_TREE
+      ? fileTreePaneRef.current
+      : diffPaneRef.current
+    if (!pane) return false
+
+    activateSurface(surface)
+    pane.focus({ preventScroll: true })
+    return true
+  }, [activateSurface])
+
+  const selectTreeFile = useCallback((path) => {
+    selectFile(path)
+    requestAnimationFrame(() => focusSurface(ActiveSurface.DIFF_PANE))
+  }, [focusSurface, selectFile])
+
+  const registerFileTreeActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.FILE_TREE, adapter),
+    [surfaceActions],
+  )
+  const registerDiffPaneActions = useCallback(
+    (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
+    [surfaceActions],
+  )
+  const registerFinderActions = useCallback((adapter) => {
+    finderActionsRef.current = adapter
+    return () => {
+      if (finderActionsRef.current === adapter) finderActionsRef.current = null
+    }
+  }, [])
+
+  const addFileComment = useCallback(() => {
+    const action = surfaceActions
+      .get(ActiveSurface.DIFF_PANE)?.[ApplicationAction.ADD_FILE_COMMENT]
+    return typeof action === 'function' && action()
+  }, [surfaceActions])
+
+  const globalActions = useMemo(() => ({
+    [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
+    [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
+      dispatchWorkspace({ type: 'file_tree_resized', steps: count })
+      return true
+    },
+    [ApplicationAction.TREE_SIZE_DECREASE]: (count) => {
+      dispatchWorkspace({ type: 'file_tree_resized', steps: -count })
+      return true
+    },
+    [ApplicationAction.FOCUS_FILE_TREE]: () => (
+      focusSurface(ActiveSurface.FILE_TREE)
+    ),
+    [ApplicationAction.FOCUS_DIFF_PANE]: () => (
+      focusSurface(ActiveSurface.DIFF_PANE)
+    ),
+    [ApplicationAction.SHOW_CHANGES]: () => (
+      changeTreeMode(TreeMode.CHANGES)
+    ),
+    [ApplicationAction.SHOW_FILES]: () => (
+      changeTreeMode(TreeMode.FILES)
+    ),
+    [ApplicationAction.OPEN_FILE_FINDER]: () => {
+      if (!reviewAvailable) return false
+      openFileFinder()
+      return true
+    },
+    [ApplicationAction.COPY_COMMENTS]: copyComments,
+  }), [
+    changeTreeMode,
+    copyComments,
+    dispatchWorkspace,
+    focusSurface,
+    openFileFinder,
+    reviewAvailable,
+  ])
+
+  useEffect(() => {
+    const dispatchApplicationAction = createApplicationDispatcher({
+      getActiveSurface: () => workspace.activeSurface,
+      getSurfaceActions: surfaceActions.get,
+      getOverlayActions: () => workspace.finderOpen
+        ? finderActionsRef.current
+        : null,
+      globalActions,
+    })
+    return vimController.subscribeCommands((command) => (
+      dispatchApplicationAction(command.command, command.count)
+    ))
+  }, [
+    globalActions,
+    surfaceActions,
+    vimController,
+    workspace.activeSurface,
+    workspace.finderOpen,
+  ])
+
+  return {
+    activateSurface,
+    addFileComment,
+    diffPaneRef,
+    fileTreePaneRef,
+    registerDiffPaneActions,
+    registerFileTreeActions,
+    registerFinderActions,
+    selectTreeFile,
+  }
+}

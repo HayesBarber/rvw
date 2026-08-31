@@ -7,7 +7,7 @@ import {
   removeDeletedComment,
   replaceEditedComment,
   settleCommentFetch,
-} from './review-data.js'
+} from './comments-request.js'
 
 const original = [{
   id: 'comment-1',
