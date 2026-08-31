@@ -8,8 +8,23 @@ export const ActionScope = Object.freeze({
   DIFF_PANE: 'diff_pane',
 })
 
+export const ActionGroup = Object.freeze({
+  APPLICATION: 'application',
+  NAVIGATION: 'navigation',
+  FILE_TREE: 'file_tree',
+  REVIEW: 'review',
+})
+
+export const applicationActionGroups = Object.freeze([
+  Object.freeze({ id: ActionGroup.APPLICATION, label: 'Application' }),
+  Object.freeze({ id: ActionGroup.NAVIGATION, label: 'Navigation' }),
+  Object.freeze({ id: ActionGroup.FILE_TREE, label: 'File tree' }),
+  Object.freeze({ id: ActionGroup.REVIEW, label: 'Review comments' }),
+])
+
 export const ApplicationAction = Object.freeze({
   CLOSE_APPLICATION: 'application.close',
+  OPEN_KEYMAP_REFERENCE: 'keymap_reference.open',
   CURSOR_UP: 'cursor.up',
   CURSOR_DOWN: 'cursor.down',
   CURSOR_PAGE_UP: 'cursor.page.up',
@@ -37,38 +52,44 @@ export const ApplicationAction = Object.freeze({
 })
 
 const actionDefinitions = [
-  [ApplicationAction.CLOSE_APPLICATION, ActionScope.GLOBAL, 'Close the application.'],
-  [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, 'Move the active cursor up.'],
-  [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down.'],
-  [ApplicationAction.CURSOR_PAGE_UP, ActionScope.ACTIVE_SURFACE, 'Move the active cursor up by half a viewport.'],
-  [ApplicationAction.CURSOR_PAGE_DOWN, ActionScope.ACTIVE_SURFACE, 'Move the active cursor down by half a viewport.'],
-  [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the first item.'],
-  [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, 'Move the active cursor to the last item.'],
-  [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, 'Center the active cursor in its viewport.'],
-  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, 'Activate the focused file-tree item.'],
-  [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
-  [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, 'Expand the focused tree item.'],
-  [ApplicationAction.TREE_SIZE_INCREASE, ActionScope.GLOBAL, 'Widen the file-tree pane.'],
-  [ApplicationAction.TREE_SIZE_DECREASE, ActionScope.GLOBAL, 'Narrow the file-tree pane.'],
-  [ApplicationAction.FOCUS_FILE_TREE, ActionScope.GLOBAL, 'Focus the file tree.'],
-  [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.GLOBAL, 'Focus the diff pane.'],
-  [ApplicationAction.SHOW_CHANGES, ActionScope.GLOBAL, 'Show changed files in the file tree.'],
-  [ApplicationAction.SHOW_FILES, ActionScope.GLOBAL, 'Show all repository files in the file tree.'],
-  [ApplicationAction.OPEN_NEXT_FILE, ActionScope.GLOBAL, 'Open the next file in the active file-tree mode.'],
-  [ApplicationAction.OPEN_PREVIOUS_FILE, ActionScope.GLOBAL, 'Open the previous file in the active file-tree mode.'],
-  [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, 'Open the file finder.'],
-  [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, 'Copy all review comments as Markdown.'],
-  [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, 'Add a comment at the active diff cursor.'],
-  [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, 'Add a comment to the open file.'],
-  [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, 'Edit the comment in the active context.'],
-  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, 'Delete the comment in the active context.'],
+  [ApplicationAction.CLOSE_APPLICATION, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Close the application.'],
+  [ApplicationAction.OPEN_KEYMAP_REFERENCE, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Show the effective keyboard bindings.'],
+  [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor up.'],
+  [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor down.'],
+  [ApplicationAction.CURSOR_PAGE_UP, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor up by half a viewport.'],
+  [ApplicationAction.CURSOR_PAGE_DOWN, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor down by half a viewport.'],
+  [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the first item.'],
+  [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the last item.'],
+  [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Center the active cursor in its viewport.'],
+  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Activate the focused file-tree item.'],
+  [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
+  [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Expand the focused tree item.'],
+  [ApplicationAction.TREE_SIZE_INCREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Widen the file-tree pane.'],
+  [ApplicationAction.TREE_SIZE_DECREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Narrow the file-tree pane.'],
+  [ApplicationAction.FOCUS_FILE_TREE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Focus the file tree.'],
+  [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.FILE_TREE, ActionGroup.APPLICATION, 'Focus the diff pane.'],
+  [ApplicationAction.SHOW_CHANGES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show changed files in the file tree.'],
+  [ApplicationAction.SHOW_FILES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show all repository files in the file tree.'],
+  [ApplicationAction.OPEN_NEXT_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the next file in the active file-tree mode.'],
+  [ApplicationAction.OPEN_PREVIOUS_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the previous file in the active file-tree mode.'],
+  [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Open the file finder.'],
+  [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, ActionGroup.REVIEW, 'Copy all review comments as Markdown.'],
+  [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment at the active diff cursor.'],
+  [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment to the open file.'],
+  [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Edit the comment in the active context.'],
+  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Delete the comment in the active context.'],
 ]
 
 /** Stable application actions indexed by their user-configurable identifier. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
-  actionDefinitions.map(([id, scope, description]) => [
+  actionDefinitions.map(([id, scope, group, description]) => [
     id,
-    Object.freeze({ id, scope, description }),
+    Object.freeze({
+      id,
+      scope,
+      group,
+      description,
+    }),
   ]),
 ))
 
@@ -77,10 +98,13 @@ const actionBindings = (...sequences) => Object.freeze(sequences)
 
 export const LEADER_KEY = '<leader>'
 export const DEFAULT_LEADER_KEY = '<Space>'
+/** Internal Vim command carrying configured actions to the application dispatcher. */
+export const APPLICATION_DISPATCH_COMMAND = 'application.dispatch'
 
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLOSE_APPLICATION]: actionBindings(keySequence('q')),
+  [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
     keySequence('<Up>'),
@@ -104,27 +128,51 @@ export const defaultNormalKeymap = Object.freeze({
     keySequence('<Right>'),
   ),
   [ApplicationAction.TREE_SIZE_INCREASE]: actionBindings(
-    keySequence('<C-w>', '>'),
+    keySequence('>'),
   ),
   [ApplicationAction.TREE_SIZE_DECREASE]: actionBindings(
-    keySequence('<C-w>', '<'),
+    keySequence('<'),
   ),
-  [ApplicationAction.FOCUS_FILE_TREE]: actionBindings(keySequence('g', 't')),
-  [ApplicationAction.FOCUS_DIFF_PANE]: actionBindings(keySequence('g', 'd')),
-  [ApplicationAction.SHOW_CHANGES]: actionBindings(keySequence('g', 'c')),
-  [ApplicationAction.SHOW_FILES]: actionBindings(keySequence('g', 'f')),
+  [ApplicationAction.FOCUS_FILE_TREE]: actionBindings(keySequence(LEADER_KEY, 'o')),
+  [ApplicationAction.FOCUS_DIFF_PANE]: actionBindings(keySequence(LEADER_KEY, 'o')),
+  [ApplicationAction.SHOW_CHANGES]: actionBindings(keySequence('c')),
+  [ApplicationAction.SHOW_FILES]: actionBindings(keySequence('f')),
   [ApplicationAction.OPEN_NEXT_FILE]: actionBindings(keySequence(']', 'b')),
   [ApplicationAction.OPEN_PREVIOUS_FILE]: actionBindings(keySequence('[', 'b')),
   [ApplicationAction.OPEN_FILE_FINDER]: actionBindings(
     keySequence('<C-p>'),
     keySequence('<D-p>'),
+    keySequence(LEADER_KEY, 'f'),
   ),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
-  [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'c')),
+  [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'd')),
 })
+
+const workspaceSurfaces = Object.freeze([
+  ActionScope.FILE_TREE,
+  ActionScope.DIFF_PANE,
+])
+
+function actionBindingSurfaces(action) {
+  const definition = applicationActionCatalog[action]
+  if (!definition) return []
+  if (workspaceSurfaces.includes(definition.scope)) return [definition.scope]
+  return workspaceSurfaces
+}
+
+function haveDisjointBindingSurfaces(actions) {
+  const claimedSurfaces = new Set()
+  for (const action of actions) {
+    for (const surface of actionBindingSurfaces(action)) {
+      if (claimedSurfaces.has(surface)) return false
+      claimedSurfaces.add(surface)
+    }
+  }
+  return true
+}
 
 function validateKeymap(keymap) {
   if (!keymap || typeof keymap !== 'object' || Array.isArray(keymap)) {
@@ -170,13 +218,31 @@ export function compileApplicationKeymap(
     throw new TypeError('Application keymap leader must be a concrete non-empty key')
   }
 
-  const bindings = Object.entries(keymap).flatMap(([action, sequences]) => (
-    sequences.map((keys) => Object.freeze({
+  const groupedBindings = new Map()
+  for (const [action, sequences] of Object.entries(keymap)) {
+    for (const keys of sequences) {
+      const expandedKeys = Object.freeze(
+        keys.map((key) => key === LEADER_KEY ? leader : key),
+      )
+      const sequence = expandedKeys.join('\u0000')
+      const grouped = groupedBindings.get(sequence)
+      if (grouped) grouped.actions.push(action)
+      else groupedBindings.set(sequence, { keys: expandedKeys, actions: [action] })
+    }
+  }
+
+  const bindings = [...groupedBindings.values()].map(({ keys, actions }) => {
+    if (actions.length > 1 && !haveDisjointBindingSurfaces(actions)) {
+      throw new TypeError(`Duplicate Vim binding for normal: ${keys.join(' ')}`)
+    }
+    const bindingActions = Object.freeze(actions)
+    return Object.freeze({
       mode: VimMode.NORMAL,
-      keys: Object.freeze(keys.map((key) => key === LEADER_KEY ? leader : key)),
-      command: action,
-    }))
-  ))
+      keys,
+      command: APPLICATION_DISPATCH_COMMAND,
+      args: Object.freeze({ actions: bindingActions }),
+    })
+  })
 
   compileBindings(bindings)
   return Object.freeze(bindings)

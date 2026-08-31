@@ -7,6 +7,7 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
 | `application.close` | `q` | Close rvw through the native application host. In HTTP development mode, this action is a safe no-op. |
+| `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |
 | `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. Supports counts. |
@@ -17,20 +18,20 @@ rvw uses a Vim-style Normal-mode keymap for navigation and global review actions
 | `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |
-| `tree.size.increase` | `<C-w> >` | Widen the file-tree pane by one step. Supports counts. |
-| `tree.size.decrease` | `<C-w> <` | Narrow the file-tree pane by one step. Supports counts. |
-| `focus.file_tree` | `g t` | Focus the file tree. |
-| `focus.diff_pane` | `g d` | Focus the diff pane. |
-| `tree_mode.changes` | `g c` | Show changed files. |
-| `tree_mode.files` | `g f` | Show all repository files. |
+| `tree.size.increase` | `>` | Widen the file-tree pane by one step. Supports counts. |
+| `tree.size.decrease` | `<` | Narrow the file-tree pane by one step. Supports counts. |
+| `focus.file_tree` | `<leader> o` | Focus the file tree. |
+| `focus.diff_pane` | `<leader> o` | Focus the diff pane. |
+| `tree_mode.changes` | `c` | Show changed files. |
+| `tree_mode.files` | `f` | Show all repository files. |
 | `file.open.next` | `] b` | Open the next file in the current tree mode. Supports counts and stops at the last file. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. Supports counts and stops at the first file. |
-| `file_finder.open` | `<C-p>`, `<D-p>` | Open the file finder. |
+| `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
 | `comments.edit` | `e` | Edit the saved comment at the active diff context. |
-| `comments.delete` | `d c` | Delete the saved comment at the active diff context. |
+| `comments.delete` | `d d` | Delete the saved comment at the active diff context. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
@@ -39,6 +40,12 @@ focus to the result list and enable its Vim bindings without changing the
 query, then press `<Esc>` again to close the finder. Outside that transition,
 `<Esc>` clears a pending count or multi-key sequence. An unmatched key after a
 pending sequence also clears that pending input without running an action.
+
+Press `?` to open the keyboard reference. It is grouped by purpose and reads
+from the effective keymap, so valid user replacements and disabled actions are
+shown exactly as installed. While the reference is open, workspace commands
+are blocked. Use `j` and `k` to scroll the reference. Press `<Esc>` to close it
+and restore focus to the prior workspace context.
 
 ## User configuration
 

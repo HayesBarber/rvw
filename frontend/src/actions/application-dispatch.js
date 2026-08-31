@@ -42,8 +42,8 @@ export function createSurfaceActionRegistry() {
  * Creates the single application-level semantic action dispatcher.
  *
  * An active overlay receives all actions first so commands cannot leak to the
- * workspace behind it. Otherwise, global actions are resolved centrally and
- * contextual actions are offered only to the active workspace surface.
+ * workspace behind it. Otherwise, each semantic action is offered to its
+ * declared scope, with surface actions handled by the active surface adapter.
  */
 export function createApplicationDispatcher({
   getActiveSurface,
@@ -61,25 +61,33 @@ export function createApplicationDispatcher({
     throw new TypeError('Application dispatch requires an overlay-action reader')
   }
 
-  return (action, count = 1) => {
-    const definition = applicationActionCatalog[action]
-    if (!definition) return false
-
+  return (actionOrActions, count = 1) => {
+    const actions = Array.isArray(actionOrActions)
+      ? actionOrActions
+      : [actionOrActions]
     const overlayActions = getOverlayActions()
-    if (overlayActions) return invokeAction(overlayActions, action, count)
-
-    if (definition.scope === ActionScope.GLOBAL) {
-      return invokeAction(globalActions, action, count)
+    if (overlayActions) {
+      return actions.some((action) => (
+        invokeAction(overlayActions, action, count)
+      ))
     }
 
     const activeSurface = getActiveSurface()
-    if (
-      definition.scope !== ActionScope.ACTIVE_SURFACE &&
-      definition.scope !== activeSurface
-    ) {
-      return false
+    for (const action of actions) {
+      const definition = applicationActionCatalog[action]
+      if (!definition) continue
+      if (definition.scope === ActionScope.GLOBAL) {
+        if (invokeAction(globalActions, action, count)) return true
+        continue
+      }
+      if (
+        definition.scope !== ActionScope.ACTIVE_SURFACE &&
+        definition.scope !== activeSurface
+      ) {
+        continue
+      }
+      if (invokeAction(getSurfaceActions(activeSurface), action, count)) return true
     }
-
-    return invokeAction(getSurfaceActions(activeSurface), action, count)
+    return false
   }
 }

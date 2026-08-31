@@ -13,7 +13,7 @@ import { VimController } from '../vim/machine.js'
 
 function bindingKeys(bindings, action) {
   return bindings
-    .filter((binding) => binding.command === action)
+    .filter((binding) => binding.args.actions.includes(action))
     .map((binding) => binding.keys)
 }
 
@@ -24,7 +24,7 @@ test('configured actions replace defaults while missing actions retain them', ()
         normal: {
           [ApplicationAction.CURSOR_UP]: [['w']],
           [ApplicationAction.ADD_COMMENT]: [['a']],
-          [ApplicationAction.ADD_FILE_COMMENT]: [['f', 'c']],
+          [ApplicationAction.ADD_FILE_COMMENT]: [['x', 'c']],
         },
       },
     },
@@ -40,7 +40,7 @@ test('configured actions replace defaults while missing actions retain them', ()
   assert.deepEqual(bindingKeys(result.bindings, ApplicationAction.ADD_COMMENT), [['a']])
   assert.deepEqual(
     bindingKeys(result.bindings, ApplicationAction.ADD_FILE_COMMENT),
-    [['f', 'c']],
+    [['x', 'c']],
   )
 })
 
@@ -58,6 +58,7 @@ test('an empty configured sequence list disables its action', () => {
 
   assert.equal(result.diagnostic, null)
   assert.deepEqual(bindingKeys(result.bindings, ApplicationAction.COPY_COMMENTS), [])
+  assert.deepEqual(result.keymap[ApplicationAction.COPY_COMMENTS], [])
 })
 
 for (const [name, normal, message] of [
@@ -143,7 +144,7 @@ test('Vim binding replacement is atomic when a later map is invalid', () => {
     { mode: 'normal', keys: ['x'], command: ApplicationAction.CURSOR_DOWN },
   ]))
   assert.equal(
-    controller.dispatch({ type: 'key', key: 'w' }).command.command,
+    controller.dispatch({ type: 'key', key: 'w' }).command.args.actions[0],
     ApplicationAction.CURSOR_UP,
   )
 })

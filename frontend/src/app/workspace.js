@@ -21,6 +21,7 @@ export const initialWorkspaceState = Object.freeze({
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
   finderOpen: false,
+  keymapReferenceOpen: false,
   activeSurface: ActiveSurface.FILE_TREE,
 })
 
@@ -77,6 +78,14 @@ export function workspaceReducer(state, action) {
         finderOpen: false,
         activeSurface: ActiveSurface.DIFF_PANE,
       }
+    case 'keymap_reference_opened':
+      return state.keymapReferenceOpen
+        ? state
+        : { ...state, keymapReferenceOpen: true }
+    case 'keymap_reference_closed':
+      return state.keymapReferenceOpen
+        ? { ...state, keymapReferenceOpen: false }
+        : state
     default:
       return state
   }

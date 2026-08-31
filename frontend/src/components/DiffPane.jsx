@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 
+import { ApplicationAction } from '../actions/application-actions.js'
 import { createCommentActionAdapter, openFileCommentTarget } from '../actions/comment-actions.js'
 import { createDiffCursorActionAdapter } from '../actions/diff-cursor-actions.js'
 import DiffSurface from './diff-pane/DiffSurface.jsx'
@@ -24,6 +25,7 @@ export default function DiffPane({
   onCreateComment,
   onEditComment,
   onDeleteComment,
+  onFocusFileTree,
   registerActionAdapter,
 }) {
   const cursor = useDiffCursor({ comments, fileDiff, isCursorVisible })
@@ -37,6 +39,7 @@ export default function DiffPane({
   })
 
   useEffect(() => registerActionAdapter({
+    [ApplicationAction.FOCUS_FILE_TREE]: onFocusFileTree,
     ...createDiffCursorActionAdapter({
       getRows: cursor.getRows,
       getCursor: cursor.getCursor,
@@ -66,6 +69,7 @@ export default function DiffPane({
     cursor.getInstance,
     cursor.getRows,
     fileDiff,
+    onFocusFileTree,
     registerActionAdapter,
   ])
 

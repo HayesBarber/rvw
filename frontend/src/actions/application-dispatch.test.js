@@ -202,11 +202,71 @@ test('Vim commands consume keys only when application dispatch handles them', ()
   })
   const controller = new VimController({ bindings: defaultApplicationBindings })
   controller.subscribeCommands((command) => (
-    dispatch(command.command, command.count)
+    dispatch(command.args.actions, command.count)
   ))
 
   assert.equal(controller.dispatch({ type: 'key', key: 'j' }).handled, false)
   handleCursor = true
   assert.equal(controller.dispatch({ type: 'key', key: '2' }).handled, true)
   assert.equal(controller.dispatch({ type: 'key', key: 'j' }).handled, true)
+})
+
+test('contextual duplicate keys resolve against the active surface', () => {
+  let activeSurface = ActiveSurface.FILE_TREE
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => activeSurface,
+    getSurfaceActions: (surface) => surface === ActiveSurface.FILE_TREE
+      ? {
+          [ApplicationAction.SHOW_CHANGES]: () => {
+            calls.push('changes')
+            return true
+          },
+        }
+      : {
+          [ApplicationAction.ADD_COMMENT]: () => {
+            calls.push('comment')
+            return true
+          },
+        },
+  })
+  const controller = new VimController({ bindings: defaultApplicationBindings })
+  controller.subscribeCommands((command) => (
+    dispatch(command.args.actions, command.count)
+  ))
+
+  assert.equal(controller.dispatch({ type: 'key', key: 'c' }).handled, true)
+  activeSurface = ActiveSurface.DIFF_PANE
+  assert.equal(controller.dispatch({ type: 'key', key: 'c' }).handled, true)
+  assert.deepEqual(calls, ['changes', 'comment'])
+})
+
+test('the active surface handles its respective focus command', () => {
+  let activeSurface = ActiveSurface.FILE_TREE
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => activeSurface,
+    getSurfaceActions: (surface) => surface === ActiveSurface.FILE_TREE
+      ? {
+          [ApplicationAction.FOCUS_DIFF_PANE]: () => {
+            calls.push('diff')
+            return true
+          },
+        }
+      : {
+          [ApplicationAction.FOCUS_FILE_TREE]: () => {
+            calls.push('tree')
+            return true
+          },
+        },
+  })
+
+  const focusActions = [
+    ApplicationAction.FOCUS_FILE_TREE,
+    ApplicationAction.FOCUS_DIFF_PANE,
+  ]
+  assert.equal(dispatch(focusActions), true)
+  activeSurface = ActiveSurface.DIFF_PANE
+  assert.equal(dispatch(focusActions), true)
+  assert.deepEqual(calls, ['diff', 'tree'])
 })

@@ -12,8 +12,11 @@ export default function FileTreePane({
   files,
   isCursorVisible,
   mode,
+  onFocusDiffPane,
   selectedPath,
   onSelectFile,
+  onShowChanges,
+  onShowFiles,
   registerActionAdapter,
 }) {
   const filePaths = useMemo(
@@ -54,8 +57,23 @@ export default function FileTreePane({
   })
 
   useEffect(
-    () => registerActionAdapter(createFileTreeActionAdapter(model, onSelectFile)),
-    [model, onSelectFile, registerActionAdapter],
+    () => registerActionAdapter(createFileTreeActionAdapter(
+      model,
+      onSelectFile,
+      {
+        focusDiffPane: onFocusDiffPane,
+        showChanges: onShowChanges,
+        showFiles: onShowFiles,
+      },
+    )),
+    [
+      model,
+      onFocusDiffPane,
+      onSelectFile,
+      onShowChanges,
+      onShowFiles,
+      registerActionAdapter,
+    ],
   )
 
   useEffect(() => {

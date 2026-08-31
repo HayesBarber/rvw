@@ -21,6 +21,31 @@ test('file-tree cursor styling is gated by the host visibility state', () => {
   )
 })
 
+test('the file-tree adapter owns its contextual surface actions', (t) => {
+  const model = createTree()
+  t.after(() => model.cleanUp())
+  const calls = []
+  const actions = createFileTreeActionAdapter(model, () => {}, {
+    focusDiffPane: () => {
+      calls.push('focus diff')
+      return true
+    },
+    showChanges: () => {
+      calls.push('show changes')
+      return true
+    },
+    showFiles: () => {
+      calls.push('show files')
+      return true
+    },
+  })
+
+  assert.equal(actions[ApplicationAction.FOCUS_DIFF_PANE](), true)
+  assert.equal(actions[ApplicationAction.SHOW_CHANGES](), true)
+  assert.equal(actions[ApplicationAction.SHOW_FILES](), true)
+  assert.deepEqual(calls, ['focus diff', 'show changes', 'show files'])
+})
+
 test('cursor actions move focus with counts and request nearest scrolling', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())

@@ -46,9 +46,20 @@ function moveFocusByPage(model, operation, count = 1) {
   ))
 }
 
-/** Adapts semantic application actions to the public @pierre/trees API. */
-export function createFileTreeActionAdapter(model, onSelectFile) {
+/** Adapts semantic application actions to the file-tree surface. */
+export function createFileTreeActionAdapter(
+  model,
+  onSelectFile,
+  {
+    focusDiffPane = () => false,
+    showChanges = () => false,
+    showFiles = () => false,
+  } = {},
+) {
   return Object.freeze({
+    [ApplicationAction.FOCUS_DIFF_PANE]: focusDiffPane,
+    [ApplicationAction.SHOW_CHANGES]: showChanges,
+    [ApplicationAction.SHOW_FILES]: showFiles,
     [ApplicationAction.CURSOR_UP]: (count) => moveFocus(
       model,
       () => model.focusPreviousItem(),
