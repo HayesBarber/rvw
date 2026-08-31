@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   ActionGroup,
   ActionScope,
+  APPLICATION_DISPATCH_COMMAND,
   ApplicationAction,
   DEFAULT_LEADER_KEY,
   LEADER_KEY,
@@ -40,12 +41,15 @@ test('every default binding references a known action and compiles for Normal mo
 
   for (const binding of defaultApplicationBindings) {
     assert.equal(binding.mode, VimMode.NORMAL)
-    assert(Object.hasOwn(applicationActionCatalog, binding.command))
-    for (const action of binding.args?.actions ?? []) {
+    assert.equal(binding.command, APPLICATION_DISPATCH_COMMAND)
+    assert(binding.args.actions.length > 0)
+    for (const action of binding.args.actions) {
       assert(Object.hasOwn(applicationActionCatalog, action))
     }
     assert(Object.isFrozen(binding))
     assert(Object.isFrozen(binding.keys))
+    assert(Object.isFrozen(binding.args))
+    assert(Object.isFrozen(binding.args.actions))
   }
 
   assert.doesNotThrow(() => new VimController({
@@ -89,7 +93,7 @@ test('contextual bindings are inferred from action scopes', () => {
   assert.deepEqual(commentBinding, {
     mode: VimMode.NORMAL,
     keys: ['c'],
-    command: ApplicationAction.SHOW_CHANGES,
+    command: APPLICATION_DISPATCH_COMMAND,
     args: {
       actions: [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT],
     },
@@ -119,7 +123,7 @@ test('user-configured duplicate keys compile for disjoint surface scopes', () =>
   }), [{
     mode: VimMode.NORMAL,
     keys: ['x'],
-    command: ApplicationAction.TREE_COLLAPSE_OR_PARENT,
+    command: APPLICATION_DISPATCH_COMMAND,
     args: {
       actions: [
         ApplicationAction.TREE_COLLAPSE_OR_PARENT,
@@ -138,12 +142,14 @@ test('leader placeholders compile to a concrete key without mutating the keymap'
   assert.deepEqual(compileApplicationKeymap(keymap), [{
     mode: VimMode.NORMAL,
     keys: ['<Space>', 'y'],
-    command: ApplicationAction.COPY_COMMENTS,
+    command: APPLICATION_DISPATCH_COMMAND,
+    args: { actions: [ApplicationAction.COPY_COMMENTS] },
   }])
   assert.deepEqual(compileApplicationKeymap(keymap, { leader: '\\' }), [{
     mode: VimMode.NORMAL,
     keys: ['\\', 'y'],
-    command: ApplicationAction.COPY_COMMENTS,
+    command: APPLICATION_DISPATCH_COMMAND,
+    args: { actions: [ApplicationAction.COPY_COMMENTS] },
   }])
   assert.deepEqual(keymap, {
     [ApplicationAction.COPY_COMMENTS]: [[LEADER_KEY, 'y']],
@@ -157,8 +163,8 @@ test('compiled bindings preserve counts and multi-key sequences', () => {
   assert.equal(controller.dispatch({ type: 'key', key: '0' }).command, null)
   assert.deepEqual(controller.dispatch({ type: 'key', key: 'j' }).command, {
     type: 'command',
-    command: ApplicationAction.CURSOR_DOWN,
-    args: undefined,
+    command: APPLICATION_DISPATCH_COMMAND,
+    args: { actions: [ApplicationAction.CURSOR_DOWN] },
     count: 20,
     keys: ['j'],
     mode: VimMode.NORMAL,
@@ -167,8 +173,8 @@ test('compiled bindings preserve counts and multi-key sequences', () => {
   assert.equal(controller.dispatch({ type: 'key', key: 'g' }).command, null)
   assert.deepEqual(controller.dispatch({ type: 'key', key: 'g' }).command, {
     type: 'command',
-    command: ApplicationAction.CURSOR_FIRST,
-    args: undefined,
+    command: APPLICATION_DISPATCH_COMMAND,
+    args: { actions: [ApplicationAction.CURSOR_FIRST] },
     count: 1,
     keys: ['g', 'g'],
     mode: VimMode.NORMAL,
@@ -178,8 +184,8 @@ test('compiled bindings preserve counts and multi-key sequences', () => {
   assert.equal(controller.dispatch({ type: 'key', key: ']' }).command, null)
   assert.deepEqual(controller.dispatch({ type: 'key', key: 'b' }).command, {
     type: 'command',
-    command: ApplicationAction.OPEN_NEXT_FILE,
-    args: undefined,
+    command: APPLICATION_DISPATCH_COMMAND,
+    args: { actions: [ApplicationAction.OPEN_NEXT_FILE] },
     count: 3,
     keys: [']', 'b'],
     mode: VimMode.NORMAL,

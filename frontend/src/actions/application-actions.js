@@ -98,6 +98,8 @@ const actionBindings = (...sequences) => Object.freeze(sequences)
 
 export const LEADER_KEY = '<leader>'
 export const DEFAULT_LEADER_KEY = '<Space>'
+/** Internal Vim command carrying configured actions to the application dispatcher. */
+export const APPLICATION_DISPATCH_COMMAND = 'application.dispatch'
 
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
@@ -233,16 +235,12 @@ export function compileApplicationKeymap(
     if (actions.length > 1 && !haveDisjointBindingSurfaces(actions)) {
       throw new TypeError(`Duplicate Vim binding for normal: ${keys.join(' ')}`)
     }
-    const contextualActions = Object.freeze(actions)
+    const bindingActions = Object.freeze(actions)
     return Object.freeze({
       mode: VimMode.NORMAL,
       keys,
-      command: actions[0],
-      // The generic Vim machine emits one command. The application dispatcher
-      // owns the surface-specific alternatives attached to that command.
-      ...(actions.length > 1
-        ? { args: Object.freeze({ actions: contextualActions }) }
-        : {}),
+      command: APPLICATION_DISPATCH_COMMAND,
+      args: Object.freeze({ actions: bindingActions }),
     })
   })
 

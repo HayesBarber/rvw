@@ -13,9 +13,7 @@ import { VimController } from '../vim/machine.js'
 
 function bindingKeys(bindings, action) {
   return bindings
-    .filter((binding) => (
-      binding.command === action || binding.args?.actions?.includes(action)
-    ))
+    .filter((binding) => binding.args.actions.includes(action))
     .map((binding) => binding.keys)
 }
 
@@ -146,7 +144,7 @@ test('Vim binding replacement is atomic when a later map is invalid', () => {
     { mode: 'normal', keys: ['x'], command: ApplicationAction.CURSOR_DOWN },
   ]))
   assert.equal(
-    controller.dispatch({ type: 'key', key: 'w' }).command.command,
+    controller.dispatch({ type: 'key', key: 'w' }).command.args.actions[0],
     ApplicationAction.CURSOR_UP,
   )
 })

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { ApplicationAction } from '../actions/application-actions.js'
+import {
+  APPLICATION_DISPATCH_COMMAND,
+  ApplicationAction,
+} from '../actions/application-actions.js'
 import {
   createApplicationDispatcher,
   createSurfaceActionRegistry,
@@ -127,12 +130,10 @@ export function useApplicationActions({
       },
       globalActions,
     })
-    return vimController.subscribeCommands((command) => (
-      dispatchApplicationAction(
-        command.args?.actions ?? command.command,
-        command.count,
-      )
-    ))
+    return vimController.subscribeCommands((command) => {
+      if (command.command !== APPLICATION_DISPATCH_COMMAND) return false
+      return dispatchApplicationAction(command.args.actions, command.count)
+    })
   }, [
     globalActions,
     surfaceActions,

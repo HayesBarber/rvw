@@ -202,7 +202,7 @@ test('Vim commands consume keys only when application dispatch handles them', ()
   })
   const controller = new VimController({ bindings: defaultApplicationBindings })
   controller.subscribeCommands((command) => (
-    dispatch(command.command, command.count)
+    dispatch(command.args.actions, command.count)
   ))
 
   assert.equal(controller.dispatch({ type: 'key', key: 'j' }).handled, false)
@@ -232,7 +232,7 @@ test('contextual duplicate keys resolve against the active surface', () => {
   })
   const controller = new VimController({ bindings: defaultApplicationBindings })
   controller.subscribeCommands((command) => (
-    dispatch(command.args?.actions ?? command.command, command.count)
+    dispatch(command.args.actions, command.count)
   ))
 
   assert.equal(controller.dispatch({ type: 'key', key: 'c' }).handled, true)
