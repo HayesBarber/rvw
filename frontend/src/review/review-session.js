@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo } from 'react'
 
 import { TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
+import {
+  orderedFilePaths,
+  relativeFilePath,
+} from '../actions/file-navigation-actions.js'
 import { useCopyComments } from './comment-copy-request.js'
 import { useReviewComments } from './comments-request.js'
 import { useReviewOverview } from './overview-request.js'
@@ -73,6 +77,10 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     ),
     [overview, visibleFiles, workspace.selectedPath],
   )
+  const visibleFilePaths = useMemo(
+    () => orderedFilePaths(visibleFiles),
+    [visibleFiles],
+  )
   const fileRequest = useReviewFile({
     diffId: overview?.id ?? null,
     path: activePath,
@@ -107,6 +115,31 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const selectFile = useCallback((path) => {
     dispatchWorkspace({ type: 'file_selected', path })
   }, [dispatchWorkspace])
+
+  const navigateFile = useCallback((direction, count) => {
+    const listAvailable = workspace.treeMode === TreeMode.CHANGES
+      ? Boolean(overview)
+      : allFilesRequest.status === RequestStatus.SUCCESS
+    if (!listAvailable) return false
+
+    const path = relativeFilePath(
+      visibleFilePaths,
+      activePath,
+      direction,
+      count,
+    )
+    if (!path) return false
+
+    selectFile(path)
+    return true
+  }, [
+    activePath,
+    allFilesRequest.status,
+    overview,
+    selectFile,
+    visibleFilePaths,
+    workspace.treeMode,
+  ])
 
   const openFinderFile = useCallback((path) => {
     dispatchWorkspace({
@@ -171,6 +204,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
       ? fileRequest.data
       : null,
     filesModeEntries,
+    navigateFile,
     openFileFinder,
     openFinderFile,
     overview,

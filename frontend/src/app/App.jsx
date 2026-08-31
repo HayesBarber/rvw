@@ -39,6 +39,7 @@ export default function App() {
     fileError,
     fileLoading,
     filesModeEntries,
+    navigateFile,
     openFileFinder,
     openFinderFile: handleFinderOpen,
     overview,
@@ -64,6 +65,7 @@ export default function App() {
     reviewAvailable: Boolean(overview),
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
+    navigateFile,
     openFileFinder,
     selectFile,
   })
