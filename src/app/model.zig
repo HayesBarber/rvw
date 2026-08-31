@@ -1,6 +1,5 @@
 const std = @import("std");
 const config = @import("../config/config.zig");
-const log = @import("../log/log.zig");
 
 pub const FileStatus = enum {
     modified,
@@ -203,12 +202,6 @@ pub const Request = union(enum) {
         body: []const u8,
     },
     delete_comment: struct { comment_id: []const u8 },
-    log: struct {
-        level: log.Level,
-        message: []const u8,
-        context: ?std.json.Value = null,
-        metrics: ?std.json.Value = null,
-    },
 };
 
 pub const CopyCommentsResult = struct {
@@ -229,7 +222,6 @@ pub const Response = union(enum) {
     comment: Comment,
     delete_comment_result: DeleteCommentResult,
     copy_comments_result: CopyCommentsResult,
-    log: struct {},
 };
 
 pub const AppError = error{
@@ -238,7 +230,6 @@ pub const AppError = error{
     InvalidComment,
     InvalidCommentId,
     UnknownComment,
-    InvalidLogEntry,
     NoComments,
 };
 
@@ -262,7 +253,6 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.InvalidComment => .invalid_comment,
         error.InvalidCommentId => .invalid_comment_id,
         error.UnknownComment => .unknown_comment,
-        error.InvalidLogEntry => .malformed_request,
         error.NoComments => .no_comments,
         error.ClipboardCommandFailed,
         error.ClipboardToolNotFound,

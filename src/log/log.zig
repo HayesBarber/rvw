@@ -4,7 +4,6 @@ pub const interface = @import("interface.zig");
 pub const file = @import("file.zig");
 pub const stderr = @import("stderr.zig");
 
-pub const maximum_message_size = interface.maximum_message_size;
 pub const Level = interface.Level;
 pub const Source = interface.Source;
 pub const Event = interface.Event;

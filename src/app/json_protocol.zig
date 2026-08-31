@@ -1,6 +1,5 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
-const log = @import("../log/log.zig");
 const model = @import("model.zig");
 
 const Allocator = std.mem.Allocator;
@@ -74,39 +73,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
         const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
         return .{ .delete_comment = .{ .comment_id = comment_id } };
     }
-    if (std.mem.eql(u8, operation, "log")) {
-        const level = parseLogLevel(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse
-            return error.MalformedRequest;
-        const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
-        const context = parseOptionalObject(object.get("context")) orelse return error.MalformedRequest;
-        const metrics = parseOptionalObject(object.get("metrics")) orelse return error.MalformedRequest;
-        return .{ .log = .{
-            .level = level,
-            .message = message,
-            .context = context,
-            .metrics = metrics,
-        } };
-    }
     return error.UnknownOperation;
-}
-
-fn parseLogLevel(value: []const u8) ?log.Level {
-    if (std.mem.eql(u8, value, "debug")) return .debug;
-    if (std.mem.eql(u8, value, "info")) return .info;
-    if (std.mem.eql(u8, value, "warning")) return .warning;
-    if (std.mem.eql(u8, value, "error")) return .err;
-    return null;
-}
-
-/// The outer optional distinguishes malformed values from a valid absent/null
-/// value; structured context and metrics must be JSON objects when supplied.
-fn parseOptionalObject(value: ?std.json.Value) ??std.json.Value {
-    const actual = value orelse return @as(?std.json.Value, null);
-    return switch (actual) {
-        .null => @as(?std.json.Value, null),
-        .object => @as(?std.json.Value, actual),
-        else => null,
-    };
 }
 
 fn jsonString(value: ?std.json.Value) ?[]const u8 {

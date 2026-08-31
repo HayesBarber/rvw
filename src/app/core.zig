@@ -95,17 +95,6 @@ pub const Core = struct {
                 try self.comment_provider.deleteComment(self.io, details.comment_id);
                 break :blk .{ .delete_comment_result = .{ .commentId = details.comment_id } };
             },
-            .log => |details| blk: {
-                if (!validLogMessage(details.message)) return error.InvalidLogEntry;
-                self.logger.log(self.io, .{
-                    .level = details.level,
-                    .source = .frontend,
-                    .message = details.message,
-                    .context = details.context,
-                    .metrics = details.metrics,
-                });
-                break :blk .{ .log = .{} };
-            },
         };
     }
 };
@@ -130,12 +119,6 @@ fn validCommentId(comment_id: []const u8) bool {
         comment_id.len <= 128 and
         std.mem.trim(u8, comment_id, " \t\r\n").len == comment_id.len and
         std.unicode.utf8ValidateSlice(comment_id);
-}
-
-fn validLogMessage(message: []const u8) bool {
-    return message.len > 0 and
-        message.len <= log.maximum_message_size and
-        std.unicode.utf8ValidateSlice(message);
 }
 
 test "comment mutation validation rejects blank bodies and malformed IDs" {

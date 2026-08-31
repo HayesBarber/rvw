@@ -3,8 +3,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
-pub const maximum_message_size = 16 * 1024;
-
 pub const Level = enum {
     debug,
     info,
@@ -23,7 +21,6 @@ pub const Level = enum {
 
 pub const Source = enum {
     backend,
-    frontend,
 };
 
 pub const Event = struct {
@@ -31,7 +28,6 @@ pub const Event = struct {
     source: Source,
     message: []const u8,
     context: ?std.json.Value = null,
-    metrics: ?std.json.Value = null,
 };
 
 pub const Logger = struct {
@@ -59,8 +55,7 @@ pub fn encodeEvent(allocator: Allocator, io: Io, event: Event) ![]u8 {
         .source = event.source,
         .message = event.message,
         .context = event.context,
-        .metrics = event.metrics,
-    }, .{ .emit_null_optional_fields = true });
+    }, .{ .emit_null_optional_fields = false });
 }
 
 fn writeFallback(allocator: Allocator, io: Io, event: Event, err: anyerror) void {
