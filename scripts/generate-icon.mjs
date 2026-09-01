@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 const execFile = promisify(execFileCallback)
 const projectRoot = path.resolve(import.meta.dirname, '..')
 
-export const masterPath = path.join(projectRoot, 'assets', 'icon', 'rvw-icon-1024.png')
+export const sourcePath = path.join(projectRoot, 'assets', 'icon', 'rvw-icon-1024.png')
 export const iconsetPath = path.join(projectRoot, 'assets', 'icon', 'Rvw.iconset')
 export const icnsPath = path.join(projectRoot, 'macos', 'Rvw.icns')
 
@@ -39,30 +39,30 @@ export function parseSipsMetadata(output) {
   }
 }
 
-export function validateMasterMetadata(metadata) {
+export function validateSourceMetadata(metadata) {
   if (metadata.format?.toLowerCase() !== 'png') {
-    throw new Error('master image must use PNG format')
+    throw new Error('source image must use PNG format')
   }
   if (metadata.width !== 1024 || metadata.height !== 1024) {
     throw new Error(
-      `master image must be exactly 1024×1024 pixels; found ${metadata.width}×${metadata.height}`,
+      `source image must be exactly 1024×1024 pixels; found ${metadata.width}×${metadata.height}`,
     )
   }
   if (metadata.hasAlpha !== 'yes') {
-    throw new Error('master image must contain an alpha channel for transparent padding')
+    throw new Error('source image must contain an alpha channel for transparent padding')
   }
 }
 
-async function requireMaster() {
+async function requireSource() {
   try {
-    await access(masterPath, constants.R_OK)
+    await access(sourcePath, constants.R_OK)
   } catch (error) {
     if (error.code === 'ENOENT') {
       throw new Error(
-        'approved master image is missing; add assets/icon/rvw-icon-1024.png and retry',
+        'approved source image is missing; add assets/icon/rvw-icon-1024.png and retry',
       )
     }
-    throw new Error(`master image is not readable: ${error.message}`)
+    throw new Error(`source image is not readable: ${error.message}`)
   }
 
   const { stdout } = await execFile('/usr/bin/sips', [
@@ -74,16 +74,16 @@ async function requireMaster() {
     'pixelHeight',
     '-g',
     'hasAlpha',
-    masterPath,
+    sourcePath,
   ])
-  validateMasterMetadata(parseSipsMetadata(stdout))
+  validateSourceMetadata(parseSipsMetadata(stdout))
 }
 
 export async function generateIcon() {
   if (process.platform !== 'darwin') {
     throw new Error('icon generation requires macOS')
   }
-  await requireMaster()
+  await requireSource()
 
   await rm(iconsetPath, { recursive: true, force: true })
   await mkdir(iconsetPath, { recursive: true })
@@ -94,7 +94,7 @@ export async function generateIcon() {
       '-z',
       pixels,
       pixels,
-      masterPath,
+      sourcePath,
       '--out',
       path.join(iconsetPath, representation.filename),
     ])

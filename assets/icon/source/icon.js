@@ -11,8 +11,8 @@ const iconConfiguration = Object.freeze({
   fontWeight: 600,
 })
 
-const masterCanvas = document.querySelector('#icon-master')
-const downloadButton = document.querySelector('#download-master')
+const sourceCanvas = document.querySelector('#icon-source')
+const downloadButton = document.querySelector('#download-source')
 const renderStatus = document.querySelector('#render-status')
 
 function roundedRectangle(context, x, y, width, height, radius) {
@@ -43,11 +43,11 @@ function fittedFontSize(context) {
   return (trialSize * iconConfiguration.labelTargetWidth) / trialWidth
 }
 
-function drawMaster() {
-  const context = masterCanvas.getContext('2d', { alpha: true })
+function drawSource() {
+  const context = sourceCanvas.getContext('2d', { alpha: true })
   const bodySize = iconConfiguration.canvasSize - iconConfiguration.bodyInset * 2
 
-  context.clearRect(0, 0, masterCanvas.width, masterCanvas.height)
+  context.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height)
   context.fillStyle = iconConfiguration.bodyColor
   roundedRectangle(
     context,
@@ -83,14 +83,14 @@ function updatePreviews() {
     const preview = document.querySelector(selector)
     const context = preview.getContext('2d', { alpha: true })
     context.clearRect(0, 0, size, size)
-    context.drawImage(masterCanvas, 0, 0, size, size)
+    context.drawImage(sourceCanvas, 0, 0, size, size)
   }
 }
 
-function downloadMaster() {
-  masterCanvas.toBlob((blob) => {
+function downloadSource() {
+  sourceCanvas.toBlob((blob) => {
     if (!blob) {
-      renderStatus.textContent = 'Unable to encode the master PNG.'
+      renderStatus.textContent = 'Unable to encode the source PNG.'
       return
     }
 
@@ -107,7 +107,7 @@ async function render() {
   await document.fonts.ready
   await document.fonts.load(`600 320px "SF Mono"`)
 
-  drawMaster()
+  drawSource()
   updatePreviews()
 
   const hasSFMono = document.fonts.check(`600 320px "SF Mono"`)
@@ -117,7 +117,7 @@ async function render() {
   downloadButton.disabled = false
 }
 
-downloadButton.addEventListener('click', downloadMaster)
+downloadButton.addEventListener('click', downloadSource)
 render().catch((error) => {
   renderStatus.textContent = `Unable to render icon: ${error.message}`
 })

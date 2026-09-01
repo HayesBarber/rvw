@@ -4,7 +4,7 @@ import test from 'node:test'
 import {
   parseSipsMetadata,
   representations,
-  validateMasterMetadata,
+  validateSourceMetadata,
 } from './generate-icon.mjs'
 
 test('the icon generation plan covers every required macOS representation', () => {
@@ -38,20 +38,20 @@ test('sips metadata parsing retains format, dimensions, and transparency', () =>
   )
 })
 
-test('master validation requires a transparent 1024×1024 PNG', () => {
+test('source validation requires a transparent 1024×1024 PNG', () => {
   assert.doesNotThrow(() =>
-    validateMasterMetadata({ format: 'png', width: 1024, height: 1024, hasAlpha: 'yes' }),
+    validateSourceMetadata({ format: 'png', width: 1024, height: 1024, hasAlpha: 'yes' }),
   )
   assert.throws(
-    () => validateMasterMetadata({ format: 'jpeg', width: 1024, height: 1024, hasAlpha: 'yes' }),
+    () => validateSourceMetadata({ format: 'jpeg', width: 1024, height: 1024, hasAlpha: 'yes' }),
     /must use PNG format/,
   )
   assert.throws(
-    () => validateMasterMetadata({ format: 'png', width: 512, height: 1024, hasAlpha: 'yes' }),
+    () => validateSourceMetadata({ format: 'png', width: 512, height: 1024, hasAlpha: 'yes' }),
     /must be exactly 1024×1024/,
   )
   assert.throws(
-    () => validateMasterMetadata({ format: 'png', width: 1024, height: 1024, hasAlpha: 'no' }),
+    () => validateSourceMetadata({ format: 'png', width: 1024, height: 1024, hasAlpha: 'no' }),
     /must contain an alpha channel/,
   )
 })

@@ -13,26 +13,26 @@
         <p class="eyebrow">Application icon source</p>
         <h1>rvw</h1>
         <p class="introduction">
-          A deterministic 1024×1024 master rendered with browser canvas. The
+          A deterministic 1024×1024 source image rendered with browser canvas. The
           downloaded PNG retains transparent padding around the black icon body.
         </p>
       </header>
 
       <section class="workspace" aria-label="Icon workspace">
-        <div class="master-panel">
+        <div class="source-panel">
           <div class="panel-heading">
             <div>
-              <p class="panel-label">Master</p>
+              <p class="panel-label">Source image</p>
               <p class="panel-detail">1024 × 1024 · transparent PNG</p>
             </div>
-            <button id="download-master" type="button" disabled>
-              Download master PNG
+            <button id="download-source" type="button" disabled>
+              Download source PNG
             </button>
           </div>
 
-          <div class="master-stage transparency-grid">
+          <div class="source-stage transparency-grid">
             <canvas
-              id="icon-master"
+              id="icon-source"
               width="1024"
               height="1024"
               aria-label="Black rounded-square rvw application icon"
