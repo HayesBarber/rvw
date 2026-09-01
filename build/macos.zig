@@ -57,7 +57,7 @@ fn addAppArtifacts(context: Context) AppArtifacts {
         }),
     });
 
-    const frontend = b.addSystemCommand(&.{ "npm", "--prefix", "frontend", "run", "build" });
+    const frontend = b.addSystemCommand(&.{ "node", "build/build-frontend.mjs" });
     const swift = b.addSystemCommand(&.{
         "xcrun",      "swiftc",
         "-target",    swift_target,
@@ -112,9 +112,20 @@ fn addSwiftTests(context: Context) void {
     const run_swift_tests = b.addSystemCommand(&.{"/usr/bin/env"});
     run_swift_tests.addFileArg(swift_test_executable);
     context.test_step.dependOn(&run_swift_tests.step);
+
+    const run_install_tests = b.addSystemCommand(&.{
+        "node",
+        "--test",
+        "build/system-install.test.mjs",
+    });
+    context.test_step.dependOn(&run_install_tests.step);
 }
 
 fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
+    const staged_app = b.getInstallPath(.prefix, "Rvw.app");
+    const prepare_bundle = b.addSystemCommand(&.{ "node", "build/prepare-bundle.mjs" });
+    prepare_bundle.addArg(staged_app);
+
     const install_executable = b.addInstallFileWithDir(
         artifacts.executable,
         .prefix,
@@ -137,12 +148,45 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
         .install_dir = .prefix,
         .install_subdir = "Rvw.app/Contents/Resources/web",
     });
+    install_executable.step.dependOn(&prepare_bundle.step);
+    install_cli.step.dependOn(&prepare_bundle.step);
+    install_plist.step.dependOn(&prepare_bundle.step);
+    install_frontend.step.dependOn(&prepare_bundle.step);
     install_frontend.step.dependOn(&artifacts.frontend.step);
 
     b.getInstallStep().dependOn(&install_executable.step);
     b.getInstallStep().dependOn(&install_cli.step);
     b.getInstallStep().dependOn(&install_plist.step);
     b.getInstallStep().dependOn(&install_frontend.step);
+
+    const system_install = b.option(
+        bool,
+        "system",
+        "Install Rvw.app and its rvw command into system destinations",
+    ) orelse false;
+    const application_destination = b.option(
+        []const u8,
+        "application-destination",
+        "System-mode application bundle destination",
+    ) orelse "/Applications/Rvw.app";
+    const cli_link_destination = b.option(
+        []const u8,
+        "cli-link-destination",
+        "System-mode rvw symlink destination",
+    ) orelse "/usr/local/bin/rvw";
+    if (!system_install) return;
+
+    const install_system = b.addSystemCommand(&.{ "node", "build/system-install.mjs" });
+    install_system.addArgs(&.{
+        staged_app,
+        application_destination,
+        cli_link_destination,
+    });
+    install_system.step.dependOn(&install_executable.step);
+    install_system.step.dependOn(&install_cli.step);
+    install_system.step.dependOn(&install_plist.step);
+    install_system.step.dependOn(&install_frontend.step);
+    b.getInstallStep().dependOn(&install_system.step);
 }
 
 fn addRunStep(b: *std.Build) void {
