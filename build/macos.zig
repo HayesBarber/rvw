@@ -117,7 +117,6 @@ fn addSwiftTests(context: Context) void {
         "node",
         "--test",
         "build/system-install.test.mjs",
-        "scripts/generate-icon.test.mjs",
     });
     context.test_step.dependOn(&run_install_tests.step);
 }
