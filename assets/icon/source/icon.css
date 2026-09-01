@@ -257,6 +257,71 @@ input[type="range"] {
   accent-color: #f5f5f5;
 }
 
+.color-controls {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #27292e;
+}
+
+.color-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.color-field {
+  display: grid;
+  gap: 7px;
+  color: #c7c9ce;
+  font-size: 12px;
+}
+
+.color-input-shell {
+  display: flex;
+  min-width: 0;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid #393c43;
+  border-radius: 8px;
+  background: #0f1012;
+}
+
+.color-input-shell:focus-within {
+  border-color: #78a7ff;
+  box-shadow: 0 0 0 2px rgb(120 167 255 / 22%);
+}
+
+input[type="color"] {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 5px;
+}
+
+.color-input-shell output {
+  min-width: 0;
+  overflow: hidden;
+  color: #8c8f96;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
 .source-stage {
   display: grid;
   min-height: 520px;

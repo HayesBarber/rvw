@@ -77,8 +77,8 @@
                 <p id="typography-heading" class="panel-label">Typography</p>
                 <p class="panel-detail">Pick a preset or enter any installed font</p>
               </div>
-              <button id="reset-typography" class="secondary-button" type="button">
-                Reset
+              <button id="reset-design" class="secondary-button" type="button">
+                Reset all
               </button>
             </div>
 
@@ -138,6 +138,39 @@
               </span>
               <input id="label-offset" type="range" min="-60" max="60" value="-8" />
             </label>
+
+            <div class="color-controls" aria-labelledby="colors-heading">
+              <p id="colors-heading" class="panel-label">Colors</p>
+              <div class="color-control-grid">
+                <label class="color-field" for="background-color">
+                  <span>Background</span>
+                  <span class="color-input-shell">
+                    <input
+                      id="background-color"
+                      type="color"
+                      value="#000000"
+                      aria-label="Icon background color"
+                    />
+                    <output id="background-color-output" for="background-color">
+                      #000000
+                    </output>
+                  </span>
+                </label>
+
+                <label class="color-field" for="text-color">
+                  <span>Text</span>
+                  <span class="color-input-shell">
+                    <input
+                      id="text-color"
+                      type="color"
+                      value="#ffffff"
+                      aria-label="Icon text color"
+                    />
+                    <output id="text-color-output" for="text-color">#FFFFFF</output>
+                  </span>
+                </label>
+              </div>
+            </div>
           </section>
 
           <dl class="specification-list">
@@ -160,6 +193,10 @@
             <div>
               <dt>Wordmark</dt>
               <dd id="selected-wordmark">530px · −8px</dd>
+            </div>
+            <div>
+              <dt>Colors</dt>
+              <dd id="selected-colors">#000000 · #FFFFFF</dd>
             </div>
           </dl>
         </aside>

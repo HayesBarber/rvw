@@ -2,9 +2,7 @@ const iconConfiguration = Object.freeze({
   canvasSize: 1024,
   bodyInset: 100,
   bodyRadius: 185,
-  bodyColor: '#000000',
   label: 'rvw',
-  labelColor: '#ffffff',
 })
 
 const fontPresets = Object.freeze([
@@ -39,6 +37,13 @@ const defaultTypography = Object.freeze({
 
 const typography = { ...defaultTypography }
 
+const defaultColors = Object.freeze({
+  background: '#000000',
+  text: '#ffffff',
+})
+
+const colors = { ...defaultColors }
+
 const sourceCanvas = document.querySelector('#icon-source')
 const downloadButton = document.querySelector('#download-source')
 const renderStatus = document.querySelector('#render-status')
@@ -51,8 +56,13 @@ const labelWidthOutput = document.querySelector('#label-width-output')
 const labelOffsetOutput = document.querySelector('#label-offset-output')
 const selectedTypeface = document.querySelector('#selected-typeface')
 const selectedWordmark = document.querySelector('#selected-wordmark')
+const selectedColors = document.querySelector('#selected-colors')
 const fontPresetContainer = document.querySelector('#font-presets')
-const resetTypographyButton = document.querySelector('#reset-typography')
+const backgroundColorInput = document.querySelector('#background-color')
+const backgroundColorOutput = document.querySelector('#background-color-output')
+const textColorInput = document.querySelector('#text-color')
+const textColorOutput = document.querySelector('#text-color-output')
+const resetDesignButton = document.querySelector('#reset-design')
 
 let renderRequest = 0
 let fontInputTimer
@@ -104,7 +114,7 @@ function drawSource() {
   const bodySize = iconConfiguration.canvasSize - iconConfiguration.bodyInset * 2
 
   context.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height)
-  context.fillStyle = iconConfiguration.bodyColor
+  context.fillStyle = colors.background
   roundedRectangle(
     context,
     iconConfiguration.bodyInset,
@@ -115,7 +125,7 @@ function drawSource() {
   )
   context.fill()
 
-  context.fillStyle = iconConfiguration.labelColor
+  context.fillStyle = colors.text
   context.font = fontDescription(fittedFontSize(context))
   context.textAlign = 'center'
   context.textBaseline = 'alphabetic'
@@ -197,6 +207,11 @@ function updateControls() {
   labelOffsetOutput.textContent = signedPixels(typography.verticalOffset)
   selectedTypeface.textContent = `${typography.fontName} · ${typography.fontWeight}`
   selectedWordmark.textContent = `${typography.labelWidth}px · ${signedPixels(typography.verticalOffset)}`
+  backgroundColorInput.value = colors.background
+  backgroundColorOutput.textContent = colors.background.toUpperCase()
+  textColorInput.value = colors.text
+  textColorOutput.textContent = colors.text.toUpperCase()
+  selectedColors.textContent = `${colors.background.toUpperCase()} · ${colors.text.toUpperCase()}`
   pageWordmark.style.fontFamily = fontStack
   pageWordmark.style.fontWeight = typography.fontWeight
 
@@ -271,8 +286,19 @@ labelOffsetInput.addEventListener('input', () => {
   requestRender()
 })
 
-resetTypographyButton.addEventListener('click', () => {
+backgroundColorInput.addEventListener('input', () => {
+  colors.background = backgroundColorInput.value
+  requestRender()
+})
+
+textColorInput.addEventListener('input', () => {
+  colors.text = textColorInput.value
+  requestRender()
+})
+
+resetDesignButton.addEventListener('click', () => {
   Object.assign(typography, defaultTypography)
+  Object.assign(colors, defaultColors)
   requestRender()
 })
 
