@@ -71,6 +71,75 @@
             </figure>
           </div>
 
+          <section class="typography-controls" aria-labelledby="typography-heading">
+            <div class="control-heading">
+              <div>
+                <p id="typography-heading" class="panel-label">Typography</p>
+                <p class="panel-detail">Pick a preset or enter any installed font</p>
+              </div>
+              <button id="reset-typography" class="secondary-button" type="button">
+                Reset
+              </button>
+            </div>
+
+            <div
+              id="font-presets"
+              class="font-presets"
+              role="group"
+              aria-label="Font presets"
+            ></div>
+
+            <label class="control-field" for="font-family">
+              <span>Font family</span>
+              <input
+                id="font-family"
+                type="text"
+                value="SF Mono"
+                list="font-family-options"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <datalist id="font-family-options">
+              <option value="SF Mono"></option>
+              <option value="Menlo"></option>
+              <option value="Avenir Next"></option>
+              <option value="Avenir Next Condensed"></option>
+              <option value="Futura"></option>
+              <option value="Helvetica Neue"></option>
+              <option value="Arial Rounded MT Bold"></option>
+              <option value="Arial Black"></option>
+            </datalist>
+
+            <label class="control-field" for="font-weight">
+              <span>Weight</span>
+              <select id="font-weight">
+                <option value="400">Regular · 400</option>
+                <option value="500">Medium · 500</option>
+                <option value="600" selected>Semibold · 600</option>
+                <option value="700">Bold · 700</option>
+                <option value="800">Extra bold · 800</option>
+                <option value="900">Heavy · 900</option>
+              </select>
+            </label>
+
+            <label class="control-field" for="label-width">
+              <span>
+                Wordmark width
+                <output id="label-width-output" for="label-width">530px</output>
+              </span>
+              <input id="label-width" type="range" min="400" max="700" value="530" />
+            </label>
+
+            <label class="control-field" for="label-offset">
+              <span>
+                Vertical position
+                <output id="label-offset-output" for="label-offset">−8px</output>
+              </span>
+              <input id="label-offset" type="range" min="-60" max="60" value="-8" />
+            </label>
+          </section>
+
           <dl class="specification-list">
             <div>
               <dt>Canvas</dt>
@@ -86,7 +155,11 @@
             </div>
             <div>
               <dt>Typeface</dt>
-              <dd>SF Mono Semibold</dd>
+              <dd id="selected-typeface">SF Mono · 600</dd>
+            </div>
+            <div>
+              <dt>Wordmark</dt>
+              <dd id="selected-wordmark">530px · −8px</dd>
             </div>
           </dl>
         </aside>

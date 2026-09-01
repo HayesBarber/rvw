@@ -5,15 +5,57 @@ const iconConfiguration = Object.freeze({
   bodyColor: '#000000',
   label: 'rvw',
   labelColor: '#ffffff',
-  labelTargetWidth: 530,
-  labelVerticalOffset: -8,
-  fontFamily: '"SF Mono", "SFMono-Semibold", ui-monospace, monospace',
-  fontWeight: 600,
 })
+
+const fontPresets = Object.freeze([
+  {
+    name: 'SF Mono',
+    stack: '"SF Mono", "SFMono-Semibold", ui-monospace, monospace',
+    weight: 600,
+  },
+  { name: 'Menlo', stack: 'Menlo, ui-monospace, monospace', weight: 700 },
+  { name: 'Avenir Next', stack: '"Avenir Next", sans-serif', weight: 700 },
+  {
+    name: 'Avenir Next Condensed',
+    stack: '"Avenir Next Condensed", "Arial Narrow", sans-serif',
+    weight: 900,
+  },
+  { name: 'Futura', stack: 'Futura, sans-serif', weight: 700 },
+  { name: 'Helvetica Neue', stack: '"Helvetica Neue", sans-serif', weight: 700 },
+  {
+    name: 'Arial Rounded MT Bold',
+    stack: '"Arial Rounded MT Bold", sans-serif',
+    weight: 700,
+  },
+  { name: 'Arial Black', stack: '"Arial Black", sans-serif', weight: 900 },
+])
+
+const defaultTypography = Object.freeze({
+  fontName: 'SF Mono',
+  fontWeight: 600,
+  labelWidth: 530,
+  verticalOffset: -8,
+})
+
+const typography = { ...defaultTypography }
 
 const sourceCanvas = document.querySelector('#icon-source')
 const downloadButton = document.querySelector('#download-source')
 const renderStatus = document.querySelector('#render-status')
+const pageWordmark = document.querySelector('h1')
+const fontFamilyInput = document.querySelector('#font-family')
+const fontWeightInput = document.querySelector('#font-weight')
+const labelWidthInput = document.querySelector('#label-width')
+const labelOffsetInput = document.querySelector('#label-offset')
+const labelWidthOutput = document.querySelector('#label-width-output')
+const labelOffsetOutput = document.querySelector('#label-offset-output')
+const selectedTypeface = document.querySelector('#selected-typeface')
+const selectedWordmark = document.querySelector('#selected-wordmark')
+const fontPresetContainer = document.querySelector('#font-presets')
+const resetTypographyButton = document.querySelector('#reset-typography')
+
+let renderRequest = 0
+let fontInputTimer
 
 function roundedRectangle(context, x, y, width, height, radius) {
   const right = x + width
@@ -32,15 +74,29 @@ function roundedRectangle(context, x, y, width, height, radius) {
   context.closePath()
 }
 
+function findPreset(fontName) {
+  const normalizedName = fontName.trim().toLowerCase()
+  return fontPresets.find(({ name }) => name.toLowerCase() === normalizedName)
+}
+
+function sanitizedFontName(fontName) {
+  return fontName.replace(/[\\"';]/g, '').trim() || defaultTypography.fontName
+}
+
+function currentFontStack() {
+  const preset = findPreset(typography.fontName)
+  return preset?.stack ?? `"${sanitizedFontName(typography.fontName)}", sans-serif`
+}
+
 function fontDescription(size) {
-  return `${iconConfiguration.fontWeight} ${size}px ${iconConfiguration.fontFamily}`
+  return `${typography.fontWeight} ${size}px ${currentFontStack()}`
 }
 
 function fittedFontSize(context) {
   const trialSize = 320
   context.font = fontDescription(trialSize)
   const trialWidth = context.measureText(iconConfiguration.label).width
-  return (trialSize * iconConfiguration.labelTargetWidth) / trialWidth
+  return (trialSize * typography.labelWidth) / trialWidth
 }
 
 function drawSource() {
@@ -68,7 +124,7 @@ function drawSource() {
   const textBaseline =
     iconConfiguration.canvasSize / 2 +
     (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2 +
-    iconConfiguration.labelVerticalOffset
+    typography.verticalOffset
 
   context.fillText(iconConfiguration.label, iconConfiguration.canvasSize / 2, textBaseline)
 }
@@ -104,20 +160,122 @@ function downloadSource() {
 }
 
 async function render() {
+  const request = ++renderRequest
+  const fontName = sanitizedFontName(typography.fontName)
+  const fontQuery = `${typography.fontWeight} 320px "${fontName}"`
+
   await document.fonts.ready
-  await document.fonts.load(`600 320px "SF Mono"`)
+  await document.fonts.load(fontQuery)
+  if (request !== renderRequest) return
 
   drawSource()
   updatePreviews()
+  updateControls()
 
-  const hasSFMono = document.fonts.check(`600 320px "SF Mono"`)
-  renderStatus.textContent = hasSFMono
-    ? 'Ready · rendered with SF Mono Semibold'
-    : 'Ready · SF Mono was unavailable, so the system monospace fallback was used'
+  const fontAvailable = document.fonts.check(fontQuery)
+  renderStatus.textContent = fontAvailable
+    ? `Ready · ${fontName} · weight ${typography.fontWeight}`
+    : `Ready · ${fontName} was unavailable, so its fallback was used`
   downloadButton.disabled = false
 }
 
-downloadButton.addEventListener('click', downloadSource)
-render().catch((error) => {
-  renderStatus.textContent = `Unable to render icon: ${error.message}`
+function signedPixels(value) {
+  if (value === 0) return '0px'
+  return `${value < 0 ? '−' : '+'}${Math.abs(value)}px`
+}
+
+function updateControls() {
+  const fontStack = currentFontStack()
+
+  fontFamilyInput.value = typography.fontName
+  fontFamilyInput.style.fontFamily = fontStack
+  fontFamilyInput.style.fontWeight = typography.fontWeight
+  fontWeightInput.value = String(typography.fontWeight)
+  labelWidthInput.value = String(typography.labelWidth)
+  labelOffsetInput.value = String(typography.verticalOffset)
+  labelWidthOutput.textContent = `${typography.labelWidth}px`
+  labelOffsetOutput.textContent = signedPixels(typography.verticalOffset)
+  selectedTypeface.textContent = `${typography.fontName} · ${typography.fontWeight}`
+  selectedWordmark.textContent = `${typography.labelWidth}px · ${signedPixels(typography.verticalOffset)}`
+  pageWordmark.style.fontFamily = fontStack
+  pageWordmark.style.fontWeight = typography.fontWeight
+
+  for (const button of fontPresetContainer.querySelectorAll('.font-option')) {
+    button.setAttribute(
+      'aria-pressed',
+      String(button.dataset.fontName === typography.fontName),
+    )
+  }
+}
+
+function selectFont(fontName, usePresetWeight = false) {
+  const preset = findPreset(fontName)
+  typography.fontName = preset?.name ?? sanitizedFontName(fontName)
+  if (preset && usePresetWeight) typography.fontWeight = preset.weight
+  requestRender()
+}
+
+function requestRender() {
+  render().catch((error) => {
+    renderStatus.textContent = `Unable to render icon: ${error.message}`
+  })
+}
+
+function createFontPresetButtons() {
+  for (const preset of fontPresets) {
+    const button = document.createElement('button')
+    button.className = 'font-option'
+    button.type = 'button'
+    button.dataset.fontName = preset.name
+    button.setAttribute('aria-pressed', 'false')
+    button.setAttribute('aria-label', `Use ${preset.name}`)
+
+    const sample = document.createElement('span')
+    sample.className = 'font-option-sample'
+    sample.textContent = iconConfiguration.label
+    sample.style.fontFamily = preset.stack
+    sample.style.fontWeight = preset.weight
+
+    const name = document.createElement('span')
+    name.className = 'font-option-name'
+    name.textContent = preset.name
+
+    button.append(sample, name)
+    button.addEventListener('click', () => selectFont(preset.name, true))
+    fontPresetContainer.append(button)
+  }
+}
+
+fontFamilyInput.addEventListener('input', () => {
+  clearTimeout(fontInputTimer)
+  fontInputTimer = setTimeout(() => selectFont(fontFamilyInput.value), 150)
 })
+
+fontFamilyInput.addEventListener('change', () => {
+  clearTimeout(fontInputTimer)
+  selectFont(fontFamilyInput.value, true)
+})
+
+fontWeightInput.addEventListener('change', () => {
+  typography.fontWeight = Number(fontWeightInput.value)
+  requestRender()
+})
+
+labelWidthInput.addEventListener('input', () => {
+  typography.labelWidth = Number(labelWidthInput.value)
+  requestRender()
+})
+
+labelOffsetInput.addEventListener('input', () => {
+  typography.verticalOffset = Number(labelOffsetInput.value)
+  requestRender()
+})
+
+resetTypographyButton.addEventListener('click', () => {
+  Object.assign(typography, defaultTypography)
+  requestRender()
+})
+
+downloadButton.addEventListener('click', downloadSource)
+createFontPresetButtons()
+requestRender()
