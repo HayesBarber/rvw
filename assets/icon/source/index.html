@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rvw application icon</title>
+    <link rel="stylesheet" href="icon.css" />
+    <script src="icon.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <p class="eyebrow">Application icon source</p>
+        <h1>rvw</h1>
+        <p class="introduction">
+          A deterministic 1024×1024 master rendered with browser canvas. The
+          downloaded PNG retains transparent padding around the black icon body.
+        </p>
+      </header>
+
+      <section class="workspace" aria-label="Icon workspace">
+        <div class="master-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-label">Master</p>
+              <p class="panel-detail">1024 × 1024 · transparent PNG</p>
+            </div>
+            <button id="download-master" type="button" disabled>
+              Download master PNG
+            </button>
+          </div>
+
+          <div class="master-stage transparency-grid">
+            <canvas
+              id="icon-master"
+              width="1024"
+              height="1024"
+              aria-label="Black rounded-square rvw application icon"
+            ></canvas>
+          </div>
+
+          <p id="render-status" class="render-status" role="status">
+            Preparing icon…
+          </p>
+        </div>
+
+        <aside class="preview-panel" aria-label="Icon previews">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-label">Preview</p>
+              <p class="panel-detail">Common display sizes</p>
+            </div>
+          </div>
+
+          <div class="preview-grid">
+            <figure class="preview-card preview-light">
+              <canvas id="preview-128-light" width="128" height="128"></canvas>
+              <figcaption>128px · light</figcaption>
+            </figure>
+            <figure class="preview-card preview-dark">
+              <canvas id="preview-128-dark" width="128" height="128"></canvas>
+              <figcaption>128px · dark</figcaption>
+            </figure>
+            <figure class="preview-card preview-light">
+              <canvas id="preview-32" width="32" height="32"></canvas>
+              <figcaption>32px</figcaption>
+            </figure>
+            <figure class="preview-card preview-dark">
+              <canvas id="preview-16" width="16" height="16"></canvas>
+              <figcaption>16px</figcaption>
+            </figure>
+          </div>
+
+          <dl class="specification-list">
+            <div>
+              <dt>Canvas</dt>
+              <dd>1024px</dd>
+            </div>
+            <div>
+              <dt>Body</dt>
+              <dd>824px</dd>
+            </div>
+            <div>
+              <dt>Inset</dt>
+              <dd>100px</dd>
+            </div>
+            <div>
+              <dt>Typeface</dt>
+              <dd>SF Mono Semibold</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
