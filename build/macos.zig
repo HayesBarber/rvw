@@ -144,6 +144,14 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
         .prefix,
         "Rvw.app/Contents/Info.plist",
     );
+    const install_icon = if (std.Io.Dir.cwd().access(b.graph.io, "macos/Rvw.icns", .{}))
+        b.addInstallFileWithDir(
+            b.path("macos/Rvw.icns"),
+            .prefix,
+            "Rvw.app/Contents/Resources/Rvw.icns",
+        )
+    else |_|
+        null;
     const install_frontend = b.addInstallDirectory(.{
         .source_dir = b.path("frontend/dist"),
         .install_dir = .prefix,
@@ -152,12 +160,14 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
     install_executable.step.dependOn(&prepare_bundle.step);
     install_cli.step.dependOn(&prepare_bundle.step);
     install_plist.step.dependOn(&prepare_bundle.step);
+    if (install_icon) |icon| icon.step.dependOn(&prepare_bundle.step);
     install_frontend.step.dependOn(&prepare_bundle.step);
     install_frontend.step.dependOn(&artifacts.frontend.step);
 
     b.getInstallStep().dependOn(&install_executable.step);
     b.getInstallStep().dependOn(&install_cli.step);
     b.getInstallStep().dependOn(&install_plist.step);
+    if (install_icon) |icon| b.getInstallStep().dependOn(&icon.step);
     b.getInstallStep().dependOn(&install_frontend.step);
 
     const system_install = b.option(
@@ -186,6 +196,7 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
     install_system.step.dependOn(&install_executable.step);
     install_system.step.dependOn(&install_cli.step);
     install_system.step.dependOn(&install_plist.step);
+    if (install_icon) |icon| install_system.step.dependOn(&icon.step);
     install_system.step.dependOn(&install_frontend.step);
     b.getInstallStep().dependOn(&install_system.step);
 }
