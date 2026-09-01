@@ -75,6 +75,7 @@ fn addAppArtifacts(context: Context) AppArtifacts {
         "macos/bundled_assets.swift",
         "macos/asset_handler.swift",
         "macos/navigation_policy.swift",
+        "macos/window_lifecycle.swift",
         "macos/application_controller.swift",
     }) |source| swift.addFileArg(b.path(source));
     swift.step.dependOn(&library.step);
@@ -97,10 +98,12 @@ fn addSwiftTests(context: Context) void {
         "macos/native_request_router.swift",
         "macos/bundled_assets.swift",
         "macos/navigation_policy.swift",
+        "macos/window_lifecycle.swift",
         "macos/test_support.swift",
         "macos/launch_configuration_tests.swift",
         "macos/bundled_assets_tests.swift",
         "macos/navigation_policy_tests.swift",
+        "macos/window_lifecycle_tests.swift",
         "macos/native_host_tests.swift",
         "macos/native_request_router_tests.swift",
     }) |source| swift_tests.addFileArg(b.path(source));

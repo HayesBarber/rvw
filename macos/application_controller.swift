@@ -134,6 +134,7 @@ final class ApplicationController: NSObject, NSApplicationDelegate, NSWindowDele
             backing: .buffered,
             defer: false
         )
+        retainApplicationWindowAfterClose(window)
         window.title = "rvw"
         window.contentView = webView
         window.titleVisibility = .hidden
