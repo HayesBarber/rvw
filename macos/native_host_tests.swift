@@ -32,5 +32,6 @@ struct NativeHostTests {
         testNavigationPolicy()
         testNativeHost()
         testNativeRequestRouter()
+        testWindowLifecycle()
     }
 }
