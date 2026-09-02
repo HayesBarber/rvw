@@ -22,7 +22,8 @@ body {
 
 button,
 canvas,
-.font-option {
+.font-option,
+.mode-option {
   -webkit-user-select: none;
   user-select: none;
 }
@@ -137,7 +138,7 @@ button:disabled {
   cursor: wait;
 }
 
-.typography-controls {
+.design-controls {
   padding: 18px;
   border-top: 1px solid #27292e;
 }
@@ -161,6 +162,59 @@ button:disabled {
 
 .secondary-button:hover:not(:disabled) {
   background: #22242a;
+}
+
+.artwork-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #33363c;
+  border-radius: 11px;
+  background: #0f1012;
+}
+
+.mode-option {
+  min-height: 32px;
+  padding: 0 10px;
+  background: transparent;
+  color: #8c8f96;
+}
+
+.mode-option:hover:not(:disabled) {
+  background: #191a1e;
+}
+
+.mode-option[aria-pressed="true"] {
+  background: #292b31;
+  color: #f5f5f5;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+}
+
+.control-group {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #27292e;
+}
+
+.control-group[hidden] {
+  display: none;
+}
+
+.group-heading {
+  margin-bottom: 14px;
+}
+
+.field-hint {
+  margin: 8px 0 0;
+  color: #8c8f96;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.field-hint code {
+  color: #c7c9ce;
+  font-family: ui-monospace, monospace;
 }
 
 .font-presets {
@@ -232,7 +286,8 @@ button:disabled {
 }
 
 input[type="text"],
-select {
+select,
+input[type="file"] {
   width: 100%;
   min-height: 36px;
   padding: 0 10px;
@@ -246,9 +301,28 @@ select {
 }
 
 input[type="text"]:focus,
-select:focus {
+select:focus,
+input[type="file"]:focus-visible {
   border-color: #78a7ff;
   box-shadow: 0 0 0 2px rgb(120 167 255 / 22%);
+}
+
+input[type="file"] {
+  height: auto;
+  padding: 7px;
+  color: #8c8f96;
+}
+
+input[type="file"]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: #292b31;
+  color: #f5f5f5;
+  font: inherit;
+  cursor: pointer;
 }
 
 input[type="range"] {

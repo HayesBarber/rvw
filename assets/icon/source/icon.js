@@ -37,9 +37,18 @@ const defaultTypography = Object.freeze({
 
 const typography = { ...defaultTypography }
 
+const defaultArtwork = Object.freeze({
+  mode: 'text',
+  svgName: '',
+  svgSource: '',
+  svgSize: 480,
+})
+
+const artwork = { ...defaultArtwork }
+
 const defaultColors = Object.freeze({
   background: '#000000',
-  text: '#ffffff',
+  foreground: '#ffffff',
 })
 
 const colors = { ...defaultColors }
@@ -56,12 +65,22 @@ const labelWidthOutput = document.querySelector('#label-width-output')
 const labelOffsetOutput = document.querySelector('#label-offset-output')
 const selectedTypeface = document.querySelector('#selected-typeface')
 const selectedWordmark = document.querySelector('#selected-wordmark')
+const selectedArtwork = document.querySelector('#selected-artwork')
 const selectedColors = document.querySelector('#selected-colors')
+const typefaceSpecification = document.querySelector('#typeface-specification')
+const wordmarkSpecification = document.querySelector('#wordmark-specification')
 const fontPresetContainer = document.querySelector('#font-presets')
 const backgroundColorInput = document.querySelector('#background-color')
 const backgroundColorOutput = document.querySelector('#background-color-output')
-const textColorInput = document.querySelector('#text-color')
-const textColorOutput = document.querySelector('#text-color-output')
+const foregroundColorInput = document.querySelector('#foreground-color')
+const foregroundColorOutput = document.querySelector('#foreground-color-output')
+const artworkModeButtons = document.querySelectorAll('[data-artwork-mode]')
+const wordmarkControls = document.querySelector('#wordmark-controls')
+const svgControls = document.querySelector('#svg-controls')
+const svgFileInput = document.querySelector('#svg-file')
+const svgFileStatus = document.querySelector('#svg-file-status')
+const svgSizeInput = document.querySelector('#svg-size')
+const svgSizeOutput = document.querySelector('#svg-size-output')
 const resetDesignButton = document.querySelector('#reset-design')
 
 let renderRequest = 0
@@ -109,7 +128,7 @@ function fittedFontSize(context) {
   return (trialSize * typography.labelWidth) / trialWidth
 }
 
-function drawSource() {
+function drawSource(svgImage = null) {
   const context = sourceCanvas.getContext('2d', { alpha: true })
   const bodySize = iconConfiguration.canvasSize - iconConfiguration.bodyInset * 2
 
@@ -125,7 +144,23 @@ function drawSource() {
   )
   context.fill()
 
-  context.fillStyle = colors.text
+  if (artwork.mode === 'svg') {
+    if (!svgImage) return
+
+    const imageRatio = svgImage.naturalWidth / svgImage.naturalHeight || 1
+    const width = imageRatio >= 1 ? artwork.svgSize : artwork.svgSize * imageRatio
+    const height = imageRatio >= 1 ? artwork.svgSize / imageRatio : artwork.svgSize
+    context.drawImage(
+      svgImage,
+      (iconConfiguration.canvasSize - width) / 2,
+      (iconConfiguration.canvasSize - height) / 2,
+      width,
+      height,
+    )
+    return
+  }
+
+  context.fillStyle = colors.foreground
   context.font = fontDescription(fittedFontSize(context))
   context.textAlign = 'center'
   context.textBaseline = 'alphabetic'
@@ -137,6 +172,51 @@ function drawSource() {
     typography.verticalOffset
 
   context.fillText(iconConfiguration.label, iconConfiguration.canvasSize / 2, textBaseline)
+}
+
+function sanitizedSvgSource(source) {
+  const svgDocument = new DOMParser().parseFromString(source, 'image/svg+xml')
+  if (svgDocument.querySelector('parsererror')) {
+    throw new Error('the selected file is not valid SVG')
+  }
+
+  const svg = svgDocument.documentElement
+  if (svg.localName !== 'svg') {
+    throw new Error('the selected file does not contain an SVG root element')
+  }
+
+  svg.querySelectorAll('script, foreignObject').forEach((element) => element.remove())
+  for (const element of [svg, ...svg.querySelectorAll('*')]) {
+    for (const attribute of [...element.attributes]) {
+      if (attribute.name.toLowerCase().startsWith('on')) {
+        element.removeAttribute(attribute.name)
+      }
+    }
+  }
+
+  if (!svg.hasAttribute('xmlns')) {
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  }
+  return new XMLSerializer().serializeToString(svg)
+}
+
+function loadSvgImage() {
+  const coloredSource = artwork.svgSource.replaceAll(/currentColor/gi, colors.foreground)
+  const sourceBlob = new Blob([coloredSource], { type: 'image/svg+xml' })
+  const sourceURL = URL.createObjectURL(sourceBlob)
+
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener('load', () => {
+      URL.revokeObjectURL(sourceURL)
+      resolve(image)
+    })
+    image.addEventListener('error', () => {
+      URL.revokeObjectURL(sourceURL)
+      reject(new Error('the selected SVG could not be rendered'))
+    })
+    image.src = sourceURL
+  })
 }
 
 function updatePreviews() {
@@ -171,6 +251,28 @@ function downloadSource() {
 
 async function render() {
   const request = ++renderRequest
+
+  updateControls()
+  downloadButton.disabled = true
+
+  if (artwork.mode === 'svg') {
+    if (!artwork.svgSource) {
+      drawSource()
+      updatePreviews()
+      renderStatus.textContent = 'Choose an SVG file to render the icon.'
+      return
+    }
+
+    const svgImage = await loadSvgImage()
+    if (request !== renderRequest) return
+
+    drawSource(svgImage)
+    updatePreviews()
+    renderStatus.textContent = `Ready · ${artwork.svgName} · centered at ${artwork.svgSize}px`
+    downloadButton.disabled = false
+    return
+  }
+
   const fontName = sanitizedFontName(typography.fontName)
   const fontQuery = `${typography.fontWeight} 320px "${fontName}"`
 
@@ -180,7 +282,6 @@ async function render() {
 
   drawSource()
   updatePreviews()
-  updateControls()
 
   const fontAvailable = document.fonts.check(fontQuery)
   renderStatus.textContent = fontAvailable
@@ -196,6 +297,7 @@ function signedPixels(value) {
 
 function updateControls() {
   const fontStack = currentFontStack()
+  const usingSvg = artwork.mode === 'svg'
 
   fontFamilyInput.value = typography.fontName
   fontFamilyInput.style.fontFamily = fontStack
@@ -207,13 +309,37 @@ function updateControls() {
   labelOffsetOutput.textContent = signedPixels(typography.verticalOffset)
   selectedTypeface.textContent = `${typography.fontName} · ${typography.fontWeight}`
   selectedWordmark.textContent = `${typography.labelWidth}px · ${signedPixels(typography.verticalOffset)}`
+  selectedArtwork.textContent = usingSvg
+    ? artwork.svgSource
+      ? `SVG · ${artwork.svgName} · ${artwork.svgSize}px`
+      : 'SVG · no file selected'
+    : `Text · ${iconConfiguration.label}`
   backgroundColorInput.value = colors.background
   backgroundColorOutput.textContent = colors.background.toUpperCase()
-  textColorInput.value = colors.text
-  textColorOutput.textContent = colors.text.toUpperCase()
-  selectedColors.textContent = `${colors.background.toUpperCase()} · ${colors.text.toUpperCase()}`
+  foregroundColorInput.value = colors.foreground
+  foregroundColorOutput.textContent = colors.foreground.toUpperCase()
+  selectedColors.textContent = `${colors.background.toUpperCase()} · ${colors.foreground.toUpperCase()}`
+  wordmarkControls.hidden = usingSvg
+  svgControls.hidden = !usingSvg
+  typefaceSpecification.hidden = usingSvg
+  wordmarkSpecification.hidden = usingSvg
+  svgSizeInput.value = String(artwork.svgSize)
+  svgSizeOutput.textContent = `${artwork.svgSize}px`
+  svgFileStatus.textContent = artwork.svgName
+    ? `${artwork.svgName} · centered automatically`
+    : 'Choose an SVG with no background or text. Lucide currentColor strokes use the foreground color below.'
+  sourceCanvas.setAttribute(
+    'aria-label',
+    usingSvg && artwork.svgName
+      ? `rvw application icon using ${artwork.svgName}`
+      : 'rvw application icon using the rvw wordmark',
+  )
   pageWordmark.style.fontFamily = fontStack
   pageWordmark.style.fontWeight = typography.fontWeight
+
+  for (const button of artworkModeButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.artworkMode === artwork.mode))
+  }
 
   for (const button of fontPresetContainer.querySelectorAll('.font-option')) {
     button.setAttribute(
@@ -221,6 +347,11 @@ function updateControls() {
       String(button.dataset.fontName === typography.fontName),
     )
   }
+}
+
+function selectArtworkMode(mode) {
+  artwork.mode = mode
+  requestRender()
 }
 
 function selectFont(fontName, usePresetWeight = false) {
@@ -291,14 +422,42 @@ backgroundColorInput.addEventListener('input', () => {
   requestRender()
 })
 
-textColorInput.addEventListener('input', () => {
-  colors.text = textColorInput.value
+foregroundColorInput.addEventListener('input', () => {
+  colors.foreground = foregroundColorInput.value
+  requestRender()
+})
+
+for (const button of artworkModeButtons) {
+  button.addEventListener('click', () => selectArtworkMode(button.dataset.artworkMode))
+}
+
+svgFileInput.addEventListener('change', async () => {
+  const [file] = svgFileInput.files
+  if (!file) return
+
+  downloadButton.disabled = true
+  renderStatus.textContent = `Reading ${file.name}…`
+
+  try {
+    artwork.svgSource = sanitizedSvgSource(await file.text())
+    artwork.svgName = file.name
+    artwork.mode = 'svg'
+    requestRender()
+  } catch (error) {
+    renderStatus.textContent = `Unable to use SVG: ${error.message}`
+  }
+})
+
+svgSizeInput.addEventListener('input', () => {
+  artwork.svgSize = Number(svgSizeInput.value)
   requestRender()
 })
 
 resetDesignButton.addEventListener('click', () => {
   Object.assign(typography, defaultTypography)
+  Object.assign(artwork, defaultArtwork)
   Object.assign(colors, defaultColors)
+  svgFileInput.value = ''
   requestRender()
 })
 
