@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rvw application icon</title>
+    <link rel="stylesheet" href="icon.css" />
+    <script src="icon.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <p class="eyebrow">Application icon source</p>
+        <h1>rvw</h1>
+        <p class="introduction">
+          A deterministic 1024×1024 source image rendered with browser canvas. Use
+          a wordmark or import an SVG as the centered foreground artwork.
+        </p>
+      </header>
+
+      <section class="workspace" aria-label="Icon workspace">
+        <div class="source-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-label">Source image</p>
+              <p class="panel-detail">1024 × 1024 · transparent PNG</p>
+            </div>
+            <button id="download-source" type="button" disabled>
+              Download source PNG
+            </button>
+          </div>
+
+          <div class="source-stage transparency-grid">
+            <canvas
+              id="icon-source"
+              width="1024"
+              height="1024"
+              aria-label="rvw application icon"
+            ></canvas>
+          </div>
+
+          <p id="render-status" class="render-status" role="status">
+            Preparing icon…
+          </p>
+        </div>
+
+        <aside class="preview-panel" aria-label="Icon previews">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-label">Preview</p>
+              <p class="panel-detail">Common display sizes</p>
+            </div>
+          </div>
+
+          <div class="preview-grid">
+            <figure class="preview-card preview-light">
+              <canvas id="preview-128-light" width="128" height="128"></canvas>
+              <figcaption>128px · light</figcaption>
+            </figure>
+            <figure class="preview-card preview-dark">
+              <canvas id="preview-128-dark" width="128" height="128"></canvas>
+              <figcaption>128px · dark</figcaption>
+            </figure>
+            <figure class="preview-card preview-light">
+              <canvas id="preview-32" width="32" height="32"></canvas>
+              <figcaption>32px</figcaption>
+            </figure>
+            <figure class="preview-card preview-dark">
+              <canvas id="preview-16" width="16" height="16"></canvas>
+              <figcaption>16px</figcaption>
+            </figure>
+          </div>
+
+          <section class="design-controls" aria-labelledby="artwork-heading">
+            <div class="control-heading">
+              <div>
+                <p id="artwork-heading" class="panel-label">Artwork</p>
+                <p class="panel-detail">Use the rvw wordmark or a centered SVG</p>
+              </div>
+              <button id="reset-design" class="secondary-button" type="button">
+                Reset all
+              </button>
+            </div>
+
+            <div class="artwork-mode" role="group" aria-label="Artwork type">
+              <button
+                class="mode-option"
+                type="button"
+                data-artwork-mode="text"
+                aria-pressed="true"
+              >
+                Text
+              </button>
+              <button
+                class="mode-option"
+                type="button"
+                data-artwork-mode="svg"
+                aria-pressed="false"
+              >
+                SVG
+              </button>
+            </div>
+
+            <div id="svg-controls" class="control-group" hidden>
+              <label class="control-field" for="svg-file">
+                <span>SVG file</span>
+                <input id="svg-file" type="file" accept=".svg,image/svg+xml" />
+              </label>
+              <p id="svg-file-status" class="field-hint">
+                Choose an SVG with no background or text.
+              </p>
+
+              <label class="control-field" for="svg-size">
+                <span>
+                  Artwork size
+                  <output id="svg-size-output" for="svg-size">480px</output>
+                </span>
+                <input id="svg-size" type="range" min="240" max="640" value="480" />
+              </label>
+            </div>
+
+            <div id="wordmark-controls" class="control-group">
+              <div class="group-heading">
+                <p class="panel-label">Typography</p>
+                <p class="panel-detail">Pick a preset or enter any installed font</p>
+              </div>
+
+              <div
+                id="font-presets"
+                class="font-presets"
+                role="group"
+                aria-label="Font presets"
+              ></div>
+
+              <label class="control-field" for="font-family">
+                <span>Font family</span>
+                <input
+                  id="font-family"
+                  type="text"
+                  value="SF Mono"
+                  list="font-family-options"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <datalist id="font-family-options">
+                <option value="SF Mono"></option>
+                <option value="Menlo"></option>
+                <option value="Avenir Next"></option>
+                <option value="Avenir Next Condensed"></option>
+                <option value="Futura"></option>
+                <option value="Helvetica Neue"></option>
+                <option value="Arial Rounded MT Bold"></option>
+                <option value="Arial Black"></option>
+              </datalist>
+
+              <label class="control-field" for="font-weight">
+                <span>Weight</span>
+                <select id="font-weight">
+                  <option value="400">Regular · 400</option>
+                  <option value="500">Medium · 500</option>
+                  <option value="600" selected>Semibold · 600</option>
+                  <option value="700">Bold · 700</option>
+                  <option value="800">Extra bold · 800</option>
+                  <option value="900">Heavy · 900</option>
+                </select>
+              </label>
+
+              <label class="control-field" for="label-width">
+                <span>
+                  Wordmark width
+                  <output id="label-width-output" for="label-width">530px</output>
+                </span>
+                <input id="label-width" type="range" min="400" max="700" value="530" />
+              </label>
+
+              <label class="control-field" for="label-offset">
+                <span>
+                  Vertical position
+                  <output id="label-offset-output" for="label-offset">−8px</output>
+                </span>
+                <input id="label-offset" type="range" min="-60" max="60" value="-8" />
+              </label>
+            </div>
+
+            <div class="color-controls" aria-labelledby="colors-heading">
+              <p id="colors-heading" class="panel-label">Colors</p>
+              <div class="color-control-grid">
+                <label class="color-field" for="background-color">
+                  <span>Background</span>
+                  <span class="color-input-shell">
+                    <input
+                      id="background-color"
+                      type="color"
+                      value="#000000"
+                      aria-label="Icon background color"
+                    />
+                    <output id="background-color-output" for="background-color">
+                      #000000
+                    </output>
+                  </span>
+                </label>
+
+                <label class="color-field" for="foreground-color">
+                  <span>Foreground</span>
+                  <span class="color-input-shell">
+                    <input
+                      id="foreground-color"
+                      type="color"
+                      value="#ffffff"
+                      aria-label="Icon foreground color"
+                    />
+                    <output id="foreground-color-output" for="foreground-color">
+                      #FFFFFF
+                    </output>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <dl class="specification-list">
+            <div>
+              <dt>Canvas</dt>
+              <dd>1024px</dd>
+            </div>
+            <div>
+              <dt>Body</dt>
+              <dd>824px</dd>
+            </div>
+            <div>
+              <dt>Inset</dt>
+              <dd>100px</dd>
+            </div>
+            <div>
+              <dt>Artwork</dt>
+              <dd id="selected-artwork">Text · rvw</dd>
+            </div>
+            <div id="typeface-specification">
+              <dt>Typeface</dt>
+              <dd id="selected-typeface">SF Mono · 600</dd>
+            </div>
+            <div id="wordmark-specification">
+              <dt>Wordmark</dt>
+              <dd id="selected-wordmark">530px · −8px</dd>
+            </div>
+            <div>
+              <dt>Colors</dt>
+              <dd id="selected-colors">#000000 · #FFFFFF</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
