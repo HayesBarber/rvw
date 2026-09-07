@@ -9,12 +9,14 @@
 </p>
 
 <p align="center">
-  <b><a href="#installation-and-usage">Installation</a></b> | <b><a href="./docs">Documentation</a></b>
+  <b><a href="#installation">Installation</a></b> | <b><a href="#usage">Usage</a></b> | <b><a href="./docs">Documentation</a></b>
 </p>
 
 <img src="./assets/screenshot.png" alt="Rvw" width="100%"/>
 
-## Installation and Usage
+## Installation
+
+## Usage
 
 ## Acknowledgements
 
