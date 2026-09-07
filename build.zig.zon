@@ -13,6 +13,7 @@
         "build.zig",
         "build.zig.zon",
         "build",
+        "assets",
         "docs",
         "frontend",
         "include",

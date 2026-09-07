@@ -8,6 +8,8 @@
   <string>dev.rvw.app</string>
   <key>CFBundleName</key>
   <string>rvw</string>
+  <key>CFBundleIconFile</key>
+  <string>Rvw</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>LSMinimumSystemVersion</key>

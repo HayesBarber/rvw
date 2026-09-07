@@ -38,6 +38,7 @@ async function fixture() {
   )
   await writeFile(path.join(stagedApp, 'Contents', 'MacOS', 'Rvw'), 'native')
   await writeFile(path.join(stagedApp, bundledCLIPath), 'cli-v1')
+  await writeFile(path.join(stagedApp, 'Contents', 'Resources', 'Rvw.icns'), 'icon-v1')
   await writeFile(path.join(stagedApp, 'Contents', 'Resources', 'web', 'index.html'), 'v1')
   return { root, stagedApp, applicationDestination, cliLinkDestination }
 }
@@ -56,6 +57,13 @@ test('installs a complete bundle and links its bundled CLI', async () => {
       'utf8',
     ),
     'v1',
+  )
+  assert.equal(
+    await readFile(
+      path.join(options.applicationDestination, 'Contents', 'Resources', 'Rvw.icns'),
+      'utf8',
+    ),
+    'icon-v1',
   )
 })
 
