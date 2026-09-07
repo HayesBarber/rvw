@@ -6,7 +6,7 @@
   <br/>
   <b><a href="">Installation</a></b> | <b><a href="">Documentation</a></b>
   <br/>
-  <img src="todo" alt="Rvw" width="100%"/>
+  <img src="./assets/screenshot.png" alt="Rvw" width="100%"/>
 </p>
 
 ## Installation and Usage
