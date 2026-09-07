@@ -1,13 +1,23 @@
 <h1 align="center">Rvw</h1>
+
 <p align="center">
-  <p>Rvw (Review) is a code review and annotation tool designed for fast iteration with AI agents during development</p>
-  <br/>
-  <img width="130" alt="Rvw" src="./assets/icon/rvw-icon.svg"/>
-  <br/>
-  <b><a href="">Installation</a></b> | <b><a href="">Documentation</a></b>
-  <br/>
-  <img src="./assets/screenshot.png" alt="Rvw" width="100%"/>
+  Rvw (Review) is a code review and annotation tool designed for fast iteration with AI agents during development
 </p>
+
+<p align="center">
+  <img
+    width="130"
+    alt="Rvw"
+    src="./assets/icon/rvw-icon.svg"
+    style="border-radius: 24px;"
+  />
+</p>
+
+<p align="center">
+  <b><a href="">Installation</a></b> | <b><a href="">Documentation</a></b>
+</p>
+
+<img src="./assets/screenshot.png" alt="Rvw" width="100%"/>
 
 ## Installation and Usage
 
