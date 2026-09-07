@@ -5,12 +5,7 @@
 </p>
 
 <p align="center">
-  <img
-    width="130"
-    alt="Rvw"
-    src="./assets/icon/rvw-icon.svg"
-    style="border-radius: 24px;"
-  />
+  <img width="130" alt="Rvw" src="./assets/icon/rvw-rounded.png"/>
 </p>
 
 <p align="center">
