@@ -29,7 +29,8 @@ There is a `system` flag that will place the app in `/Applications` and sysmlink
 sudo zig build -Dsystem
 ```
 
-Rvw uses a CLI to launch the GUI. After building the app, the CLI binary is located at `/zig-out/Rvw.app/Contents/MacOS/rvw-cli`. For pre v1.0, it is recommended to symlink or alias this path.
+Rvw uses a CLI to launch the GUI. After building the app, the CLI binary is located at  
+`zig-out/Rvw.app/Contents/MacOS/rvw-cli`. For pre v1.0, it is recommended to symlink or alias this path.
 
 > Note that the CLI resolves the GUI path via relative locations, so don't relocate it
 
