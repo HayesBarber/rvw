@@ -43,7 +43,9 @@ usage: rvw [DIR] [-r RANGE | --range RANGE]
 
 ## Usage
 
-The GUI is built with Vim in mind. See the docs for [configuring the keybindings](./docs/keyboard.md).
+Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
+
+Rvw is built with Vim in mind. See the docs for [configuring the keybindings](./docs/keyboard.md).
 
 ## Acknowledgements
 
