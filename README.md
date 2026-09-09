@@ -49,3 +49,6 @@ Rvw is built with Vim in mind. See the docs for [configuring the keybindings](./
 
 ## Acknowledgements
 
+- Rvw was inspired by [tuicr](https://tuicr.dev/)
+- The frontend is centered around [pierre/diffs](https://diffs.com/) and [pierre/trees](https://trees.software/)
+
