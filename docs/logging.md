@@ -17,18 +17,13 @@ uses.
 
 Each structured line has these fields:
 
-- `timestamp`: Unix time in milliseconds, assigned by the backend when the
-  event is written.
-- `level`: `debug`, `info`, `warning`, or `error`; the event's diagnostic
-  severity.
-- `source`: the component that emitted the event. V1 structured events use
-  `backend` because browser-originated logging is not part of the V1 surface.
-- `message`: a short, stable event description. It must not contain user or
-  repository content.
-- `context`: optional event-specific diagnostic dimensions. It is an object
-  and is omitted when the event has no dimensions.
+- `timestamp`: Unix time in milliseconds, assigned by the backend when the event is written.
+- `level`: `debug`, `info`, `warning`, or `error`; the event's diagnostic severity.
+- `source`: the component that emitted the event.
+- `message`: a short, stable event description. It must not contain user or repository content.
+- `context`: optional event-specific diagnostic dimensions. It is an object and is omitted when the event has no dimensions.
 
-The retained and added V1 events are deliberately limited to:
+The retained V1 events are limited to:
 
 | Event | Level | Context | Purpose |
 | --- | --- | --- | --- |
@@ -40,11 +35,6 @@ The retained and added V1 events are deliberately limited to:
 that could not be used; it is needed to correct that file. Structured events do
 not include repository or file paths, request URLs, comment bodies, file
 contents, configuration contents, credentials, or environment values.
-
-The former frontend `logEvent` transport, `/api/logs` endpoint, `frontend`
-source value, and `metrics` field were unused and are not part of V1. HTTP
-access logs were also removed because they duplicated development-server output
-and could include repository-relative paths in query strings.
 
 ## stderr diagnostics
 
