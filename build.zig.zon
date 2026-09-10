@@ -1,6 +1,6 @@
 .{
     .name = .rvw,
-    .version = "0.3.0",
+    .version = "1.0.0-alpha",
     .fingerprint = 0x1f305fc3a094ab6a,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
