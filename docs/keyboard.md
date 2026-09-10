@@ -1,37 +1,37 @@
 # Keyboard controls
 
-Rvw uses a Vim-style Normal-mode keymap for navigation and global review actions. Text inputs, comment editors, dialogs, and elements marked to ignore Vim input retain their native keyboard behavior.
+Rvw uses a Vim-style keymap for navigation and actions.
 
 ## Built-in bindings
 
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
-| `application.close` | `q` | Close Rvw through the native application host. In HTTP development mode, this action is a safe no-op. |
+| `application.close` | `q` | Close Rvw through the native application host. In HTTP development mode, this action is a no-op. |
 | `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |
-| `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. Supports counts. |
-| `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. Supports counts. |
+| `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. |
+| `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |
-| `tree.size.increase` | `>` | Widen the file-tree pane by one step. Supports counts. |
-| `tree.size.decrease` | `<` | Narrow the file-tree pane by one step. Supports counts. |
+| `tree.size.increase` | `>` | Widen the file-tree pane by one step. |
+| `tree.size.decrease` | `<` | Narrow the file-tree pane by one step. |
 | `focus.file_tree` | `<leader> o` | Focus the file tree. |
 | `focus.diff_pane` | `<leader> o` | Focus the diff pane. |
 | `tree_mode.changes` | `c` | Show changed files. |
 | `tree_mode.files` | `f` | Show all repository files. |
-| `file.open.next` | `] b` | Open the next file in the current tree mode. Supports counts and stops at the last file. |
-| `file.open.previous` | `[ b` | Open the previous file in the current tree mode. Supports counts and stops at the first file. |
+| `file.open.next` | `] b` | Open the next file in the current tree mode. |
+| `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
-| `comments.edit` | `e` | Edit the saved comment at the active diff context. |
-| `comments.delete` | `d d` | Delete the saved comment at the active diff context. |
+| `comments.edit` | `e` | Edit the comment at the cursor. |
+| `comments.delete` | `d d` | Delete the saved comment at the cursor. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
@@ -49,11 +49,11 @@ and restore focus to the prior workspace context.
 
 ## User configuration
 
-Rvw reads `~/.config/rvw/config.json` once when the application starts. Create the parent directories if they do not exist, and restart Rvw after every configuration change.
+Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
 The JSON root accepts one optional `keybindings` object. `keybindings` accepts one optional `normal` object. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings.
 
-This complete example replaces four actions, disables one action, and leaves every omitted action at its built-in binding:
+This complete example replaces four actions, disables one action, and leaves every omitted action at its default binding:
 
 ```json
 {
