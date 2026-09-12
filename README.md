@@ -45,7 +45,7 @@ usage: rvw [DIR] [-r RANGE | --range RANGE]
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
 
-Rvw is built with Vim in mind. See the docs for [configuring the keybindings](./docs/keyboard.md).
+Rvw is built with Vim in mind. See the docs for [configuring the keybindings and user settings](./docs/configuration.md).
 
 > Pre v1.0 holds comments in memory, and review sessions are not persisted. The Rvw app window is meant to be short lived (e.g. yank the comments and then close the window)
 
