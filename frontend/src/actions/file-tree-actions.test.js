@@ -6,6 +6,7 @@ import { ApplicationAction } from './application-actions.js'
 import {
   createFileTreeActionAdapter,
   fileTreeFocusCSS,
+  focusFileTreePath,
 } from './file-tree-actions.js'
 
 function createTree(paths = ['README.md', 'src/index.js', 'src/view.js']) {
@@ -19,6 +20,34 @@ test('file-tree cursor styling is gated by the host visibility state', () => {
     )?.length,
     2,
   )
+})
+
+test('focusing a selected file expands its ancestors and reveals it', (t) => {
+  const model = new FileTree({
+    initialExpansion: 'closed',
+    paths: ['src/components/View.js'],
+  })
+  t.after(() => model.cleanUp())
+  const scrollRequests = []
+  model.scrollToPath = (path, options) => scrollRequests.push([path, options])
+
+  assert.equal(focusFileTreePath(model, 'src/components/View.js'), true)
+  assert.equal(model.getItem('src/')?.isExpanded(), true)
+  assert.equal(model.getItem('src/components/')?.isExpanded(), true)
+  assert.equal(model.getFocusedPath(), 'src/components/View.js')
+  assert.deepEqual(scrollRequests, [[
+    'src/components/View.js',
+    { focus: false, offset: 'nearest' },
+  ]])
+})
+
+test('focusing a missing file is a safe no-op', (t) => {
+  const model = createTree()
+  t.after(() => model.cleanUp())
+  const initiallyFocusedPath = model.getFocusedPath()
+
+  assert.equal(focusFileTreePath(model, 'missing.js'), false)
+  assert.equal(model.getFocusedPath(), initiallyFocusedPath)
 })
 
 test('the file-tree adapter owns its contextual surface actions', (t) => {

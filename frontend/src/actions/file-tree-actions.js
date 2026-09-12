@@ -15,6 +15,21 @@ export const fileTreeFocusCSS = `
   }
 `
 
+/** Focuses and reveals a file, opening its containing directories if needed. */
+export function focusFileTreePath(model, path) {
+  if (!path || !model.getItem(path)) return false
+
+  let separator = path.lastIndexOf('/')
+  while (separator !== -1) {
+    model.getItem(path.slice(0, separator + 1))?.expand()
+    separator = path.lastIndexOf('/', separator - 1)
+  }
+
+  model.focusPath(path)
+  model.scrollToPath(path, { focus: false, offset: 'nearest' })
+  return model.getFocusedPath() === path
+}
+
 function repeat(count, operation) {
   const repetitions = Number.isSafeInteger(count) && count > 0 ? count : 1
   for (let index = 0; index < repetitions; index += 1) operation()

@@ -6,6 +6,7 @@ import {
 import {
   createFileTreeActionAdapter,
   fileTreeFocusCSS,
+  focusFileTreePath,
 } from '../actions/file-tree-actions.js'
 
 export default function FileTreePane({
@@ -78,21 +79,23 @@ export default function FileTreePane({
 
   useEffect(() => {
     const selectedPaths = model.getSelectedPaths()
-    if (
+    const selectionMatches =
       selectedPaths.length === (selectedPath ? 1 : 0) &&
       selectedPaths[0] === selectedPath
-    ) {
-      return
+    if (!selectionMatches) {
+      synchronizingSelectionRef.current = true
+      try {
+        for (const path of selectedPaths) model.getItem(path)?.deselect()
+        if (selectedPath && filePaths.has(selectedPath)) {
+          model.getItem(selectedPath)?.select()
+        }
+      } finally {
+        synchronizingSelectionRef.current = false
+      }
     }
 
-    synchronizingSelectionRef.current = true
-    try {
-      for (const path of selectedPaths) model.getItem(path)?.deselect()
-      if (selectedPath && filePaths.has(selectedPath)) {
-        model.getItem(selectedPath)?.select()
-      }
-    } finally {
-      synchronizingSelectionRef.current = false
+    if (selectedPath && filePaths.has(selectedPath)) {
+      focusFileTreePath(model, selectedPath)
     }
   }, [filePaths, model, selectedPath])
 
