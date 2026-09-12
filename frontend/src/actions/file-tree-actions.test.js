@@ -41,7 +41,7 @@ test('focusing a selected file expands its ancestors and reveals it', (t) => {
   ]])
 })
 
-test('focusing a missing file is a safe no-op', (t) => {
+test('focusing a missing file is a no-op', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())
   const initiallyFocusedPath = model.getFocusedPath()
@@ -54,7 +54,7 @@ test('the file-tree adapter owns its contextual surface actions', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())
   const calls = []
-  const actions = createFileTreeActionAdapter(model, () => {}, {
+  const actions = createFileTreeActionAdapter(model, () => { }, {
     focusDiffPane: () => {
       calls.push('focus diff')
       return true
@@ -79,7 +79,7 @@ test('an empty file tree still exposes tree-mode actions', (t) => {
   const model = createTree([])
   t.after(() => model.cleanUp())
   const calls = []
-  const actions = createFileTreeActionAdapter(model, () => {}, {
+  const actions = createFileTreeActionAdapter(model, () => { }, {
     showFiles: () => {
       calls.push('show files')
       return true
@@ -99,7 +99,7 @@ test('cursor actions move focus with counts and request nearest scrolling', (t) 
     scrollRequests.push([path, options])
     scrollToPath(path, options)
   }
-  const actions = createFileTreeActionAdapter(model, () => {})
+  const actions = createFileTreeActionAdapter(model, () => { })
 
   assert.equal(actions[ApplicationAction.CURSOR_DOWN](2), true)
   assert.equal(model.getFocusedPath(), 'src/view.js')
@@ -168,23 +168,23 @@ test('half-page actions safely handle non-scrollable, unmounted, and empty trees
   })
 
   nonScrollable.getFileTreeContainer = () => ({ clientHeight: 300 })
-  nonScrollable.scrollToPath = () => {}
+  nonScrollable.scrollToPath = () => { }
   nonScrollable.focusFirstItem()
   assert.equal(createFileTreeActionAdapter(
     nonScrollable,
-    () => {},
+    () => { },
   )[ApplicationAction.CURSOR_PAGE_DOWN](), true)
   assert.equal(nonScrollable.getFocusedPath(), '2.txt')
 
   assert.equal(createFileTreeActionAdapter(
     unmounted,
-    () => {},
+    () => { },
   )[ApplicationAction.CURSOR_PAGE_DOWN](), false)
 
   empty.getFileTreeContainer = () => ({ clientHeight: 120 })
   assert.equal(createFileTreeActionAdapter(
     empty,
-    () => {},
+    () => { },
   )[ApplicationAction.CURSOR_PAGE_UP](), false)
 })
 
@@ -220,7 +220,7 @@ test('centering an empty file tree is a safe no-op', (t) => {
 test('directory actions toggle, collapse, expand, and move to the parent', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())
-  const actions = createFileTreeActionAdapter(model, () => {})
+  const actions = createFileTreeActionAdapter(model, () => { })
 
   model.focusPath('src/')
   const directory = model.getFocusedItem()
