@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
@@ -42,12 +42,25 @@ export function selectActivePath(visibleFiles, selectedPath, initialPath) {
   return visibleFiles[0]?.path ?? null
 }
 
+export function selectEmptyReviewTreeMode(overview, treeMode) {
+  if (overview && overview.files.length === 0) return TreeMode.FILES
+  return treeMode
+}
+
 export function useReviewSession({ workspace, dispatchWorkspace }) {
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
   const commentsRequest = useReviewComments()
   const copyRequest = useCopyComments()
   const overview = overviewRequest.data
+
+  useEffect(() => {
+    if (!overview) return
+    dispatchWorkspace({
+      type: 'review_loaded',
+      initialPath: overview.initialPath,
+    })
+  }, [dispatchWorkspace, overview])
 
   const changedPaths = useMemo(
     () => new Set(overview?.files.map((file) => file.path) ?? []),
@@ -177,17 +190,16 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     return true
   }, [commentsRequest.data.length, copyRequest])
 
+  const reviewedOverview = useRef(null)
+
   useEffect(() => {
-    if (!overview) return
-    dispatchWorkspace({
-      type: 'review_loaded',
-      initialPath: overview.initialPath,
-    })
-    // no changes to view, swap to files
-    if (!overview.files.length) {
-      changeTreeMode(TreeMode.FILES)
+    if (!overview || reviewedOverview.current === overview) return
+    reviewedOverview.current = overview
+    const nextMode = selectEmptyReviewTreeMode(overview, workspace.treeMode)
+    if (nextMode !== workspace.treeMode) {
+      changeTreeMode(nextMode)
     }
-  }, [dispatchWorkspace, overview, changeTreeMode])
+  }, [changeTreeMode, overview, workspace.treeMode])
 
   return {
     activePath,

@@ -5,6 +5,7 @@ import { TreeMode } from '../app/workspace.js'
 import {
   createFilesModeEntries,
   selectActivePath,
+  selectEmptyReviewTreeMode,
   selectVisibleFiles,
 } from './review-session.js'
 
@@ -50,6 +51,39 @@ test('tree mode authoritatively selects changed or repository-wide entries', () 
     selectVisibleFiles(overview, filesModeEntries, TreeMode.FILES),
     filesModeEntries,
   )
+})
+
+test('empty reviews return FILES mode', () => {
+  for (const mode of [TreeMode.CHANGES, TreeMode.FILES]) {
+    assert.equal(
+      selectEmptyReviewTreeMode({ files: [] }, mode),
+      TreeMode.FILES,
+    )
+  }
+})
+
+test('reviews with changes never alter the tree mode', () => {
+  assert.equal(
+    selectEmptyReviewTreeMode(overview, TreeMode.CHANGES),
+    TreeMode.CHANGES,
+  )
+  assert.equal(
+    selectEmptyReviewTreeMode(overview, TreeMode.FILES),
+    TreeMode.FILES,
+  )
+})
+
+test('missing reviews leave the tree mode untouched', () => {
+  for (const missing of [null, undefined]) {
+    assert.equal(
+      selectEmptyReviewTreeMode(missing, TreeMode.CHANGES),
+      TreeMode.CHANGES,
+    )
+    assert.equal(
+      selectEmptyReviewTreeMode(missing, TreeMode.FILES),
+      TreeMode.FILES,
+    )
+  }
 })
 
 test('active paths retain valid selection and fall back deterministically', () => {
