@@ -110,6 +110,10 @@ export function useApplicationActions({
       openKeymapReference()
       return true
     },
+    [ApplicationAction.DIFF_WRAP_TOGGLE]: () => {
+      dispatchWorkspace({ type: 'wrap_lines_toggled' })
+      return true
+    },
     [ApplicationAction.COPY_COMMENTS]: copyComments,
   }), [
     copyComments,

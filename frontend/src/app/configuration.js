@@ -7,6 +7,8 @@ import {
 
 export const USER_CONFIGURATION_PATH = '~/.config/rvw/config.json'
 
+export const DEFAULT_WRAP_LINES = true
+
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -15,11 +17,25 @@ function onlyFields(object, allowed) {
   return Object.keys(object).every((field) => allowed.includes(field))
 }
 
+function configuredDiffSettings(diff) {
+  if (!isObject(diff)) {
+    throw new TypeError('User configuration diff must be a JSON object')
+  }
+  if (!onlyFields(diff, ['wrapLines'])) {
+    throw new TypeError('User configuration diff contains an unsupported field')
+  }
+  const wrapLines = diff.wrapLines ?? DEFAULT_WRAP_LINES
+  if (typeof wrapLines !== 'boolean') {
+    throw new TypeError('User configuration diff.wrapLines must be a boolean')
+  }
+  return wrapLines
+}
+
 function configuredKeyboardConfiguration(configuration) {
   if (!isObject(configuration)) {
     throw new TypeError('User configuration must be a JSON object')
   }
-  if (!onlyFields(configuration, ['keybindings'])) {
+  if (!onlyFields(configuration, ['keybindings', 'diff'])) {
     throw new TypeError('User configuration contains an unsupported top-level field')
   }
 
@@ -75,13 +91,13 @@ function frontendDiagnostic(code, message) {
  * Resolves one backend snapshot without mutating the active Vim controller.
  * A null bindings result tells callers to preserve the currently installed map.
  */
-export function resolveKeyboardConfiguration(snapshot) {
+export function resolveConfiguration(snapshot) {
   if (!isObject(snapshot)) {
     return {
       bindings: null,
       keymap: null,
       diagnostic: frontendDiagnostic(
-        'invalid_keybindings',
+        'invalid_configuration',
         'configuration service returned an invalid snapshot',
       ),
     }
@@ -92,26 +108,30 @@ export function resolveKeyboardConfiguration(snapshot) {
   }
 
   try {
-    const { keymap, leader } = configuredKeyboardConfiguration(snapshot.configuration)
+    const keyboard = configuredKeyboardConfiguration(snapshot.configuration)
+    const wrapLines = snapshot.configuration.diff === undefined
+      ? DEFAULT_WRAP_LINES
+      : configuredDiffSettings(snapshot.configuration.diff)
     return {
-      bindings: compileApplicationKeymap(keymap, { leader }),
-      keymap,
-      leader,
+      bindings: compileApplicationKeymap(keyboard.keymap, { leader: keyboard.leader }),
+      keymap: keyboard.keymap,
+      leader: keyboard.leader,
+      wrapLines,
       diagnostic: null,
     }
   } catch (error) {
     return {
       bindings: null,
       keymap: null,
-      diagnostic: frontendDiagnostic('invalid_keybindings', error.message),
+      diagnostic: frontendDiagnostic('invalid_configuration', error.message),
     }
   }
 }
 
 /** Loads and validates configuration without delaying other startup requests. */
-export async function loadKeyboardConfiguration(loadSnapshot = getConfiguration) {
+export async function loadConfiguration(loadSnapshot = getConfiguration) {
   try {
-    return resolveKeyboardConfiguration(await loadSnapshot())
+    return resolveConfiguration(await loadSnapshot())
   } catch (error) {
     return {
       bindings: null,

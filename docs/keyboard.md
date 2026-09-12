@@ -27,6 +27,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.open.next` | `] b` | Open the next file in the current tree mode. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. |
+| `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the diff view. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
@@ -51,9 +52,11 @@ and restore focus to the prior workspace context.
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts one optional `keybindings` object. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
+The JSON root accepts one optional `keybindings` object and one optional `diff` object. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
 
-This complete example replaces four actions, disables one action, selects `\` as the leader key, and leaves every other action at its default binding:
+`diff` accepts one optional `wrapLines` key, a boolean that selects the starting text wrapping of the diff view. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. The `diff.wrap.toggle` action flips wrapping for the current session only.
+
+This complete example replaces four actions, disables one action, starts with wrapping disabled, selects `\` as the leader key, and leaves every other action at its default binding:
 
 ```json
 {
@@ -66,6 +69,9 @@ This complete example replaces four actions, disables one action, selects `\` as
       "comments.edit": [["c", "e"]],
       "comments.copy": []
     }
+  },
+  "diff": {
+    "wrapLines": false
   }
 }
 ```

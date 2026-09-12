@@ -29,15 +29,17 @@ export default function DiffSurface({
   onBeginComment,
   onPostRender,
   onSelectLines,
+  wrapLines = true,
 }) {
   const options = useMemo(() => ({
     ...baseOptions,
+    overflow: wrapLines ? 'wrap' : 'scroll',
     onGutterUtilityClick: onBeginComment,
     onLineSelected: onSelectLines,
     onLineSelectionChange: onSelectLines,
     onLineSelectionEnd: onSelectLines,
     onPostRender,
-  }), [onBeginComment, onPostRender, onSelectLines])
+  }), [onBeginComment, onPostRender, onSelectLines, wrapLines])
 
   return (
     <Virtualizer className="diff-scroll">
