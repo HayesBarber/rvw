@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { copyCommentsAsMarkdown } from './api.js'
 import { RequestStatus } from './request-state.js'
@@ -8,6 +8,8 @@ const idleCopyRequest = Object.freeze({
   data: null,
   error: null,
 })
+
+export const COPY_MESSAGE_TIMEOUT_MS = 3_000
 
 export function copyRequestMessage(request) {
   if (request.status === RequestStatus.LOADING) return 'Copying…'
@@ -19,6 +21,15 @@ export function copyRequestMessage(request) {
 
 export function useCopyComments() {
   const [request, setRequest] = useState(idleCopyRequest)
+
+  useEffect(() => {
+    if (request.status !== RequestStatus.SUCCESS) return undefined
+
+    const timeout = setTimeout(() => {
+      setRequest(idleCopyRequest)
+    }, COPY_MESSAGE_TIMEOUT_MS)
+    return () => clearTimeout(timeout)
+  }, [request.status])
 
   const copy = useCallback(async () => {
     setRequest({
