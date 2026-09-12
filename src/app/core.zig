@@ -264,7 +264,7 @@ test "core routes file listing variants through their tree providers" {
     defer threaded.deinit();
     var all_context: u8 = 0;
     var all_tree: TreeStub = .{ .paths = &.{ "a.txt", "ignored.txt" } };
-    var visible_tree: TreeStub = .{ .paths = &.{ "a.txt" } };
+    var visible_tree: TreeStub = .{ .paths = &.{"a.txt"} };
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
     var core = Core.init(

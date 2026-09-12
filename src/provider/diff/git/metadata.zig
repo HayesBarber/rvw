@@ -35,9 +35,9 @@ fn trackedChanges(
     snapshot: snapshot_module.Snapshot,
 ) !std.ArrayList(Change) {
     const output = if (snapshot.head) |head|
-try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, process.maximum_metadata_size * 2)
-        else
-            try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, process.maximum_metadata_size * 2);
+        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, process.maximum_metadata_size * 2)
+    else
+        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, process.maximum_metadata_size * 2);
     return parseChanges(allocator, output);
 }
 
