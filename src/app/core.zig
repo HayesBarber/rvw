@@ -14,6 +14,8 @@ pub const Core = struct {
     io: Io,
     diff_provider: provider_module.diff.DiffProvider,
     file_provider: provider_module.file.FileProvider,
+    all_files_tree_provider: provider_module.filetree.FileTreeProvider,
+    visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
     logger: log.Logger,
@@ -24,6 +26,8 @@ pub const Core = struct {
         io: Io,
         diff_provider: provider_module.diff.DiffProvider,
         file_provider: provider_module.file.FileProvider,
+        all_files_tree_provider: provider_module.filetree.FileTreeProvider,
+        visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
         logger: log.Logger,
@@ -34,6 +38,8 @@ pub const Core = struct {
             .io = io,
             .diff_provider = diff_provider,
             .file_provider = file_provider,
+            .all_files_tree_provider = all_files_tree_provider,
+            .visible_files_tree_provider = visible_files_tree_provider,
             .comment_provider = comment_provider,
             .clipboard = clipboard,
             .logger = logger,
@@ -64,7 +70,8 @@ pub const Core = struct {
         return switch (request) {
             .get_configuration => .{ .configuration = self.configuration },
             .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
-            .get_files => .{ .files = try self.file_provider.getFiles(self.io) },
+            .get_files => .{ .files = try self.all_files_tree_provider.getFiles(self.io) },
+            .get_files_not_ignored => .{ .files = try self.visible_files_tree_provider.getFiles(self.io) },
             .get_file => |details| .{ .file = .{
                 .path = details.path,
                 .status = .unchanged,
@@ -114,6 +121,7 @@ fn operationName(request: model.Request) []const u8 {
         .get_configuration => "get_configuration",
         .get_diff_overview => "get_diff_overview",
         .get_files => "get_files",
+        .get_files_not_ignored => "get_files_not_ignored",
         .get_file => "get_file",
         .get_file_diff => "get_file_diff",
         .get_comments => "get_comments",
@@ -238,6 +246,86 @@ test "request failure logging records only operation and error code" {
     try std.testing.expectEqualStrings("AccessDenied", recorder.error_code.?);
 }
 
+test "core routes file listing variants through their tree providers" {
+    const TreeStub = struct {
+        paths: []const []const u8,
+
+        fn getFiles(context: *anyopaque, _: Io) ![]const []const u8 {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            return self.paths;
+        }
+
+        fn interface(self: *@This()) provider_module.filetree.FileTreeProvider {
+            return .{ .context = self, .vtable = &.{ .getFiles = getFiles } };
+        }
+    };
+
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var all_context: u8 = 0;
+    var all_tree: TreeStub = .{ .paths = &.{ "a.txt", "ignored.txt" } };
+    var visible_tree: TreeStub = .{ .paths = &.{"a.txt"} };
+    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+    defer comments.deinit();
+    var core = Core.init(
+        std.testing.allocator,
+        threaded.io(),
+        .{ .context = &all_context, .vtable = &failed_diff_vtable },
+        .{ .context = &all_context, .vtable = &empty_file_vtable },
+        all_tree.interface(),
+        visible_tree.interface(),
+        comments.interface(),
+        .{ .context = &all_context, .vtable = &noop_clipboard_vtable },
+        .{
+            .allocator = std.testing.allocator,
+            .context = &all_context,
+            .vtable = &silent_logger_vtable,
+        },
+        .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+    );
+
+    const all_files = (try core.dispatch(.get_files)).files;
+    try std.testing.expectEqual(@as(usize, 2), all_files.len);
+    try std.testing.expectEqualStrings("ignored.txt", all_files[1]);
+
+    const visible_files = (try core.dispatch(.get_files_not_ignored)).files;
+    try std.testing.expectEqual(@as(usize, 1), visible_files.len);
+    try std.testing.expectEqualStrings("a.txt", visible_files[0]);
+}
+
+const empty_file_vtable: provider_module.file.FileProvider.VTable = .{
+    .getFile = emptyGetFile,
+};
+
+fn emptyGetFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
+    return error.UnknownFile;
+}
+
+const noop_clipboard_vtable: output.Clipboard.VTable = .{
+    .copy = noopCopy,
+};
+
+fn noopCopy(_: *anyopaque, _: Io, _: []const u8) !void {}
+
+const silent_logger_vtable: log.Logger.VTable = .{
+    .write = silentLog,
+};
+
+fn silentLog(_: *anyopaque, _: Io, _: log.Event) !void {}
+
+const failed_diff_vtable: provider_module.diff.DiffProvider.VTable = .{
+    .getDiffOverview = failedDiffOverview,
+    .getFileDiff = failedFileDiff,
+};
+
+fn failedDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
+    return error.TestUnexpectedResult;
+}
+
+fn failedFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
+    return error.TestUnexpectedResult;
+}
+
 test "core edits and deletes only the requested comment with useful errors" {
     const TestDependencies = struct {
         fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
@@ -263,8 +351,10 @@ test "core edits and deletes only the requested comment with useful errors" {
             .getDiffOverview = getDiffOverview,
             .getFileDiff = getFileDiff,
         };
-        const file_vtable: provider_module.file.FileProvider.VTable = .{
+        const tree_vtable: provider_module.filetree.FileTreeProvider.VTable = .{
             .getFiles = getFiles,
+        };
+        const file_vtable: provider_module.file.FileProvider.VTable = .{
             .getFile = getFile,
         };
         const clipboard_vtable: output.Clipboard.VTable = .{ .copy = copy };
@@ -281,6 +371,8 @@ test "core edits and deletes only the requested comment with useful errors" {
         threaded.io(),
         .{ .context = &context, .vtable = &TestDependencies.diff_vtable },
         .{ .context = &context, .vtable = &TestDependencies.file_vtable },
+        .{ .context = &context, .vtable = &TestDependencies.tree_vtable },
+        .{ .context = &context, .vtable = &TestDependencies.tree_vtable },
         comments.interface(),
         .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
         .{

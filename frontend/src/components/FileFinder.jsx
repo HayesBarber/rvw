@@ -21,6 +21,7 @@ export default function FileFinder({
   onOpen,
   onClose,
   registerActionAdapter,
+  title = 'Find a file',
 }) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -133,7 +134,7 @@ export default function FileFinder({
         onKeyDown={handleDialogKeyDown}
       >
         <header className="file-finder-header">
-          <h2 id="file-finder-title">Find a file</h2>
+          <h2 id="file-finder-title">{title}</h2>
         </header>
         <label className="visually-hidden" htmlFor="file-finder-input">
           Search repository files

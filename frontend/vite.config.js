@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
           proxy: {
             '/api': apiUrl,
           },
+          open: true,
         }
       : undefined,
   }

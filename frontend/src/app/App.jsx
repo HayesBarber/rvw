@@ -10,6 +10,7 @@ import { RequestStatus } from '../review/request-state.js'
 import { useReviewSession } from '../review/review-session.js'
 import {
   ActiveSurface,
+  FinderMode,
   initialWorkspaceState,
   TreeMode,
   workspaceReducer,
@@ -53,7 +54,10 @@ export default function App() {
     fileLoading,
     filesModeEntries,
     navigateFile,
+    notIgnoredFilesEntries,
+    notIgnoredFilesRequest,
     openFileFinder,
+    openFileFinderAll,
     openFinderFile: handleFinderOpen,
     overview,
     overviewRequest,
@@ -90,6 +94,7 @@ export default function App() {
     copyComments: handleCopyComments,
     navigateFile,
     openFileFinder,
+    openFileFinderAll,
     openKeymapReference,
     selectFile,
   })
@@ -255,10 +260,21 @@ export default function App() {
       </main>
       {workspace.finderOpen && (
         <FileFinder
-          files={filesModeEntries}
-          status={allFilesRequest.status}
-          error={allFilesRequest.error}
-          onRetry={allFilesRequest.load}
+          files={workspace.finderMode === FinderMode.ALL
+            ? filesModeEntries
+            : notIgnoredFilesEntries}
+          status={workspace.finderMode === FinderMode.ALL
+            ? allFilesRequest.status
+            : notIgnoredFilesRequest.status}
+          error={workspace.finderMode === FinderMode.ALL
+            ? allFilesRequest.error
+            : notIgnoredFilesRequest.error}
+          onRetry={workspace.finderMode === FinderMode.ALL
+            ? allFilesRequest.load
+            : notIgnoredFilesRequest.load}
+          title={workspace.finderMode === FinderMode.ALL
+            ? 'Find any file including ignored'
+            : 'Find a file'}
           onOpen={handleFinderOpen}
           onClose={closeFileFinder}
           registerActionAdapter={registerFinderActions}

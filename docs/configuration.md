@@ -26,7 +26,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `tree_mode.files` | `f` | Show all repository files. |
 | `file.open.next` | `] b` | Open the next file in the current tree mode. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
-| `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. |
+| `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
+| `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the diff view. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |

@@ -186,6 +186,7 @@ pub const Request = union(enum) {
     get_configuration,
     get_diff_overview,
     get_files,
+    get_files_not_ignored,
     get_file: struct { path: []const u8 },
     get_file_diff: struct {
         diff_id: []const u8,

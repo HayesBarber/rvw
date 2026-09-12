@@ -33,10 +33,23 @@ pub fn main(init: std.process.Init) !void {
         return err;
     };
     defer git.deinit();
-    var files = try rvw.provider.file.filesystem.FilesystemProvider.init(
+    var all_files_tree = try rvw.provider.filetree.walk.WalkFileTreeProvider.init(
         init.gpa,
         init.io,
         options.directory.?,
+    );
+    defer all_files_tree.deinit();
+    var visible_files_tree = try rvw.provider.filetree.gitignore.GitignoreFileTreeProvider.init(
+        init.gpa,
+        init.io,
+        options.directory.?,
+    );
+    defer visible_files_tree.deinit();
+    var files = try rvw.provider.file.filesystem.FilesystemFileProvider.init(
+        init.gpa,
+        init.io,
+        options.directory.?,
+        all_files_tree.interface(),
     );
     defer files.deinit();
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
@@ -59,6 +72,8 @@ pub fn main(init: std.process.Init) !void {
         init.io,
         git.interface(),
         files.interface(),
+        all_files_tree.interface(),
+        visible_files_tree.interface(),
         comments.interface(),
         clipboard.interface(),
         logger,

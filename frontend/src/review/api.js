@@ -128,6 +128,15 @@ export async function getFiles() {
 }
 
 /**
+ * Lists the git working set: tracked files plus untracked files git does not
+ * ignore.
+ * @returns {Promise<string[]>}
+ */
+export async function getFilesNotIgnored() {
+  return requestJson('/api/files/not-ignored', { type: 'get_files_not_ignored' })
+}
+
+/**
  * Loads one unchanged repository file in the same display shape as a diff.
  * @param {string} path
  * @returns {Promise<FileDiff>}
