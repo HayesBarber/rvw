@@ -46,6 +46,21 @@ test('the file-tree adapter owns its contextual surface actions', (t) => {
   assert.deepEqual(calls, ['focus diff', 'show changes', 'show files'])
 })
 
+test('an empty file tree still exposes tree-mode actions', (t) => {
+  const model = createTree([])
+  t.after(() => model.cleanUp())
+  const calls = []
+  const actions = createFileTreeActionAdapter(model, () => {}, {
+    showFiles: () => {
+      calls.push('show files')
+      return true
+    },
+  })
+
+  assert.equal(actions[ApplicationAction.SHOW_FILES](), true)
+  assert.deepEqual(calls, ['show files'])
+})
+
 test('cursor actions move focus with counts and request nearest scrolling', (t) => {
   const model = createTree()
   t.after(() => model.cleanUp())
