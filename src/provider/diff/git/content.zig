@@ -1,6 +1,8 @@
 const std = @import("std");
 const model = @import("../../../app/model.zig");
 
+pub const maximum_text_size = 512 * 1024;
+
 pub const Loaded = union(enum) {
     contents: model.FileContents,
     unavailable: model.UnavailableReason,

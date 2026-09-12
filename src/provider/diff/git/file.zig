@@ -2,8 +2,7 @@ const std = @import("std");
 const model = @import("../../../app/model.zig");
 const snapshot_module = @import("snapshot.zig");
 const metadata = @import("metadata.zig");
-const process = @import("process.zig");
-const limits = @import("limits.zig");
+const process = @import("../../git/process.zig");
 const content = @import("content.zig");
 
 const Allocator = std.mem.Allocator;
@@ -56,7 +55,7 @@ fn loadCommitted(
         allocator,
         io,
         &.{ "git", "-C", root, "show", "--no-textconv", object },
-        limits.maximum_text_size + 1,
+        content.maximum_text_size + 1,
     ) catch |err| switch (err) {
         error.GitOutputTooLarge => return .{ .unavailable = .too_large },
         else => return err,
@@ -76,7 +75,7 @@ fn loadWorkingTree(
         io,
         path,
         allocator,
-        .limited(limits.maximum_text_size + 1),
+        .limited(content.maximum_text_size + 1),
     ) catch |err| switch (err) {
         error.StreamTooLong => return .{ .unavailable = .too_large },
         else => return err,

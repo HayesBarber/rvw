@@ -1,6 +1,5 @@
 const std = @import("std");
-const process = @import("process.zig");
-const limits = @import("limits.zig");
+const process = @import("../../git/process.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -40,7 +39,7 @@ fn resolveCommit(allocator: Allocator, io: Io, root: []const u8, revision: []con
         allocator,
         io,
         &.{ "git", "-C", root, "rev-parse", "--verify", "--end-of-options", commit },
-        limits.maximum_revision_size,
+        process.maximum_revision_size,
     ) catch |err| switch (err) {
         error.GitCommandFailed, error.GitOutputTooLarge => return error.InvalidRevision,
         else => return err,

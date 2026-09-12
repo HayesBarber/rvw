@@ -1,8 +1,7 @@
 const std = @import("std");
 const model = @import("../../../app/model.zig");
 const snapshot_module = @import("snapshot.zig");
-const process = @import("process.zig");
-const limits = @import("limits.zig");
+const process = @import("../../git/process.zig");
 const content = @import("content.zig");
 
 const Allocator = std.mem.Allocator;
@@ -36,9 +35,9 @@ fn trackedChanges(
     snapshot: snapshot_module.Snapshot,
 ) !std.ArrayList(Change) {
     const output = if (snapshot.head) |head|
-        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, limits.maximum_metadata_size * 2)
-    else
-        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, limits.maximum_metadata_size * 2);
+try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, process.maximum_metadata_size * 2)
+        else
+            try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, process.maximum_metadata_size * 2);
     return parseChanges(allocator, output);
 }
 
@@ -104,7 +103,7 @@ fn appendUntracked(
     root: []const u8,
     changes: *std.ArrayList(Change),
 ) !void {
-    const output = try process.run(allocator, io, &.{ "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z", "--" }, limits.maximum_metadata_size);
+    const output = try process.run(allocator, io, &.{ "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z", "--" }, process.maximum_metadata_size);
     var cursor: usize = 0;
     var directory = try std.Io.Dir.openDirAbsolute(io, root, .{});
     defer directory.close(io);
@@ -112,8 +111,8 @@ fn appendUntracked(
         const path = try validPath(try nextZ(output, &cursor));
         const stat = try directory.statFile(io, path, .{ .follow_symlinks = false });
         var additions: ?usize = null;
-        if (stat.kind == .file and stat.size <= limits.maximum_text_size) {
-            const contents = try directory.readFileAlloc(io, path, allocator, .limited(limits.maximum_text_size + 1));
+        if (stat.kind == .file and stat.size <= content.maximum_text_size) {
+            const contents = try directory.readFileAlloc(io, path, allocator, .limited(content.maximum_text_size + 1));
             if (std.mem.indexOfScalar(u8, contents, 0) == null and std.unicode.utf8ValidateSlice(contents)) {
                 additions = content.lineCount(contents);
             }
