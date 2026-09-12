@@ -26,7 +26,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `tree_mode.files` | `f` | Show all repository files. |
 | `file.open.next` | `] b` | Open the next file in the current tree mode. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
-| `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. |
+| `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
+| `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the diff view. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
@@ -36,11 +37,11 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-The file finder opens with its search input focused. Press `<Esc>` once to move
-focus to the result list and enable its Vim bindings without changing the
-query, then press `<Esc>` again to close the finder. Outside that transition,
-`<Esc>` clears a pending count or multi-key sequence. An unmatched key after a
-pending sequence also clears that pending input without running an action.
+The file finder opens with its search input focused. Press `<Esc>` once to move focus to the
+result list and enable its Vim bindings without changing the query, then press
+`<Esc>` again to close the finder. Outside that transition, `<Esc>` clears a
+pending count or multi-key sequence. An unmatched key after a pending sequence
+also clears that pending input without running an action.
 
 Press `?` to open the keyboard reference. It is grouped by purpose and reads
 from the effective keymap, so valid user replacements and disabled actions are
