@@ -152,26 +152,25 @@ export default function App() {
               <button type="button" onClick={allFilesRequest.load}>Retry</button>
             </div>
           )}
-          {visibleFiles.length === 0 && allFilesRequest.status !== RequestStatus.LOADING ? (
+          {visibleFiles.length === 0 && allFilesRequest.status !== RequestStatus.LOADING && (
             <p className="tree-load-status">
               {workspace.treeMode === TreeMode.CHANGES
                 ? 'No changes to review.'
                 : 'No files found.'}
             </p>
-          ) : (
-            <FileTreePane
-              key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}`}
-              files={visibleFiles}
-              isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
-              mode={workspace.treeMode}
-              onFocusDiffPane={focusDiffPane}
-              selectedPath={activePath}
-              onSelectFile={handleTreeFileSelect}
-              onShowChanges={showChanges}
-              onShowFiles={showFiles}
-              registerActionAdapter={registerFileTreeActions}
-            />
           )}
+          <FileTreePane
+            key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}`}
+            files={visibleFiles}
+            isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
+            mode={workspace.treeMode}
+            onFocusDiffPane={focusDiffPane}
+            selectedPath={activePath}
+            onSelectFile={handleTreeFileSelect}
+            onShowChanges={showChanges}
+            onShowFiles={showFiles}
+            registerActionAdapter={registerFileTreeActions}
+          />
         </div>
       </section>
 
