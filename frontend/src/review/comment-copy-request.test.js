@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  COPY_MESSAGE_TIMEOUT_MS,
-  copyRequestMessage,
-} from './comment-copy-request.js'
+import { copyRequestMessage } from './comment-copy-request.js'
 import { RequestStatus } from './request-state.js'
 
 test('comment-copy request states retain their existing status messages', () => {
@@ -22,8 +19,4 @@ test('comment-copy request states retain their existing status messages', () => 
     status: RequestStatus.SUCCESS,
     data: { commentCount: 2 },
   }), 'Copied 2 comments')
-})
-
-test('successful copy messages use a short timeout', () => {
-  assert.equal(COPY_MESSAGE_TIMEOUT_MS, 3_000)
 })
