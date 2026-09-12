@@ -260,6 +260,7 @@ export default function App() {
       {workspace.keymapReferenceOpen && (
         <KeymapReference
           keymap={keyboardConfiguration.keymap}
+          leader={keyboardConfiguration.leader}
           onClose={closeKeymapReference}
         />
       )}

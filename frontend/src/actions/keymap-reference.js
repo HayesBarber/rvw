@@ -5,8 +5,8 @@ import {
   applicationActionGroups,
 } from './application-actions.js'
 
-function effectiveSequence(keys) {
-  return keys.map((key) => key === LEADER_KEY ? DEFAULT_LEADER_KEY : key)
+function effectiveSequence(keys, leader) {
+  return keys.map((key) => key === LEADER_KEY ? leader : key)
 }
 
 export const KEYMAP_REFERENCE_SCROLL_STEP = 56
@@ -19,7 +19,7 @@ export function keymapReferenceScrollDelta(key) {
 }
 
 /** Builds the reference model from the effective map and action catalog. */
-export function createKeymapReference(keymap) {
+export function createKeymapReference(keymap, leader = DEFAULT_LEADER_KEY) {
   return applicationActionGroups.map((group) => Object.freeze({
     ...group,
     actions: Object.freeze(Object.values(applicationActionCatalog)
@@ -27,7 +27,7 @@ export function createKeymapReference(keymap) {
       .map((action) => Object.freeze({
         ...action,
         sequences: Object.freeze((keymap[action.id] ?? [])
-          .map((keys) => Object.freeze(effectiveSequence(keys)))),
+          .map((keys) => Object.freeze(effectiveSequence(keys, leader)))),
       }))),
   }))
 }

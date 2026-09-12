@@ -51,13 +51,14 @@ and restore focus to the prior workspace context.
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts one optional `keybindings` object. `keybindings` accepts one optional `normal` object. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings.
+The JSON root accepts one optional `keybindings` object. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
 
-This complete example replaces four actions, disables one action, and leaves every omitted action at its default binding:
+This complete example replaces four actions, disables one action, selects `\` as the leader key, and leaves every other action at its default binding:
 
 ```json
 {
   "keybindings": {
+    "leader": "\\",
     "normal": {
       "cursor.up": [["w"], ["<Up>"]],
       "cursor.down": [["s"], ["<Down>"]],
@@ -69,7 +70,7 @@ This complete example replaces four actions, disables one action, and leaves eve
 }
 ```
 
-An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the action. An action absent from the file retains all of its defaults. `<leader>` expands to `<Space>`.
+An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the action. An action absent from the file retains all of its defaults. `<leader>` expands to the `keybindings.leader` value, or `<Space>` when `leader` is omitted.
 
 ## Key notation
 
@@ -77,7 +78,7 @@ An action present in the file replaces all of that action's defaults; bindings a
 - Named keys use angle brackets: `<BS>`, `<Del>`, `<Down>`, `<End>`, `<Enter>`, `<Esc>`, `<Home>`, `<Left>`, `<PageDown>`, `<PageUp>`, `<Right>`, `<Space>`, `<Tab>`, and `<Up>`.
 - Modified keys use `C` for Control, `M` for Option/Alt, `D` for Command/Meta, and `S` for Shift. Combine modifiers in that order, followed by a lowercase printable key or a named key: `<C-p>`, `<D-p>`, `<C-S-k>`, or `<M-Left>`.
 - Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
-- Use `<Space>`, not a literal space. `<leader>` is also accepted as a configurable placeholder for `<Space>`.
+- Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
 
 ## Validation and diagnostics
 

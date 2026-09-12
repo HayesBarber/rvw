@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 
 import { loadKeyboardConfiguration } from './keyboard-configuration.js'
-import { defaultNormalKeymap } from '../actions/application-actions.js'
+import {
+  DEFAULT_LEADER_KEY,
+  defaultNormalKeymap,
+} from '../actions/application-actions.js'
 
 export function useKeyboardConfiguration(vimController) {
   const [state, setState] = useState({
     diagnostic: null,
     keymap: defaultNormalKeymap,
+    leader: DEFAULT_LEADER_KEY,
   })
 
   useEffect(() => {
@@ -20,6 +24,7 @@ export function useKeyboardConfiguration(vimController) {
       setState((current) => ({
         diagnostic: configuration.diagnostic,
         keymap: configuration.keymap ?? current.keymap,
+        leader: configuration.leader ?? current.leader,
       }))
     })
 

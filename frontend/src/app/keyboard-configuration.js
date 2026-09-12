@@ -1,5 +1,6 @@
 import { getConfiguration } from '../review/api.js'
 import {
+  DEFAULT_LEADER_KEY,
   compileApplicationKeymap,
   defaultNormalKeymap,
 } from '../actions/application-actions.js'
@@ -14,7 +15,7 @@ function onlyFields(object, allowed) {
   return Object.keys(object).every((field) => allowed.includes(field))
 }
 
-function configuredNormalKeymap(configuration) {
+function configuredKeyboardConfiguration(configuration) {
   if (!isObject(configuration)) {
     throw new TypeError('User configuration must be a JSON object')
   }
@@ -23,16 +24,25 @@ function configuredNormalKeymap(configuration) {
   }
 
   const keybindings = configuration.keybindings
-  if (keybindings === undefined) return defaultNormalKeymap
+  if (keybindings === undefined) {
+    return { keymap: defaultNormalKeymap, leader: DEFAULT_LEADER_KEY }
+  }
   if (!isObject(keybindings)) {
     throw new TypeError('User configuration keybindings must be a JSON object')
   }
-  if (!onlyFields(keybindings, ['normal'])) {
+  if (!onlyFields(keybindings, ['normal', 'leader'])) {
     throw new TypeError('User configuration keybindings contains an unsupported field')
   }
 
+  const leader = keybindings.leader ?? DEFAULT_LEADER_KEY
+  if (typeof leader !== 'string' || leader.length === 0 || leader === '<leader>') {
+    throw new TypeError('User configuration keybindings.leader must be a concrete non-empty key')
+  }
+
   const normal = keybindings.normal
-  if (normal === undefined) return defaultNormalKeymap
+  if (normal === undefined) {
+    return { keymap: defaultNormalKeymap, leader }
+  }
   if (!isObject(normal)) {
     throw new TypeError('User configuration keybindings.normal must be a JSON object')
   }
@@ -42,12 +52,15 @@ function configuredNormalKeymap(configuration) {
     }
   }
 
-  return Object.freeze(Object.fromEntries(
-    Object.entries(defaultNormalKeymap).map(([action, defaults]) => [
-      action,
-      Object.hasOwn(normal, action) ? normal[action] : defaults,
-    ]),
-  ))
+  return Object.freeze({
+    keymap: Object.freeze(Object.fromEntries(
+      Object.entries(defaultNormalKeymap).map(([action, defaults]) => [
+        action,
+        Object.hasOwn(normal, action) ? normal[action] : defaults,
+      ]),
+    )),
+    leader,
+  })
 }
 
 function frontendDiagnostic(code, message) {
@@ -79,10 +92,11 @@ export function resolveKeyboardConfiguration(snapshot) {
   }
 
   try {
-    const keymap = configuredNormalKeymap(snapshot.configuration)
+    const { keymap, leader } = configuredKeyboardConfiguration(snapshot.configuration)
     return {
-      bindings: compileApplicationKeymap(keymap),
+      bindings: compileApplicationKeymap(keymap, { leader }),
       keymap,
+      leader,
       diagnostic: null,
     }
   } catch (error) {
