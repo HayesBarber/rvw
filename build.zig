@@ -51,6 +51,9 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(cli_tests).step);
 
+    const frontend_tests = b.addSystemCommand(&.{ "npm", "test", "--prefix", "frontend" });
+    test_step.dependOn(&frontend_tests.step);
+
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
     dev.addArtifactArg(server);

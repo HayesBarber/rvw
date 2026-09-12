@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
@@ -40,6 +40,11 @@ export function selectActivePath(visibleFiles, selectedPath, initialPath) {
   if (selectedPath && visiblePaths.has(selectedPath)) return selectedPath
   if (initialPath && visiblePaths.has(initialPath)) return initialPath
   return visibleFiles[0]?.path ?? null
+}
+
+export function selectEmptyReviewTreeMode(overview, treeMode) {
+  if (overview && overview.files.length === 0) return TreeMode.FILES
+  return treeMode
 }
 
 export function useReviewSession({ workspace, dispatchWorkspace }) {
@@ -184,6 +189,17 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     })
     return true
   }, [commentsRequest.data.length, copyRequest])
+
+  const reviewedOverview = useRef(null)
+
+  useEffect(() => {
+    if (!overview || reviewedOverview.current === overview) return
+    reviewedOverview.current = overview
+    const nextMode = selectEmptyReviewTreeMode(overview, workspace.treeMode)
+    if (nextMode !== workspace.treeMode) {
+      changeTreeMode(nextMode)
+    }
+  }, [changeTreeMode, overview, workspace.treeMode])
 
   return {
     activePath,
