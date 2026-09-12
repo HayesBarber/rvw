@@ -16,7 +16,7 @@
 
 ## Installation
 
-Right now (pre v1.0) the only supported installation method is to build from source with Zig 0.16 on MacOS:
+Right now (pre v1.0) the only supported installation method is to build from source (see [CONTRIBUTING.md](./CONTRIBUTING.md) for prerequisites):
 
 ```bash
 zig build

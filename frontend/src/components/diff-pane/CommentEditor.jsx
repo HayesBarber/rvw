@@ -4,6 +4,7 @@ import {
   CommentKeyboardAction,
   commentKeyboardAction,
 } from './comment-keyboard.js'
+import { scrollCommentIntoView } from './scroll-comment-into-view.js'
 
 export default function CommentEditor({ comment, onCancel, onSave }) {
   const [body, setBody] = useState(comment.body)
@@ -14,8 +15,20 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
   const inputId = `edit-comment-${comment.id}`
 
   useLayoutEffect(() => {
-    textareaRef.current?.focus({ preventScroll: true })
-    textareaRef.current?.select()
+    const textarea = textareaRef.current
+    textarea?.focus({ preventScroll: true })
+    textarea?.select()
+
+    if (!textarea) return
+    const scrollContainer = textarea.closest('.diff-scroll')
+    if (!scrollContainer) return
+
+    // An edit form opened near the bottom edge is clipped like a new comment;
+    // scroll it into view once the diff renderer has settled.
+    const frame = requestAnimationFrame(() => {
+      scrollCommentIntoView(scrollContainer, formRef.current)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [])
 
   async function handleSubmit(event) {
