@@ -49,14 +49,6 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const copyRequest = useCopyComments()
   const overview = overviewRequest.data
 
-  useEffect(() => {
-    if (!overview) return
-    dispatchWorkspace({
-      type: 'review_loaded',
-      initialPath: overview.initialPath,
-    })
-  }, [dispatchWorkspace, overview])
-
   const changedPaths = useMemo(
     () => new Set(overview?.files.map((file) => file.path) ?? []),
     [overview],
@@ -184,6 +176,18 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     })
     return true
   }, [commentsRequest.data.length, copyRequest])
+
+  useEffect(() => {
+    if (!overview) return
+    dispatchWorkspace({
+      type: 'review_loaded',
+      initialPath: overview.initialPath,
+    })
+    // no changes to view, swap to files
+    if (!overview.files.length) {
+      changeTreeMode(TreeMode.FILES)
+    }
+  }, [dispatchWorkspace, overview, changeTreeMode])
 
   return {
     activePath,
