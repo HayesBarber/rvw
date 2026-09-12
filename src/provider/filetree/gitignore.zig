@@ -1,7 +1,7 @@
 const std = @import("std");
 const filetree_provider = @import("interface.zig");
 const walk = @import("walk.zig");
-const process = @import("../../provider/git/process.zig");
+const process = @import("../../util/git_process.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;

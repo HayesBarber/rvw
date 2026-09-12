@@ -1,5 +1,5 @@
 const std = @import("std");
-const process = @import("../../git/process.zig");
+const process = @import("../../../util/git_process.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;

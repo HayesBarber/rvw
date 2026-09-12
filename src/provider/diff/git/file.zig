@@ -2,7 +2,7 @@ const std = @import("std");
 const model = @import("../../../app/model.zig");
 const snapshot_module = @import("snapshot.zig");
 const metadata = @import("metadata.zig");
-const process = @import("../../git/process.zig");
+const process = @import("../../../util/git_process.zig");
 const content = @import("content.zig");
 
 const Allocator = std.mem.Allocator;

@@ -114,7 +114,6 @@ test {
     _ = @import("git/snapshot.zig");
     _ = @import("git/metadata.zig");
     _ = @import("git/content.zig");
-    _ = @import("../git/process.zig");
 }
 
 test "Git provider builds a deterministic working-tree review from a temporary repository" {

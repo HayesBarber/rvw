@@ -21,5 +21,5 @@ test {
     _ = @import("provider/file/filesystem.zig");
     _ = @import("provider/filetree/walk.zig");
     _ = @import("provider/filetree/gitignore.zig");
-    _ = @import("provider/git/process.zig");
+    _ = @import("util/git_process.zig");
 }
