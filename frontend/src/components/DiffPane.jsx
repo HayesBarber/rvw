@@ -27,6 +27,7 @@ export default function DiffPane({
   onDeleteComment,
   onFocusFileTree,
   registerActionAdapter,
+  wrapLines,
 }) {
   const cursor = useDiffCursor({ comments, fileDiff, isCursorVisible })
   const commentReview = useDiffComments({
@@ -90,6 +91,7 @@ export default function DiffPane({
       onBeginComment={commentReview.beginRangeComment}
       onPostRender={cursor.handlePostRender}
       onSelectLines={commentReview.selectLines}
+      wrapLines={wrapLines}
     />
   )
 }

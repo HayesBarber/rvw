@@ -115,6 +115,9 @@ const SchemaError = error{
     key_not_string,
     empty_key,
     invalid_utf8_key,
+    diff_not_object,
+    unknown_diff_field,
+    wrap_lines_not_boolean,
 };
 
 fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!ParseResult {
@@ -134,7 +137,18 @@ fn validateConfiguration(value: std.json.Value) SchemaError!void {
         .object => |object| object,
         else => return error.root_not_object,
     };
-    if (!onlyFields(root, &.{"keybindings"})) return error.unknown_root_field;
+    if (!onlyFields(root, &.{ "keybindings", "diff" })) return error.unknown_root_field;
+
+    if (root.get("diff")) |diff_value| {
+        const diff = switch (diff_value) {
+            .object => |object| object,
+            else => return error.diff_not_object,
+        };
+        if (!onlyFields(diff, &.{"wrapLines"})) return error.unknown_diff_field;
+        if (diff.get("wrapLines")) |wrap_lines_value| {
+            if (wrap_lines_value != .bool) return error.wrap_lines_not_boolean;
+        }
+    }
 
     const keybindings_value = root.get("keybindings") orelse return;
     const keybindings = switch (keybindings_value) {
@@ -214,6 +228,9 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.key_not_string => "each keybinding key must be a string",
         error.empty_key => "keybinding keys cannot be empty",
         error.invalid_utf8_key => "keybinding keys must contain valid UTF-8",
+        error.diff_not_object => "user configuration diff must be a JSON object",
+        error.unknown_diff_field => "user configuration diff contains an unsupported field",
+        error.wrap_lines_not_boolean => "user configuration diff.wrapLines must be a boolean",
     };
 }
 
@@ -327,6 +344,53 @@ test "leader diagnostics describe the invalid keybindings field" {
     try std.testing.expectEqualStrings(
         "user configuration keybindings.leader must contain valid UTF-8",
         schemaErrorMessage(error.invalid_utf8_leader),
+    );
+}
+
+test "diff.wrapLines is preserved and schema-validated" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const valid = try parseConfiguration(arena.allocator(),
+        \\{"diff":{"wrapLines":false}}
+    );
+    const configuration = switch (valid) {
+        .configuration => |value| value,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(!configuration.object.get("diff").?.object.get("wrapLines").?.bool);
+
+    const not_object = try parseConfiguration(arena.allocator(),
+        \\{"diff":[]}
+    );
+    try std.testing.expect(not_object == .invalid_schema);
+    try std.testing.expectEqual(error.diff_not_object, not_object.invalid_schema);
+
+    const unknown_field = try parseConfiguration(arena.allocator(),
+        \\{"diff":{"wrap":true}}
+    );
+    try std.testing.expect(unknown_field == .invalid_schema);
+    try std.testing.expectEqual(error.unknown_diff_field, unknown_field.invalid_schema);
+
+    const not_boolean = try parseConfiguration(arena.allocator(),
+        \\{"diff":{"wrapLines":"yes"}}
+    );
+    try std.testing.expect(not_boolean == .invalid_schema);
+    try std.testing.expectEqual(error.wrap_lines_not_boolean, not_boolean.invalid_schema);
+}
+
+test "diff diagnostics describe the invalid diff field" {
+    try std.testing.expectEqualStrings(
+        "user configuration diff must be a JSON object",
+        schemaErrorMessage(error.diff_not_object),
+    );
+    try std.testing.expectEqualStrings(
+        "user configuration diff contains an unsupported field",
+        schemaErrorMessage(error.unknown_diff_field),
+    );
+    try std.testing.expectEqualStrings(
+        "user configuration diff.wrapLines must be a boolean",
+        schemaErrorMessage(error.wrap_lines_not_boolean),
     );
 }
 

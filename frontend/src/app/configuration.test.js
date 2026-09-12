@@ -5,10 +5,11 @@ import {
   defaultApplicationBindings,
 } from '../actions/application-actions.js'
 import {
+  DEFAULT_WRAP_LINES,
   USER_CONFIGURATION_PATH,
-  loadKeyboardConfiguration,
-  resolveKeyboardConfiguration,
-} from './keyboard-configuration.js'
+  loadConfiguration,
+  resolveConfiguration,
+} from './configuration.js'
 import { VimController } from '../vim/machine.js'
 
 function bindingKeys(bindings, action) {
@@ -18,7 +19,7 @@ function bindingKeys(bindings, action) {
 }
 
 test('configured actions replace defaults while missing actions retain them', () => {
-  const result = resolveKeyboardConfiguration({
+  const result = resolveConfiguration({
     configuration: {
       keybindings: {
         normal: {
@@ -45,7 +46,7 @@ test('configured actions replace defaults while missing actions retain them', ()
 })
 
 test('an empty configured sequence list disables its action', () => {
-  const result = resolveKeyboardConfiguration({
+  const result = resolveConfiguration({
     configuration: {
       keybindings: {
         normal: {
@@ -62,7 +63,7 @@ test('an empty configured sequence list disables its action', () => {
 })
 
 test('a configured leader expands <leader> placeholders without mutating the keymap', () => {
-  const result = resolveKeyboardConfiguration({
+  const result = resolveConfiguration({
     configuration: {
       keybindings: { leader: '\\' },
     },
@@ -79,7 +80,7 @@ test('a configured leader expands <leader> placeholders without mutating the key
 })
 
 test('an absent leader resolves to the default <Space>', () => {
-  const result = resolveKeyboardConfiguration({
+  const result = resolveConfiguration({
     configuration: {
       keybindings: {
         normal: { [ApplicationAction.CURSOR_UP]: [['w']] },
@@ -94,6 +95,52 @@ test('an absent leader resolves to the default <Space>', () => {
     bindingKeys(result.bindings, ApplicationAction.FOCUS_FILE_TREE),
     [['<Space>', 'o']],
   )
+})
+
+test('wrapLines defaults to wrapping when the diff section is omitted', () => {
+  const result = resolveConfiguration({
+    configuration: {
+      keybindings: { leader: '<Space>' },
+    },
+    diagnostic: null,
+  })
+
+  assert.equal(result.diagnostic, null)
+  assert.equal(result.wrapLines, DEFAULT_WRAP_LINES)
+  assert.equal(result.wrapLines, true)
+})
+
+test('configured diff.wrapLines controls the startup default', () => {
+  const disabled = resolveConfiguration({
+    configuration: { diff: { wrapLines: false } },
+    diagnostic: null,
+  })
+
+  assert.equal(disabled.diagnostic, null)
+  assert.equal(disabled.wrapLines, false)
+
+  const enabled = resolveConfiguration({
+    configuration: { diff: { wrapLines: true } },
+    diagnostic: null,
+  })
+
+  assert.equal(enabled.diagnostic, null)
+  assert.equal(enabled.wrapLines, true)
+})
+
+test('an invalid diff schema produces a diagnostic without installable bindings', () => {
+  for (const [configuration, message] of [
+    [{ diff: [] }, 'diff must be a JSON object'],
+    [{ diff: { wrap: true } }, 'diff contains an unsupported field'],
+    [{ diff: { wrapLines: 'yes' } }, 'diff.wrapLines must be a boolean'],
+  ]) {
+    const result = resolveConfiguration({ configuration, diagnostic: null })
+
+    assert.equal(result.bindings, null)
+    assert.equal(result.diagnostic.code, 'invalid_configuration')
+    assert.equal(result.diagnostic.path, USER_CONFIGURATION_PATH)
+    assert.match(result.diagnostic.message, new RegExp(message))
+  }
 })
 
 for (const [name, normal, message] of [
@@ -125,26 +172,26 @@ for (const [name, normal, message] of [
   ],
 ]) {
   test(`${name} produce diagnostics without installable bindings`, () => {
-    const result = resolveKeyboardConfiguration({
+    const result = resolveConfiguration({
       configuration: { keybindings: { normal } },
       diagnostic: null,
     })
 
     assert.equal(result.bindings, null)
-    assert.equal(result.diagnostic.code, 'invalid_keybindings')
+    assert.equal(result.diagnostic.code, 'invalid_configuration')
     assert.equal(result.diagnostic.path, USER_CONFIGURATION_PATH)
     assert.match(result.diagnostic.message, new RegExp(message))
   })
 }
 
 test('an invalid leader produces a diagnostic without installable bindings', () => {
-  const result = resolveKeyboardConfiguration({
+  const result = resolveConfiguration({
     configuration: { keybindings: { leader: '' } },
     diagnostic: null,
   })
 
   assert.equal(result.bindings, null)
-  assert.equal(result.diagnostic.code, 'invalid_keybindings')
+  assert.equal(result.diagnostic.code, 'invalid_configuration')
   assert.equal(result.diagnostic.path, USER_CONFIGURATION_PATH)
   assert.match(result.diagnostic.message, /leader/)
 })
@@ -155,14 +202,14 @@ test('backend diagnostics preserve the built-in keymap', () => {
     message: 'user configuration contains malformed JSON',
     path: '/Users/example/.config/rvw/config.json',
   }
-  const result = resolveKeyboardConfiguration({ configuration: {}, diagnostic })
+  const result = resolveConfiguration({ configuration: {}, diagnostic })
 
   assert.equal(result.bindings, null)
   assert.equal(result.diagnostic, diagnostic)
 })
 
 test('configuration transport failures produce an actionable fallback diagnostic', async () => {
-  const result = await loadKeyboardConfiguration(async () => {
+  const result = await loadConfiguration(async () => {
     throw new Error('service unavailable')
   })
 
@@ -176,7 +223,7 @@ test('configuration transport failures produce an actionable fallback diagnostic
 
 test('Vim binding replacement is atomic when a later map is invalid', () => {
   const controller = new VimController({ bindings: defaultApplicationBindings })
-  const valid = resolveKeyboardConfiguration({
+  const valid = resolveConfiguration({
     configuration: {
       keybindings: {
         normal: { [ApplicationAction.CURSOR_UP]: [['w']] },

@@ -22,6 +22,7 @@ export const initialWorkspaceState = Object.freeze({
   finderOpen: false,
   keymapReferenceOpen: false,
   activeSurface: ActiveSurface.FILE_TREE,
+  wrapLines: true,
 })
 
 function validPath(selectedPath, visiblePaths, initialPath) {
@@ -92,6 +93,13 @@ export function workspaceReducer(state, action) {
       return state.keymapReferenceOpen
         ? { ...state, keymapReferenceOpen: false }
         : state
+    case 'wrap_lines_toggled':
+      return { ...state, wrapLines: !state.wrapLines }
+    case 'wrap_lines_set':
+      if (typeof action.wrapLines !== 'boolean') return state
+      return state.wrapLines === action.wrapLines
+        ? state
+        : { ...state, wrapLines: action.wrapLines }
     default:
       return state
   }

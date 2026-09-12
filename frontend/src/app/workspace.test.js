@@ -164,6 +164,35 @@ test('file selection preserves the active tree mode and surface', () => {
   assert.equal(selected.activeSurface, ActiveSurface.DIFF_PANE)
 })
 
+test('text wrapping starts enabled and toggles at runtime', () => {
+  assert.equal(initialWorkspaceState.wrapLines, true)
+
+  const toggled = workspaceReducer(initialWorkspaceState, {
+    type: 'wrap_lines_toggled',
+  })
+  assert.equal(toggled.wrapLines, false)
+  assert.equal(workspaceReducer(toggled, {
+    type: 'wrap_lines_toggled',
+  }).wrapLines, true)
+})
+
+test('configured wrapLines applies the startup default only for real booleans', () => {
+  for (const wrapLines of [true, false]) {
+    const configured = workspaceReducer(initialWorkspaceState, {
+      type: 'wrap_lines_set',
+      wrapLines,
+    })
+    assert.equal(configured.wrapLines, wrapLines)
+  }
+
+  for (const value of [undefined, null, 1, 'yes']) {
+    assert.equal(workspaceReducer(initialWorkspaceState, {
+      type: 'wrap_lines_set',
+      wrapLines: value,
+    }), initialWorkspaceState)
+  }
+})
+
 test('keyboard reference visibility is idempotent and preserves workspace context', () => {
   const opened = workspaceReducer(initialWorkspaceState, {
     type: 'keymap_reference_opened',

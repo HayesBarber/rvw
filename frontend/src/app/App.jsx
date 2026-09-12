@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
@@ -16,7 +16,7 @@ import {
 } from './workspace.js'
 import { useVimController, useVimState } from '../vim/index.js'
 import { useApplicationActions } from './use-application-actions.js'
-import { useKeyboardConfiguration } from './use-keyboard-configuration.js'
+import { useConfiguration } from './use-configuration.js'
 
 export default function App() {
   const [workspace, dispatchWorkspace] = useReducer(
@@ -29,8 +29,14 @@ export default function App() {
   }, [])
   const vimController = useVimController()
   const vimState = useVimState()
-  const keyboardConfiguration = useKeyboardConfiguration(vimController)
+  const keyboardConfiguration = useConfiguration(vimController)
   const configurationDiagnostic = keyboardConfiguration.diagnostic
+  useEffect(() => {
+    dispatchWorkspace({
+      type: 'wrap_lines_set',
+      wrapLines: keyboardConfiguration.wrapLines,
+    })
+  }, [keyboardConfiguration.wrapLines])
   const {
     activePath,
     allFilesRequest,
@@ -242,6 +248,7 @@ export default function App() {
             onDeleteComment={handleDeleteComment}
             onFocusFileTree={focusFileTree}
             registerActionAdapter={registerDiffPaneActions}
+            wrapLines={workspace.wrapLines}
           />
         </div>
       </section>
