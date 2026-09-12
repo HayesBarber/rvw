@@ -21,7 +21,7 @@ export const initialWorkspaceState = Object.freeze({
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
   finderOpen: false,
   keymapReferenceOpen: false,
-  activeSurface: ActiveSurface.FILE_TREE,
+  activeSurface: ActiveSurface.DIFF_PANE,
   wrapLines: true,
 })
 

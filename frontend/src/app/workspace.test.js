@@ -9,6 +9,10 @@ import {
   workspaceReducer,
 } from './workspace.js'
 
+test('initial active surface is the diff pane', () => {
+  assert.equal(initialWorkspaceState.activeSurface, ActiveSurface.DIFF_PANE)
+})
+
 test('file-tree width starts at the existing layout width', () => {
   assert.equal(initialWorkspaceState.fileTreeWidth, 320)
   assert.equal(initialWorkspaceState.fileTreeWidth, FILE_TREE_WIDTH.INITIAL)
