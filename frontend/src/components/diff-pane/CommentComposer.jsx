@@ -5,6 +5,7 @@ import {
   CommentKeyboardAction,
   commentKeyboardAction,
 } from './comment-keyboard.js'
+import { scrollCommentIntoView } from './scroll-comment-into-view.js'
 
 export default function CommentComposer({ target, onCancel, onCreate }) {
   const [body, setBody] = useState('')
@@ -30,6 +31,14 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
       scrollContainer.scrollLeft = scrollPosition.left
       scrollContainer.scrollTop = scrollPosition.top
     }
+
+    // A newly opened form extends below the line it annotates; scroll it into
+    // view once the diff renderer has settled so it isn't clipped at the bottom.
+    if (!scrollContainer) return
+    const frame = requestAnimationFrame(() => {
+      scrollCommentIntoView(scrollContainer, formRef.current)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [])
 
   async function handleSubmit(event) {
