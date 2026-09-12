@@ -61,6 +61,41 @@ test('an empty configured sequence list disables its action', () => {
   assert.deepEqual(result.keymap[ApplicationAction.COPY_COMMENTS], [])
 })
 
+test('a configured leader expands <leader> placeholders without mutating the keymap', () => {
+  const result = resolveKeyboardConfiguration({
+    configuration: {
+      keybindings: { leader: '\\' },
+    },
+    diagnostic: null,
+  })
+
+  assert.equal(result.diagnostic, null)
+  assert.equal(result.leader, '\\')
+  assert.deepEqual(
+    bindingKeys(result.bindings, ApplicationAction.FOCUS_FILE_TREE),
+    [['\\', 'o']],
+  )
+  assert.deepEqual(result.keymap[ApplicationAction.FOCUS_FILE_TREE], [['<leader>', 'o']])
+})
+
+test('an absent leader resolves to the default <Space>', () => {
+  const result = resolveKeyboardConfiguration({
+    configuration: {
+      keybindings: {
+        normal: { [ApplicationAction.CURSOR_UP]: [['w']] },
+      },
+    },
+    diagnostic: null,
+  })
+
+  assert.equal(result.diagnostic, null)
+  assert.equal(result.leader, '<Space>')
+  assert.deepEqual(
+    bindingKeys(result.bindings, ApplicationAction.FOCUS_FILE_TREE),
+    [['<Space>', 'o']],
+  )
+})
+
 for (const [name, normal, message] of [
   [
     'unknown actions',
@@ -101,6 +136,18 @@ for (const [name, normal, message] of [
     assert.match(result.diagnostic.message, new RegExp(message))
   })
 }
+
+test('an invalid leader produces a diagnostic without installable bindings', () => {
+  const result = resolveKeyboardConfiguration({
+    configuration: { keybindings: { leader: '' } },
+    diagnostic: null,
+  })
+
+  assert.equal(result.bindings, null)
+  assert.equal(result.diagnostic.code, 'invalid_keybindings')
+  assert.equal(result.diagnostic.path, USER_CONFIGURATION_PATH)
+  assert.match(result.diagnostic.message, /leader/)
+})
 
 test('backend diagnostics preserve the built-in keymap', () => {
   const diagnostic = {

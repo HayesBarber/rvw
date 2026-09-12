@@ -8,11 +8,11 @@ function sequenceLabel(sequence) {
   return sequence.join(' ')
 }
 
-export default function KeymapReference({ keymap, onClose }) {
+export default function KeymapReference({ keymap, leader, onClose }) {
   const dialogRef = useRef(null)
   const bodyRef = useRef(null)
   const previousFocusRef = useRef(null)
-  const groups = useMemo(() => createKeymapReference(keymap), [keymap])
+  const groups = useMemo(() => createKeymapReference(keymap, leader), [keymap, leader])
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement

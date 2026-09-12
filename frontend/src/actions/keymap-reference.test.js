@@ -35,6 +35,15 @@ test('the keymap reference groups catalog descriptions and effective bindings', 
     byId[ApplicationAction.CURSOR_UP].description,
     applicationActionCatalog[ApplicationAction.CURSOR_UP].description,
   )
+
+  const configured = createKeymapReference(keymap, '\\')
+  const configuredActions = Object.fromEntries(
+    configured.flatMap((group) => group.actions).map((action) => [action.id, action]),
+  )
+  assert.deepEqual(
+    configuredActions[ApplicationAction.FOCUS_FILE_TREE].sequences,
+    [['\\', 'o']],
+  )
 })
 
 test('plain j and k map to one reference scroll step', () => {

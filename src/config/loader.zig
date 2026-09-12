@@ -105,6 +105,9 @@ const SchemaError = error{
     keybindings_not_object,
     unknown_keybindings_field,
     normal_not_object,
+    leader_not_string,
+    empty_leader,
+    invalid_utf8_leader,
     empty_action,
     sequences_not_array,
     sequence_not_array,
@@ -138,7 +141,16 @@ fn validateConfiguration(value: std.json.Value) SchemaError!void {
         .object => |object| object,
         else => return error.keybindings_not_object,
     };
-    if (!onlyFields(keybindings, &.{"normal"})) return error.unknown_keybindings_field;
+    if (!onlyFields(keybindings, &.{ "normal", "leader" })) return error.unknown_keybindings_field;
+
+    if (keybindings.get("leader")) |leader_value| {
+        const leader = switch (leader_value) {
+            .string => |string| string,
+            else => return error.leader_not_string,
+        };
+        if (leader.len == 0) return error.empty_leader;
+        if (!std.unicode.utf8ValidateSlice(leader)) return error.invalid_utf8_leader;
+    }
 
     const normal_value = keybindings.get("normal") orelse return;
     const normal = switch (normal_value) {
@@ -192,6 +204,9 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.keybindings_not_object => "user configuration keybindings must be a JSON object",
         error.unknown_keybindings_field => "user configuration keybindings contains an unsupported field",
         error.normal_not_object => "user configuration keybindings.normal must be a JSON object",
+        error.leader_not_string => "user configuration keybindings.leader must be a string",
+        error.empty_leader => "user configuration keybindings.leader cannot be empty",
+        error.invalid_utf8_leader => "user configuration keybindings.leader must contain valid UTF-8",
         error.empty_action => "user configuration keybindings.normal action identifiers cannot be empty",
         error.sequences_not_array => "each keybindings.normal action must contain a list of key sequences",
         error.sequence_not_array => "each keybinding sequence must be an ordered array of keys",
@@ -271,6 +286,48 @@ test "malformed JSON and invalid keybinding schema are distinct" {
     );
     try std.testing.expect(invalid == .invalid_schema);
     try std.testing.expectEqual(error.sequence_not_array, invalid.invalid_schema);
+}
+
+test "keybindings.leader is preserved and schema-validated" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const valid = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"leader":"\\","normal":{}}}
+    );
+    const configuration = switch (valid) {
+        .configuration => |value| value,
+        else => return error.TestUnexpectedResult,
+    };
+    const leader = configuration.object.get("keybindings").?.object.get("leader").?.string;
+    try std.testing.expectEqualStrings("\\", leader);
+
+    const not_string = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"leader":5}}
+    );
+    try std.testing.expect(not_string == .invalid_schema);
+    try std.testing.expectEqual(error.leader_not_string, not_string.invalid_schema);
+
+    const empty = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"leader":""}}
+    );
+    try std.testing.expect(empty == .invalid_schema);
+    try std.testing.expectEqual(error.empty_leader, empty.invalid_schema);
+}
+
+test "leader diagnostics describe the invalid keybindings field" {
+    try std.testing.expectEqualStrings(
+        "user configuration keybindings.leader must be a string",
+        schemaErrorMessage(error.leader_not_string),
+    );
+    try std.testing.expectEqualStrings(
+        "user configuration keybindings.leader cannot be empty",
+        schemaErrorMessage(error.empty_leader),
+    );
+    try std.testing.expectEqualStrings(
+        "user configuration keybindings.leader must contain valid UTF-8",
+        schemaErrorMessage(error.invalid_utf8_leader),
+    );
 }
 
 test "loader reads and serializes the user configuration file" {
