@@ -19,4 +19,7 @@ test {
     _ = @import("provider/comment/memory.zig");
     _ = @import("provider/diff/git.zig");
     _ = @import("provider/file/filesystem.zig");
+    _ = @import("provider/filetree/walk.zig");
+    _ = @import("provider/filetree/gitignore.zig");
+    _ = @import("provider/git/process.zig");
 }

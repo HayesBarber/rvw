@@ -6,6 +6,7 @@ import {
   deleteComment,
   editComment,
   getConfiguration,
+  getFilesNotIgnored,
 } from './api.js'
 
 test('application close is sent only through the native host boundary', async () => {
@@ -120,6 +121,51 @@ test('configuration uses the equivalent HTTP endpoint in development', async () 
     assert.equal(requests.length, 1)
     assert.equal(requests[0].url, '/api/configuration')
     assert.equal(requests[0].options.headers.Accept, 'application/json')
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
+
+test('not-ignored files use the native bridge request when available', async () => {
+  const requests = []
+  globalThis.window = {
+    webkit: {
+      messageHandlers: {
+        native: {
+          postMessage(request) {
+            requests.push(request)
+            return Promise.resolve(['README.md'])
+          },
+        },
+      },
+    },
+  }
+
+  try {
+    assert.deepEqual(await getFilesNotIgnored(), ['README.md'])
+    assert.deepEqual(requests, [{ type: 'get_files_not_ignored' }])
+  } finally {
+    delete globalThis.window
+  }
+})
+
+test('not-ignored files use the dedicated HTTP endpoint in development', async () => {
+  const requests = []
+  globalThis.window = {}
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options })
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ['README.md'],
+    }
+  }
+
+  try {
+    assert.deepEqual(await getFilesNotIgnored(), ['README.md'])
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0].url, '/api/files/not-ignored')
   } finally {
     delete globalThis.fetch
     delete globalThis.window

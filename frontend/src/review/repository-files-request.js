@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { getFiles } from './api.js'
+import { getFiles, getFilesNotIgnored } from './api.js'
 import { RequestStatus } from './request-state.js'
 
 export function createLatestRequestTracker() {
@@ -19,26 +19,27 @@ export function createLatestRequestTracker() {
   })
 }
 
-export function useRepositoryFiles() {
-  const [request, setRequest] = useState({
-    status: RequestStatus.IDLE,
-    data: [],
-    error: null,
-  })
-  const requestTracker = useRef(createLatestRequestTracker())
+export function createRepositoryFilesHook(fetchPaths) {
+  return function useRepositoryFiles() {
+    const [request, setRequest] = useState({
+      status: RequestStatus.IDLE,
+      data: [],
+      error: null,
+    })
+    const requestTracker = useRef(createLatestRequestTracker())
 
-  useEffect(() => () => {
-    requestTracker.current.invalidate()
-  }, [])
+    useEffect(() => () => {
+      requestTracker.current.invalidate()
+    }, [])
 
-  const load = useCallback(() => {
-    const requestId = requestTracker.current.begin()
+    const load = useCallback(() => {
+const requestId = requestTracker.current.begin()
     setRequest((current) => ({
       status: RequestStatus.LOADING,
       data: current.data,
       error: null,
     }))
-    getFiles()
+    fetchPaths()
       .then((paths) => {
         if (requestTracker.current.isCurrent(requestId)) {
           setRequest({
@@ -59,5 +60,9 @@ export function useRepositoryFiles() {
       })
   }, [])
 
-  return useMemo(() => ({ ...request, load }), [load, request])
+    return useMemo(() => ({ ...request, load }), [load, request])
+  }
 }
+
+export const useRepositoryFiles = createRepositoryFilesHook(getFiles)
+export const useNotIgnoredFiles = createRepositoryFilesHook(getFilesNotIgnored)

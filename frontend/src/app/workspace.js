@@ -9,6 +9,11 @@ export const TreeMode = Object.freeze({
   FILES: 'files',
 })
 
+export const FinderMode = Object.freeze({
+  VISIBLE: 'visible',
+  ALL: 'all',
+})
+
 export const FILE_TREE_WIDTH = Object.freeze({
   INITIAL: 320,
   STEP: 40,
@@ -20,6 +25,7 @@ export const initialWorkspaceState = Object.freeze({
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
   finderOpen: false,
+  finderMode: null,
   keymapReferenceOpen: false,
   activeSurface: ActiveSurface.DIFF_PANE,
   wrapLines: true,
@@ -73,16 +79,25 @@ export function workspaceReducer(state, action) {
         ? state
         : { ...state, fileTreeWidth }
     }
-    case 'finder_opened':
-      return state.finderOpen ? state : { ...state, finderOpen: true }
+    case 'finder_opened': {
+      const finderMode = action.mode === FinderMode.ALL
+        ? FinderMode.ALL
+        : FinderMode.VISIBLE
+      return state.finderOpen
+        ? { ...state, finderMode }
+        : { ...state, finderOpen: true, finderMode }
+    }
     case 'finder_closed':
-      return state.finderOpen ? { ...state, finderOpen: false } : state
+      return state.finderOpen
+        ? { ...state, finderOpen: false, finderMode: null }
+        : state
     case 'finder_file_opened':
       return {
         ...state,
         selectedPath: action.path,
         treeMode: action.changed ? state.treeMode : TreeMode.FILES,
         finderOpen: false,
+        finderMode: null,
         activeSurface: ActiveSurface.DIFF_PANE,
       }
     case 'keymap_reference_opened':

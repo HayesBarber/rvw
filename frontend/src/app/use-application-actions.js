@@ -22,6 +22,7 @@ export function useApplicationActions({
   copyComments,
   navigateFile,
   openFileFinder,
+  openFileFinderAll,
   openKeymapReference,
   selectFile,
 }) {
@@ -105,6 +106,11 @@ export function useApplicationActions({
       openFileFinder()
       return true
     },
+    [ApplicationAction.OPEN_FILE_FINDER_ALL]: () => {
+      if (!reviewAvailable) return false
+      openFileFinderAll()
+      return true
+    },
     [ApplicationAction.OPEN_KEYMAP_REFERENCE]: () => {
       if (!reviewAvailable) return false
       openKeymapReference()
@@ -120,6 +126,7 @@ export function useApplicationActions({
     dispatchWorkspace,
     navigateFile,
     openFileFinder,
+    openFileFinderAll,
     openKeymapReference,
     reviewAvailable,
   ])

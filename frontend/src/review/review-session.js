@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { TreeMode } from '../app/workspace.js'
+import { FinderMode, TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
 import {
   orderedFilePaths,
@@ -9,7 +9,7 @@ import {
 import { useCopyComments } from './comment-copy-request.js'
 import { useReviewComments } from './comments-request.js'
 import { useReviewOverview } from './overview-request.js'
-import { useRepositoryFiles } from './repository-files-request.js'
+import { useRepositoryFiles, useNotIgnoredFiles } from './repository-files-request.js'
 import { RequestStatus } from './request-state.js'
 import { useReviewFile } from './selected-file-request.js'
 
@@ -50,6 +50,7 @@ export function selectEmptyReviewTreeMode(overview, treeMode) {
 export function useReviewSession({ workspace, dispatchWorkspace }) {
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
+  const notIgnoredFilesRequest = useNotIgnoredFiles()
   const commentsRequest = useReviewComments()
   const copyRequest = useCopyComments()
   const overview = overviewRequest.data
@@ -69,6 +70,10 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const filesModeEntries = useMemo(
     () => createFilesModeEntries(overview, allFilesRequest.data),
     [allFilesRequest.data, overview],
+  )
+  const notIgnoredFilesEntries = useMemo(
+    () => createFilesModeEntries(overview, notIgnoredFilesRequest.data),
+    [notIgnoredFilesRequest.data, overview],
   )
   const visibleFiles = useMemo(
     () => selectVisibleFiles(overview, filesModeEntries, workspace.treeMode),
@@ -93,7 +98,20 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   })
 
   const openFileFinder = useCallback(() => {
-    dispatchWorkspace({ type: 'finder_opened' })
+    dispatchWorkspace({
+      type: 'finder_opened',
+      mode: FinderMode.VISIBLE,
+    })
+    if (notIgnoredFilesRequest.status === RequestStatus.IDLE) {
+      notIgnoredFilesRequest.load()
+    }
+  }, [dispatchWorkspace, notIgnoredFilesRequest])
+
+  const openFileFinderAll = useCallback(() => {
+    dispatchWorkspace({
+      type: 'finder_opened',
+      mode: FinderMode.ALL,
+    })
     if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
   }, [allFilesRequest, dispatchWorkspace])
 
@@ -221,7 +239,10 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
       : null,
     filesModeEntries,
     navigateFile,
+    notIgnoredFilesEntries,
+    notIgnoredFilesRequest,
     openFileFinder,
+    openFileFinderAll,
     openFinderFile,
     overview,
     overviewRequest,

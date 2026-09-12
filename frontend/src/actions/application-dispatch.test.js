@@ -19,7 +19,11 @@ test('global actions receive counts and must explicitly report handled', () => {
         return true
       },
       [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
-        calls.push(count)
+        calls.push(['finder', count])
+        return true
+      },
+      [ApplicationAction.OPEN_FILE_FINDER_ALL]: (count) => {
+        calls.push(['finder-all', count])
         return true
       },
       [ApplicationAction.COPY_COMMENTS]: () => undefined,
@@ -28,7 +32,8 @@ test('global actions receive counts and must explicitly report handled', () => {
 
   assert.equal(dispatch(ApplicationAction.CLOSE_APPLICATION), true)
   assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER, 3), true)
-  assert.deepEqual(calls, ['close', 3])
+  assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER_ALL, 2), true)
+  assert.deepEqual(calls, ['close', ['finder', 3], ['finder-all', 2]])
   assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
   assert.equal(dispatch('unknown.action'), false)
 })

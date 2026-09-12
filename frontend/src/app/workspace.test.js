@@ -88,6 +88,41 @@ test('invalid pointer widths are a safe no-op', () => {
   }
 })
 
+test('finder mode defaults to visible and resets when closed or opened', () => {
+  const bare = workspaceReducer(initialWorkspaceState, { type: 'finder_opened' })
+  assert.equal(bare.finderOpen, true)
+  assert.equal(bare.finderMode, 'visible')
+
+  const all = workspaceReducer(bare, {
+    type: 'finder_opened',
+    mode: 'all',
+  })
+  assert.equal(all.finderOpen, true)
+  assert.equal(all.finderMode, 'all')
+
+  const reopenedVisible = workspaceReducer(all, {
+    type: 'finder_opened',
+    mode: 'visible',
+  })
+  assert.equal(reopenedVisible.finderMode, 'visible')
+
+  const closed = workspaceReducer(reopenedVisible, { type: 'finder_closed' })
+  assert.equal(closed.finderOpen, false)
+  assert.equal(closed.finderMode, null)
+
+  const opened = workspaceReducer(closed, {
+    type: 'finder_opened',
+    mode: 'all',
+  })
+  const openedFile = workspaceReducer(opened, {
+    type: 'finder_file_opened',
+    path: 'README.md',
+    changed: false,
+  })
+  assert.equal(openedFile.finderOpen, false)
+  assert.equal(openedFile.finderMode, null)
+})
+
 test('file-tree width survives normal workspace transitions', () => {
   const resized = workspaceReducer(initialWorkspaceState, {
     type: 'file_tree_resized',

@@ -47,6 +47,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
+    if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
     if (std.mem.eql(u8, operation, "get_file")) {
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
         if (path.len == 0) return error.MalformedRequest;
