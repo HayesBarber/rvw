@@ -4,6 +4,11 @@ const macos = @import("build/macos.zig");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    const version = b.option([]const u8, "version", "Application version") orelse "dev";
+    const build_options = b.addOptions();
+    build_options.addOption([]const u8, "version", version);
+
     const httpz = b.dependency("httpz", .{
         .target = target,
         .optimize = optimize,
@@ -49,6 +54,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    cli_tests.root_module.addOptions("build_options", build_options);
     test_step.dependOn(&b.addRunArtifact(cli_tests).step);
 
     const frontend_tests = b.addSystemCommand(&.{ "npm", "test", "--prefix", "frontend" });
@@ -66,6 +72,7 @@ pub fn build(b: *std.Build) void {
             .b = b,
             .optimize = optimize,
             .test_step = test_step,
+            .build_options = build_options,
         });
     }
 }

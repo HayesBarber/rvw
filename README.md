@@ -39,6 +39,7 @@ CLI usage is as follows:
 ```bash
 usage: rvw [DIR] [-r RANGE | --range RANGE]
        rvw -h | --help
+       rvw -v | --version
 ```
 
 ## Usage

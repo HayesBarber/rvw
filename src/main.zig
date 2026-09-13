@@ -1,8 +1,10 @@
 const std = @import("std");
+const build_options = @import("build_options");
 
 const usage =
     \\usage: rvw [DIR] [-r RANGE | --range RANGE]
     \\       rvw -h | --help
+    \\       rvw -v | --version
     \\
 ;
 
@@ -13,6 +15,7 @@ const Options = struct {
 
 const Command = union(enum) {
     help,
+    version,
     launch: Options,
 };
 
@@ -44,6 +47,13 @@ pub fn main(init: std.process.Init) u8 {
             };
             return 0;
         },
+        .version => {
+            std.Io.File.stdout().writer(init.io).print("rvw {s}\n", .{build_options.version}) catch |err| {
+                std.log.err("unable to write version: {t}", .{err});
+                return 1;
+            };
+            return 0;
+        },
         .launch => |options| options,
     };
 
@@ -71,6 +81,11 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
             (std.mem.eql(u8, argument, "-h") or std.mem.eql(u8, argument, "--help")))
         {
             return .help;
+        }
+        if (!positional_only and
+            (std.mem.eql(u8, argument, "-v") or std.mem.eql(u8, argument, "--version")))
+        {
+            return .version;
         }
         if (!positional_only and std.mem.eql(u8, argument, "--")) {
             positional_only = true;
@@ -189,6 +204,10 @@ test "CLI parsing preserves directory, range, help, and positional-only argument
 
     try std.testing.expect((try parseArgs(&.{ "rvw", "--help" })) == .help);
     try std.testing.expect((try parseArgs(&.{ "rvw", "repository", "-h" })) == .help);
+    try std.testing.expect((try parseArgs(&.{ "rvw", "--version" })) == .version);
+    try std.testing.expect((try parseArgs(&.{ "rvw", "-v" })) == .version);
+    try std.testing.expect((try parseArgs(&.{ "rvw", "repository", "--version" })) == .version);
+    try std.testing.expect(build_options.version.len > 0);
 }
 
 test "CLI parsing rejects ambiguous and incomplete launch arguments" {
