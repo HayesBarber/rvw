@@ -44,7 +44,8 @@ workflow.
   job on `macos-latest`.
 - Steps:
   1. `actions/checkout@v4`
-  2. `ziglang/setup-zig@v2` with `version: 0.16.0`
+  2. `mlugg/setup-zig@v2` with `version: 0.16.0` (defaults to the project's
+     `minimum_zig_version` from `build.zig.zon` if omitted)
   3. `actions/setup-node@v4` (Node 22, npm cache on `frontend/package-lock.json`)
   4. `npm ci --prefix frontend`
   5. Extract version: `VERSION="${GITHUB_REF_NAME#v}"` and write to `GITHUB_ENV`
