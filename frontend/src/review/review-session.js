@@ -30,6 +30,20 @@ export function createFilesModeEntries(overview, repositoryPaths) {
     })
 }
 
+/** Keeps an explicitly selected path visible even before the full repo list loads. */
+export function includeSelectedFile(entries, selectedPath) {
+  if (!selectedPath || entries.some((file) => file.path === selectedPath)) {
+    return entries
+  }
+  return [...entries, {
+    path: selectedPath,
+    previousPath: null,
+    status: 'unchanged',
+    additions: null,
+    deletions: null,
+  }]
+}
+
 export function selectVisibleFiles(overview, filesModeEntries, treeMode) {
   return treeMode === TreeMode.FILES
     ? filesModeEntries
@@ -70,8 +84,11 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     [overview],
   )
   const filesModeEntries = useMemo(
-    () => createFilesModeEntries(overview, allFilesRequest.data),
-    [allFilesRequest.data, overview],
+    () => includeSelectedFile(
+      createFilesModeEntries(overview, allFilesRequest.data),
+      workspace.selectedPath,
+    ),
+    [allFilesRequest.data, overview, workspace.selectedPath],
   )
   const notIgnoredFilesEntries = useMemo(
     () => createFilesModeEntries(overview, notIgnoredFilesRequest.data),
@@ -167,12 +184,19 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   ])
 
   const openFinderFile = useCallback((path) => {
+    const changed = changedPaths.has(path)
+    if (
+      !changed &&
+      allFilesRequest.status === RequestStatus.IDLE
+    ) {
+      allFilesRequest.load()
+    }
     dispatchWorkspace({
       type: 'finder_file_opened',
       path,
-      changed: changedPaths.has(path),
+      changed,
     })
-  }, [changedPaths, dispatchWorkspace])
+  }, [allFilesRequest, changedPaths, dispatchWorkspace])
 
   const closeFileFinder = useCallback(() => {
     dispatchWorkspace({ type: 'finder_closed' })

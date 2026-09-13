@@ -4,6 +4,7 @@ import test from 'node:test'
 import { TreeMode } from '../app/workspace.js'
 import {
   createFilesModeEntries,
+  includeSelectedFile,
   selectActivePath,
   selectEmptyReviewTreeMode,
   selectVisibleFiles,
@@ -51,6 +52,25 @@ test('tree mode authoritatively selects changed or repository-wide entries', () 
     selectVisibleFiles(overview, filesModeEntries, TreeMode.FILES),
     filesModeEntries,
   )
+})
+
+test('explicit selections stay visible before the repository list loads', () => {
+  const entries = [changedFile]
+
+  assert.deepEqual(includeSelectedFile(entries, 'src/picked.js'), [
+    changedFile,
+    {
+      path: 'src/picked.js',
+      previousPath: null,
+      status: 'unchanged',
+      additions: null,
+      deletions: null,
+    },
+  ])
+  assert.equal(includeSelectedFile(entries, changedFile.path), entries)
+  assert.equal(includeSelectedFile(entries, null), entries)
+  assert.equal(includeSelectedFile(entries, ''), entries)
+  assert.equal(includeSelectedFile([], 'src/picked.js')?.[0]?.path, 'src/picked.js')
 })
 
 test('empty reviews return FILES mode', () => {
