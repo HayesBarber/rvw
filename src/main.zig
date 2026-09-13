@@ -48,7 +48,12 @@ pub fn main(init: std.process.Init) u8 {
             return 0;
         },
         .version => {
-            std.Io.File.stdout().writer(init.io).print("rvw {s}\n", .{build_options.version}) catch |err| {
+            var buffer: [128]u8 = undefined;
+            const message = std.fmt.bufPrint(&buffer, "rvw {s}\n", .{build_options.version}) catch |err| {
+                std.log.err("unable to write version: {t}", .{err});
+                return 1;
+            };
+            std.Io.File.stdout().writeStreamingAll(init.io, message) catch |err| {
                 std.log.err("unable to write version: {t}", .{err});
                 return 1;
             };
