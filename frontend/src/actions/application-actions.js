@@ -51,6 +51,7 @@ export const ApplicationAction = Object.freeze({
   ADD_FILE_COMMENT: 'comments.add_file',
   EDIT_COMMENT: 'comments.edit',
   DELETE_COMMENT: 'comments.delete',
+  CLEAR_COMMENTS: 'comments.clear',
 })
 
 const actionDefinitions = [
@@ -82,6 +83,7 @@ const actionDefinitions = [
   [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment to the open file.'],
   [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Edit the comment in the active context.'],
   [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Delete the comment in the active context.'],
+  [ApplicationAction.CLEAR_COMMENTS, ActionScope.GLOBAL, ActionGroup.REVIEW, 'Clear all review comments.'],
 ]
 
 /** Stable application actions indexed by their user-configurable identifier. */
@@ -157,6 +159,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'd')),
+  [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
 })
 
 const workspaceSurfaces = Object.freeze([

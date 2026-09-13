@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  clearComments,
   closeApplication,
   deleteComment,
   editComment,
@@ -180,9 +181,13 @@ test('comment mutations use equivalent native bridge requests', async () => {
         native: {
           postMessage(request) {
             requests.push(request)
-            return Promise.resolve(request.type === 'edit_comment'
-              ? { id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } }
-              : { commentId: request.commentId })
+            if (request.type === 'edit_comment') {
+              return Promise.resolve({ id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } })
+            }
+            if (request.type === 'clear_comments') {
+              return Promise.resolve({ commentCount: 2 })
+            }
+            return Promise.resolve({ commentId: request.commentId })
           },
         },
       },
@@ -192,9 +197,11 @@ test('comment mutations use equivalent native bridge requests', async () => {
   try {
     assert.equal((await editComment('comment-1', 'updated')).body, 'updated')
     assert.deepEqual(await deleteComment('comment-1'), { commentId: 'comment-1' })
+    assert.deepEqual(await clearComments(), { commentCount: 2 })
     assert.deepEqual(requests, [
       { type: 'edit_comment', commentId: 'comment-1', body: 'updated' },
       { type: 'delete_comment', commentId: 'comment-1' },
+      { type: 'clear_comments' },
     ])
   } finally {
     delete globalThis.window
@@ -207,11 +214,18 @@ test('comment mutations use ID-addressed HTTP endpoints and methods', async () =
   globalThis.fetch = async (url, options) => {
     requests.push({ url, options })
     const request = JSON.parse(options.body)
+    if (request.type === 'edit_comment') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } }),
+      }
+    }
     return {
       ok: true,
       status: 200,
-      json: async () => request.type === 'edit_comment'
-        ? { id: request.commentId, body: request.body, target: { kind: 'file', path: 'README.md' } }
+      json: async () => request.type === 'clear_comments'
+        ? { commentCount: 2 }
         : { commentId: request.commentId },
     }
   }
@@ -219,14 +233,19 @@ test('comment mutations use ID-addressed HTTP endpoints and methods', async () =
   try {
     await editComment('comment/1', 'updated')
     await deleteComment('comment/1')
+    await clearComments()
     assert.deepEqual(requests.map(({ url, options }) => [url, options.method]), [
       ['/api/comments/comment%2F1', 'PATCH'],
       ['/api/comments/comment%2F1', 'DELETE'],
+      ['/api/comments', 'DELETE'],
     ])
     assert.deepEqual(JSON.parse(requests[0].options.body), {
       type: 'edit_comment',
       commentId: 'comment/1',
       body: 'updated',
+    })
+    assert.deepEqual(JSON.parse(requests[2].options.body), {
+      type: 'clear_comments',
     })
   } finally {
     delete globalThis.fetch

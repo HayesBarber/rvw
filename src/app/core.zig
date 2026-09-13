@@ -112,6 +112,10 @@ pub const Core = struct {
                 try self.comment_provider.deleteComment(self.io, details.comment_id);
                 break :blk .{ .delete_comment_result = .{ .commentId = details.comment_id } };
             },
+            .clear_comments => blk: {
+                const count = try self.comment_provider.clearComments(self.io);
+                break :blk .{ .clear_comments_result = .{ .commentCount = count } };
+            },
         };
     }
 };
@@ -129,6 +133,7 @@ fn operationName(request: model.Request) []const u8 {
         .create_comment => "create_comment",
         .edit_comment => "edit_comment",
         .delete_comment => "delete_comment",
+        .clear_comments => "clear_comments",
     };
 }
 
@@ -424,4 +429,11 @@ test "core edits and deletes only the requested comment with useful errors" {
     try std.testing.expectEqual(@as(usize, 1), remaining.len);
     try std.testing.expectEqualStrings(second.id, remaining[0].id);
     try std.testing.expectEqualStrings("second", remaining[0].body);
+
+    const cleared = (try core.dispatch(.clear_comments)).clear_comments_result;
+    try std.testing.expectEqual(@as(usize, 1), cleared.commentCount);
+    const empty = (try core.dispatch(.get_comments)).comments;
+    try std.testing.expectEqual(@as(usize, 0), empty.len);
+    const cleared_again = (try core.dispatch(.clear_comments)).clear_comments_result;
+    try std.testing.expectEqual(@as(usize, 0), cleared_again.commentCount);
 }

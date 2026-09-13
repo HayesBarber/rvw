@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  clearComments,
   createComment,
   deleteComment,
   editComment,
@@ -25,6 +26,10 @@ export function replaceEditedComment(comments, editedComment) {
 
 export function removeDeletedComment(comments, commentId) {
   return comments.filter((comment) => comment.id !== commentId)
+}
+
+export function clearAllComments(comments) {
+  return comments.length === 0 ? comments : []
 }
 
 export function isCurrentCommentFetch(fetchRevision, mutationRevision) {
@@ -122,8 +127,19 @@ export function useReviewComments() {
     return result
   }, [])
 
+  const clear = useCallback(async (beforeCommit) => {
+    const result = await clearComments()
+    beforeCommit?.()
+    mutationTracker.current.recordMutation()
+    setRequest((current) => ({
+      ...current,
+      data: clearAllComments(current.data),
+    }))
+    return result
+  }, [])
+
   return useMemo(
-    () => ({ ...request, create, edit, remove }),
-    [create, edit, remove, request],
+    () => ({ ...request, create, edit, remove, clear }),
+    [create, clear, edit, remove, request],
   )
 }

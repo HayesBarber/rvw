@@ -218,11 +218,16 @@ textarea {
   color: #63d488;
 }
 
-.copy-status.error {
+.copy-status.error,
+.clear-status.error {
   max-width: 300px;
   overflow: hidden;
   color: #ff6762;
   text-overflow: ellipsis;
+}
+
+.clear-status.success {
+  color: #ffa94d;
 }
 
 .copy-markdown-button {

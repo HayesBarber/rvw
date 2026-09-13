@@ -112,11 +112,27 @@ pub const MemoryProvider = struct {
         return error.UnknownComment;
     }
 
+    fn clearComments(context: *anyopaque, io: Io) !usize {
+        const self: *MemoryProvider = @ptrCast(@alignCast(context));
+        self.mutex.lockUncancelable(io);
+        defer self.mutex.unlock(io);
+
+        const cleared = self.comment_count;
+        for (self.comments[0..cleared]) |comment| {
+            self.allocator.free(comment.id);
+            self.allocator.free(comment.body);
+            freeTarget(self.allocator, comment.target);
+        }
+        self.comment_count = 0;
+        return cleared;
+    }
+
     const vtable: comment_provider.CommentProvider.VTable = .{
         .createComment = createComment,
         .getComments = getComments,
         .editComment = editComment,
         .deleteComment = deleteComment,
+        .clearComments = clearComments,
     };
 };
 
@@ -180,4 +196,31 @@ test "editing and deleting comments preserve identity and isolate stale IDs" {
     try std.testing.expectEqual(@as(usize, 1), remaining.len);
     try std.testing.expectEqualStrings(second.id, remaining[0].id);
     try std.testing.expectEqualStrings("second", remaining[0].body);
+}
+
+test "clearing comments frees storage and reports the removed count" {
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var provider = MemoryProvider.init(std.testing.allocator);
+    defer provider.deinit();
+    const comments = provider.interface();
+
+    _ = try comments.createComment(threaded.io(), "first", .{ .line = .{
+        .path = "src/main.zig",
+        .side = .old,
+        .startLine = 1,
+        .endLine = 2,
+    } });
+    _ = try comments.createComment(threaded.io(), "second", .{ .file = .{
+        .path = "README.md",
+    } });
+
+    const cleared = try comments.clearComments(threaded.io());
+    try std.testing.expectEqual(@as(usize, 2), cleared);
+
+    const remaining = try comments.getComments(threaded.io());
+    try std.testing.expectEqual(@as(usize, 0), remaining.len);
+
+    const cleared_again = try comments.clearComments(threaded.io());
+    try std.testing.expectEqual(@as(usize, 0), cleared_again);
 }

@@ -6,6 +6,7 @@ import {
   orderedFilePaths,
   relativeFilePath,
 } from '../actions/file-navigation-actions.js'
+import { useClearComments } from './comment-clear-request.js'
 import { useCopyComments } from './comment-copy-request.js'
 import { useReviewComments } from './comments-request.js'
 import { useReviewOverview } from './overview-request.js'
@@ -53,6 +54,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const notIgnoredFilesRequest = useNotIgnoredFiles()
   const commentsRequest = useReviewComments()
   const copyRequest = useCopyComments()
+  const clearRequest = useClearComments()
   const overview = overviewRequest.data
 
   useEffect(() => {
@@ -179,20 +181,23 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const createReviewComment = useCallback(async (body, target, beforeCommit) => {
     const comment = await commentsRequest.create(body, target, beforeCommit)
     copyRequest.reset()
+    clearRequest.reset()
     return comment
-  }, [commentsRequest, copyRequest])
+  }, [clearRequest, commentsRequest, copyRequest])
 
   const editReviewComment = useCallback(async (commentId, body, beforeCommit) => {
     const comment = await commentsRequest.edit(commentId, body, beforeCommit)
     copyRequest.reset()
+    clearRequest.reset()
     return comment
-  }, [commentsRequest, copyRequest])
+  }, [clearRequest, commentsRequest, copyRequest])
 
   const deleteReviewComment = useCallback(async (commentId, beforeCommit) => {
     const result = await commentsRequest.remove(commentId, beforeCommit)
     copyRequest.reset()
+    clearRequest.reset()
     return result
-  }, [commentsRequest, copyRequest])
+  }, [clearRequest, commentsRequest, copyRequest])
 
   const copyComments = useCallback(() => {
     if (
@@ -207,6 +212,24 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     })
     return true
   }, [commentsRequest.data.length, copyRequest])
+
+  const clearComments = useCallback(() => {
+    if (
+      commentsRequest.data.length === 0 ||
+      clearRequest.status === RequestStatus.LOADING
+    ) {
+      return false
+    }
+
+    clearRequest.start()
+    commentsRequest.clear().then((result) => {
+      clearRequest.succeed(result)
+      copyRequest.reset()
+    }).catch((error) => {
+      clearRequest.fail(error)
+    })
+    return true
+  }, [clearRequest, commentsRequest, copyRequest])
 
   const reviewedOverview = useRef(null)
 
@@ -223,6 +246,8 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     activePath,
     allFilesRequest,
     canCommentOnFile: Boolean(openFileCommentTarget(fileRequest.data)),
+    clearComments,
+    clearRequest,
     closeFileFinder,
     comments: commentsRequest.data,
     copyComments,

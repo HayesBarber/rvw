@@ -20,6 +20,7 @@ export function useApplicationActions({
   reviewAvailable,
   changeTreeMode,
   copyComments,
+  clearComments,
   navigateFile,
   openFileFinder,
   openFileFinderAll,
@@ -121,7 +122,9 @@ export function useApplicationActions({
       return true
     },
     [ApplicationAction.COPY_COMMENTS]: copyComments,
+    [ApplicationAction.CLEAR_COMMENTS]: clearComments,
   }), [
+    clearComments,
     copyComments,
     dispatchWorkspace,
     navigateFile,
