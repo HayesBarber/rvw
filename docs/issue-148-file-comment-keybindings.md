@@ -57,7 +57,30 @@ Add a synthetic first cursor row for file-level comments, represented as
   `commentAtCursor`, so they pick up the file comment automatically once the
   cursor can land on line 0.
 
-### 4. Tests
+### 4. Visual highlight for the active file comment
+
+`setEditorActiveLine(0)` is impossible, so the file-comment card needs its own
+active indicator. Use the React-driven approach (not imperative class toggling,
+which React re-renders would wipe out).
+
+- `useDiffCursor`:
+  - Add `activeCommentId` React state alongside `activeCommentIdRef`; route every
+    write through one helper that updates both, only calling `setState` when the
+    value actually changes (avoids re-render churn between comment-less rows).
+  - `activateCursor`, `activateRangeCommentContext`, and `setActiveCommentId`
+    all go through the helper.
+  - Return `activeCommentId` in the memoized object and its dep array.
+- `DiffPane`: pass `activeCommentId` into `useDiffComments`.
+- `useDiffComments.renderAnnotation`: pass `active={comment.id === activeCommentId}`
+  to `SavedComment`; add to the callback's dependency array.
+- `SavedComment`: accept an `active` prop; set `data-active=""` on the
+  `<article>` when active.
+- `index.css`: scope the highlight to file comments (line comments already get
+  the diff-line highlight), e.g.
+  `.saved-comment[data-comment-kind='file'][data-active] {
+    outline: 2px solid #69b1ff; outline-offset: 1px; }`
+
+### 5. Tests
 
 - `frontend/src/actions/diff-cursor-actions.test.js`:
   - file row prepend (diff + file views);
@@ -70,17 +93,20 @@ Add a synthetic first cursor row for file-level comments, represented as
 - `frontend/src/actions/comment-actions.test.js`:
   - `commentAtCursor` returns the file comment at line 0;
   - `commentTargetAtCursor` at line 0 → `null`.
+- Visual highlight:
+  - `useDiffCursor` exposes reactive `activeCommentId` that updates on cursor
+    activation and is stable across comment-less rows;
+  - `SavedComment` sets `data-active` for the active comment.
 
 ## Behavior
 
 - With a file comment present, `gg` lands on it; `k`/`j` move between it and
-  line 1; `e` opens the editor and `dd` deletes — no keymap changes needed.
+  line 1; the card is visibly highlighted; `e` opens the editor and `dd` deletes
+  — no keymap changes needed.
 - No file-level comment → rows unchanged, zero behavior shift.
 
-## Loose ends (optional, not part of the minimal fix)
+## Known limitations (accepted for MVP)
 
-- **Visual highlight**: the active file comment will not be highlighted (line 0
-  has no diff-line highlight). Rely on scroll + card visibility, or add an
-  optional "active" class passed through `SavedComment`.
 - **Multiple file comments**: `commentAtCursor` matches only the first; the
-  cursor lands on a single row.
+  cursor lands on a single row. Fine for now — file comments are not
+  distinguished from one another in the UI today anyway.
