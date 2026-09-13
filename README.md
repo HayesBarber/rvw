@@ -16,7 +16,7 @@
 
 ## Installation
 
-Via Homebrew (recommended):
+Via Homebrew:
 
 ```bash
 brew install --cask HayesBarber/tap/rvw

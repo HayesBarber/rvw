@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   release:
+    name: Build and publish
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
