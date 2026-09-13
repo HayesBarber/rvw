@@ -33,6 +33,7 @@ export default function DiffPane({
   const commentReview = useDiffComments({
     comments,
     cursor,
+    activeCommentId: cursor.activeCommentId,
     fileDiff,
     onCreateComment,
     onDeleteComment,

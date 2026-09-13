@@ -1,4 +1,5 @@
 import { ApplicationAction } from './application-actions.js'
+import { scrollCommentIntoView } from '../components/diff-pane/scroll-comment-into-view.js'
 
 // Adapts diff cursor operations to the application action vocabulary.
 
@@ -14,6 +15,13 @@ export function syncDiffCursorPresentation(instance, cursor, visible) {
   if (!visible || !cursor) {
     instance.setEditorActiveLine(null)
     return false
+  }
+
+  // The file-comment row is not a real line; clearing the editor line is the
+  // only safe presentation, but the cursor still counts as handled.
+  if (cursor.lineNumber === 0) {
+    instance.setEditorActiveLine(null)
+    return true
   }
 
   instance.setEditorActiveLine(cursor.lineNumber, { side: cursor.side })
@@ -67,6 +75,12 @@ function fileLineCount(contents) {
   return newlineCount + (contents.endsWith('\n') ? 0 : 1)
 }
 
+const fileCommentRow = Object.freeze({
+  index: -1,
+  additions: 0,
+  fileCommentRow: true,
+})
+
 function createFileRows(instance) {
   const count = fileLineCount(instance.file?.contents ?? '')
   return Array.from({ length: count }, (_, index) => ({
@@ -115,10 +129,12 @@ function createDiffRows(instance) {
 }
 
 /** Build the currently navigable visual rows from a public diffs render instance. */
-export function createDiffCursorRows(instance) {
+export function createDiffCursorRows(instance, options) {
   if (!instance) return []
-  if (instance.type === 'file') return createFileRows(instance)
-  if (instance.type === 'file-diff') return createDiffRows(instance)
+  const prependFileComment = (rows) =>
+    options?.includeFileComment ? [fileCommentRow, ...rows] : rows
+  if (instance.type === 'file') return prependFileComment(createFileRows(instance))
+  if (instance.type === 'file-diff') return prependFileComment(createDiffRows(instance))
   return []
 }
 
@@ -178,6 +194,8 @@ function editorViewportHeight(instance) {
 }
 
 function positionedCursorForRow(instance, row, preferredSide) {
+  if (row?.fileCommentRow) return null
+
   const cursor = cursorForRow(row, preferredSide)
   if (!cursor) return null
 
@@ -194,10 +212,13 @@ export function moveDiffCursorByPage(instance, rows, cursor, direction, count = 
   if (currentIndex === -1) return cursorForRow(rows[0], cursor?.side)
 
   const viewportHeight = editorViewportHeight(instance)
-  const current = positionedCursorForRow(instance, rows[currentIndex], cursor?.side)
-  if (viewportHeight <= 0 || !current) return null
+  if (viewportHeight <= 0) return null
 
-  const targetCenter = current.center
+  const current = positionedCursorForRow(instance, rows[currentIndex], cursor?.side)
+  if (!current && !rows[currentIndex]?.fileCommentRow) return null
+
+  // The file-comment row sits at content top, so unpositioned here means top.
+  const targetCenter = (current?.center ?? 0)
     + direction * viewportHeight / 2 * normalizedCount(count)
   let closest = null
 
@@ -219,7 +240,21 @@ export function moveDiffCursorByPage(instance, rows, cursor, direction, count = 
   return closest?.cursor ?? cursor
 }
 
+function scrollFileCommentIntoView(node) {
+  const container = node?.closest?.('.diff-scroll')
+  const element = container?.querySelector?.('.saved-comment[data-comment-kind="file"]')
+  if (container && element) return scrollCommentIntoView(container, element)
+  // The card is always the first content, so its absence still means "top".
+  if (container?.scrollTo) {
+    container.scrollTo({ top: 0 })
+    return true
+  }
+  return false
+}
+
 export function scrollDiffCursorIntoView(instance, node, cursor) {
+  if (cursor?.lineNumber === 0) return scrollFileCommentIntoView(node)
+
   const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
   const viewport = instance?.getEditorViewport?.()
   if (!position || position.height <= 0 || !viewport || !node) return false
@@ -252,6 +287,8 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
 /** Center the current diff cursor without changing its active row or selection. */
 export function centerDiffCursor(instance, node, cursor) {
   if (!cursor) return false
+
+  if (cursor.lineNumber === 0) return scrollDiffCursorIntoView(instance, node, cursor)
 
   const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
   const viewport = instance?.getEditorViewport?.()

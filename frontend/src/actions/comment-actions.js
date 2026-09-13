@@ -46,6 +46,12 @@ export function commentTargetAtCursor(path, cursor, rows) {
 /** Finds the line comment attached to the active diff cursor. */
 export function commentAtCursor(comments, path, cursor) {
   if (!path || !cursor) return null
+  if (cursor.lineNumber === 0) {
+    return comments.find((comment) => (
+      comment.target.kind === 'file' &&
+      comment.target.path === path
+    )) ?? null
+  }
   const side = cursor.side === 'deletions' ? 'old' : 'new'
   return comments.find((comment) => (
     comment.target.kind === 'line' &&

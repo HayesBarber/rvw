@@ -122,6 +122,31 @@ test('unchanged files expose every line and empty files stay unhandled', () => {
   assert.deepEqual(createDiffCursorRows({ type: 'unresolved-file' }), [])
 })
 
+test('file comment rows are prepended when requested and left out otherwise', () => {
+  const diffRows = [
+    { index: -1, additions: 0, fileCommentRow: true },
+    { index: 0, additions: 1, deletions: 1 },
+  ]
+
+  assert.deepEqual(createDiffCursorRows(diffInstance('old\n', 'new\n'), {
+    includeFileComment: true,
+  }), diffRows)
+  assert.deepEqual(createDiffCursorRows({
+    type: 'file',
+    file: { contents: 'first\n' },
+  }, { includeFileComment: true }), [
+    { index: -1, additions: 0, fileCommentRow: true },
+    { index: 0, additions: 1 },
+  ])
+  assert.deepEqual(createDiffCursorRows(diffInstance('old\n', 'new\n'), {}), [
+    { index: 0, additions: 1, deletions: 1 },
+  ])
+  assert.equal(createDiffCursorRows(diffInstance('old\n', 'new\n'), {
+    includeFileComment: false,
+  })[0].fileCommentRow, undefined)
+  assert.deepEqual(createDiffCursorRows(null, { includeFileComment: true }), [])
+})
+
 test('diff rows skip collapsed context and include it after expansion', () => {
   const oldContents = Array.from({ length: 14 }, (_, index) => `line ${index + 1}`).join('\n')
   const newContents = oldContents.replace('line 8', 'changed 8')
@@ -401,4 +426,126 @@ test('scrolling uses public line positions and keeps visible rows stationary', (
     side: DiffCursorSide.ADDITIONS,
   }), true)
   assert.deepEqual(scrolls, [{ top: 170 }])
+})
+
+test('cursor movement moves to, between, and from the file comment row', () => {
+  const rows = [
+    { index: -1, additions: 0, fileCommentRow: true },
+    { index: 0, additions: 1, deletions: 1 },
+    { index: 1, additions: 2, deletions: 2 },
+  ]
+
+  assert.deepEqual(moveDiffCursor(rows, null, 1), {
+    lineNumber: 0,
+    side: DiffCursorSide.ADDITIONS,
+  })
+  assert.deepEqual(moveDiffCursor(rows, {
+    lineNumber: 0,
+    side: DiffCursorSide.ADDITIONS,
+  }, 1), { lineNumber: 1, side: DiffCursorSide.ADDITIONS })
+  assert.deepEqual(moveDiffCursor(rows, {
+    lineNumber: 1,
+    side: DiffCursorSide.ADDITIONS,
+  }, 1), { lineNumber: 2, side: DiffCursorSide.ADDITIONS })
+  assert.deepEqual(moveDiffCursor(rows, {
+    lineNumber: 2,
+    side: DiffCursorSide.ADDITIONS,
+  }, -2), { lineNumber: 0, side: DiffCursorSide.ADDITIONS })
+})
+
+test('half-page movement from the file comment row synthesizes a content-top center', () => {
+  const rows = [
+    { index: -1, additions: 0, fileCommentRow: true },
+    { index: 0, additions: 1 },
+    { index: 1, additions: 2 },
+    { index: 2, additions: 3 },
+  ]
+  const cursor = { lineNumber: 0, side: DiffCursorSide.ADDITIONS }
+  const instance = {
+    getEditorViewport: () => ({ nodeType: 1, clientHeight: 100 }),
+    getLinePosition(lineNumber) {
+      if (lineNumber === 0) return undefined
+      return { top: (lineNumber - 1) * 20, height: 20 }
+    },
+  }
+
+  assert.deepEqual(moveDiffCursorByPage(instance, rows, cursor, 1), {
+    lineNumber: 3,
+    side: DiffCursorSide.ADDITIONS,
+  })
+  assert.equal(moveDiffCursorByPage(instance, rows, cursor, -1), cursor)
+  assert.deepEqual(moveDiffCursorByPage({
+    getEditorViewport: () => ({ nodeType: 1, clientHeight: 100 }),
+    getLinePosition: (lineNumber) => ({ top: (lineNumber - 1) * 20, height: 20 }),
+  }, rows, { lineNumber: 1, side: DiffCursorSide.ADDITIONS }, -1), {
+    lineNumber: 1,
+    side: DiffCursorSide.ADDITIONS,
+  })
+})
+
+test('scrolling the file comment row reveals the file comment card', () => {
+  const scrolls = []
+  const container = {
+    scrollTop: 100,
+    clientHeight: 300,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const element = { getBoundingClientRect: () => ({ top: 500, height: 120 }) }
+  container.querySelector = (selector) => (
+    selector === '.saved-comment[data-comment-kind="file"]' ? element : null
+  )
+  const node = { closest: (selector) => (
+    selector === '.diff-scroll' ? container : null
+  ) }
+  const cursor = { lineNumber: 0, side: DiffCursorSide.ADDITIONS }
+
+  assert.equal(scrollDiffCursorIntoView(null, node, cursor), true)
+  assert.deepEqual(scrolls, [{ top: 444 }])
+
+  container.querySelector = () => null
+  assert.equal(scrollDiffCursorIntoView(null, node, cursor), true)
+  assert.deepEqual(scrolls, [{ top: 444 }, { top: 0 }])
+
+  node.closest = () => null
+  assert.equal(scrollDiffCursorIntoView(null, node, cursor), false)
+})
+
+test('centering the file comment row delegates to the scroll-into-view path', () => {
+  const scrolls = []
+  const container = {
+    scrollTop: 100,
+    clientHeight: 300,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+    querySelector: () => ({ getBoundingClientRect: () => ({ top: 500, height: 120 }) }),
+  }
+  const node = { closest: () => container }
+  const cursor = { lineNumber: 0, side: DiffCursorSide.ADDITIONS }
+
+  assert.equal(centerDiffCursor(null, node, cursor), true)
+  assert.deepEqual(scrolls, [{ top: 444 }])
+})
+
+test('line-zero cursor presentation clears the editor line while staying handled', () => {
+  const writes = []
+  const instance = {
+    setEditorActiveLine: (...args) => writes.push(args),
+  }
+  const cursor = { lineNumber: 0, side: DiffCursorSide.ADDITIONS }
+
+  assert.equal(syncDiffCursorPresentation(instance, cursor, true), true)
+  assert.equal(syncDiffCursorPresentation(instance, cursor, false), false)
+  assert.deepEqual(writes, [[null], [null]])
+})
+
+test('cursor reconciliation preserves the file comment row cursor', () => {
+  const rows = [
+    { index: -1, additions: 0, fileCommentRow: true },
+    { index: 0, additions: 3, deletions: 4 },
+  ]
+  const existing = { lineNumber: 0, side: DiffCursorSide.ADDITIONS }
+
+  assert.equal(reconcileDiffCursor(rows, existing), existing)
+  assert.deepEqual(reconcileDiffCursor(rows, null), existing)
 })
