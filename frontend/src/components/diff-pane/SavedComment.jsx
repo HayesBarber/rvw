@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react'
 import CommentEditor from './CommentEditor.jsx'
 
 export default function SavedComment({
+  active,
   comment,
   deleteError,
   deleting,
@@ -31,6 +32,7 @@ export default function SavedComment({
   return (
     <article
       className="saved-comment"
+      data-active={active ? '' : undefined}
       data-comment-kind={comment.target.kind}
       tabIndex={0}
       onFocus={() => onActivate(comment.id)}

@@ -41,6 +41,17 @@ test('active cursor resolution respects path, side, and target line', () => {
   }), null)
 })
 
+test('line-zero cursors resolve to the file comment for the current path', () => {
+  assert.equal(commentAtCursor(comments, 'README.md', {
+    side: 'additions',
+    lineNumber: 0,
+  }), comments[1])
+  assert.equal(commentAtCursor(comments, 'src/main.zig', {
+    side: 'additions',
+    lineNumber: 0,
+  }), null)
+})
+
 test('line comment targets preserve the current path, side, and cursor line', () => {
   const rows = [{ additions: 8, deletions: 7 }]
 
@@ -77,6 +88,16 @@ test('line comment targets reject unavailable and stale cursor contexts', () => 
     side: 'unknown',
     lineNumber: 4,
   }, [{ additions: 4 }]), null)
+})
+
+test('line comment targets reject the file comment row cursor', () => {
+  const cursor = { side: 'additions', lineNumber: 0 }
+
+  assert.equal(commentTargetAtCursor('README.md', cursor, [{
+    additions: 0,
+    fileCommentRow: true,
+  }]), null)
+  assert.equal(commentTargetAtCursor('README.md', cursor, []), null)
 })
 
 test('file comment targets contain only the current repository path', () => {

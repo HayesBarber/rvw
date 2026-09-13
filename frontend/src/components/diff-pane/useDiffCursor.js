@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import {
   centerDiffCursor,
@@ -19,10 +26,18 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const cursorRowsRef = useRef([])
   const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
+  const [activeCommentId, setActiveCommentIdState] = useState(null)
   const activeCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
   const cursorVisibleRef = useRef(isCursorVisible)
+
+  const updateActiveCommentId = useCallback((commentId) => {
+    activeCommentIdRef.current = commentId
+    setActiveCommentIdState((previous) => (
+      previous === commentId ? previous : commentId
+    ))
+  }, [])
 
   useEffect(() => {
     commentsRef.current = comments
@@ -39,15 +54,15 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     if (!instance || !node || !cursor) return false
 
     cursorRef.current = cursor
-    activeCommentIdRef.current = commentAtCursor(
+    updateActiveCommentId(commentAtCursor(
       commentsRef.current,
       pathRef.current,
       cursor,
-    )?.id ?? null
+    )?.id ?? null)
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
     if (scroll) scrollDiffCursorIntoView(instance, node, cursor)
     return true
-  }, [])
+  }, [updateActiveCommentId])
 
   useLayoutEffect(() => {
     cursorVisibleRef.current = isCursorVisible
@@ -88,7 +103,11 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
 
     renderedFileRef.current = node
     renderInstanceRef.current = instance
-    const rows = createDiffCursorRows(instance)
+    const includeFileComment = commentsRef.current.some((comment) => (
+      comment.target.kind === 'file' &&
+      comment.target.path === pathRef.current
+    ))
+    const rows = createDiffCursorRows(instance, { includeFileComment })
     const cursor = reconcileDiffCursor(rows, cursorRef.current)
     cursorRowsRef.current = rows
     cursorRef.current = cursor
@@ -117,7 +136,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
 
   const activateRangeCommentContext = useCallback((range) => {
     if (!fileDiff || !range) {
-      activeCommentIdRef.current = null
+      updateActiveCommentId(null)
       return
     }
 
@@ -131,12 +150,12 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
       side: normalized.annotationSide,
     }
     cursorRef.current = cursor
-    activeCommentIdRef.current = commentAtCursor(
+    updateActiveCommentId(commentAtCursor(
       commentsRef.current,
       fileDiff.path,
       cursor,
-    )?.id ?? null
-  }, [fileDiff])
+    )?.id ?? null)
+  }, [fileDiff, updateActiveCommentId])
 
   const getActiveComment = useCallback(() => commentsRef.current.find(
     (comment) => comment.id === activeCommentIdRef.current,
@@ -149,14 +168,15 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   ), [])
 
   const setActiveCommentId = useCallback((commentId) => {
-    activeCommentIdRef.current = commentId
-  }, [])
+    updateActiveCommentId(commentId)
+  }, [updateActiveCommentId])
 
   const getCursor = useCallback(() => cursorRef.current, [])
   const getInstance = useCallback(() => renderInstanceRef.current, [])
   const getRows = useCallback(() => cursorRowsRef.current, [])
 
   return useMemo(() => ({
+    activeCommentId,
     activateCursor,
     activateRangeCommentContext,
     centerCursor,
@@ -169,6 +189,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     handlePostRender,
     setActiveCommentId,
   }), [
+    activeCommentId,
     activateCursor,
     activateRangeCommentContext,
     centerCursor,

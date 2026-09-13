@@ -8,6 +8,7 @@ import {
 } from './comment-annotations.js'
 
 export default function useDiffComments({
+  activeCommentId,
   comments,
   cursor,
   fileDiff,
@@ -142,6 +143,7 @@ export default function useDiffComments({
     return (
       <SavedComment
         comment={comment}
+        active={comment.id === activeCommentId}
         deleteError={deleteError?.commentId === comment.id ? deleteError.message : null}
         deleting={deletingCommentId === comment.id}
         editing={editingCommentId === comment.id}
@@ -153,6 +155,7 @@ export default function useDiffComments({
       />
     )
   }, [
+    activeCommentId,
     activateComment,
     beginEditComment,
     cancelComment,

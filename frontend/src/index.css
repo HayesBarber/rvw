@@ -669,6 +669,11 @@ textarea {
   outline-offset: 1px;
 }
 
+.saved-comment[data-active] {
+  outline: 2px solid #69b1ff;
+  outline-offset: 1px;
+}
+
 .saved-comment > p {
   margin: 0;
   white-space: pre-wrap;
