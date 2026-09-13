@@ -4,6 +4,7 @@ pub const Context = struct {
     b: *std.Build,
     optimize: std.builtin.OptimizeMode,
     test_step: *std.Build.Step,
+    build_options: *std.Build.Step.Options,
 };
 
 const AppArtifacts = struct {
@@ -56,6 +57,7 @@ fn addAppArtifacts(context: Context) AppArtifacts {
             .optimize = context.optimize,
         }),
     });
+    cli.root_module.addOptions("build_options", context.build_options);
 
     const frontend = b.addSystemCommand(&.{ "node", "build/build-frontend.mjs" });
     const swift = b.addSystemCommand(&.{
