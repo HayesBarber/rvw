@@ -208,6 +208,19 @@ export async function deleteComment(commentId) {
 }
 
 /**
+ * Permanently clears every comment for the active review.
+ * @returns {Promise<{ commentCount: number }>}
+ */
+export async function clearComments() {
+  const request = { type: 'clear_comments' }
+  return requestJson('/api/comments', request, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
+/**
  * Copies every current review comment as structured Markdown.
  * @returns {Promise<{ commentCount: number }>}
  */

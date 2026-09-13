@@ -74,6 +74,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
         const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
         return .{ .delete_comment = .{ .comment_id = comment_id } };
     }
+    if (std.mem.eql(u8, operation, "clear_comments")) return .clear_comments;
     return error.UnknownOperation;
 }
 
@@ -147,4 +148,14 @@ test "comment mutation requests decode IDs and edited bodies" {
     defer parsed_delete.deinit();
     const delete = try decodeRequestValue(parsed_delete.value);
     try std.testing.expectEqualStrings("comment-7", delete.delete_comment.comment_id);
+
+    var parsed_clear = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"clear_comments\"}",
+        .{},
+    );
+    defer parsed_clear.deinit();
+    const clear = try decodeRequestValue(parsed_clear.value);
+    try std.testing.expectEqual(model.Request.clear_comments, clear);
 }

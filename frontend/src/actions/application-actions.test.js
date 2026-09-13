@@ -86,6 +86,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_FILE_COMMENT], [['C']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.EDIT_COMMENT], [['e']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DELETE_COMMENT], [['d', 'd']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.CLEAR_COMMENTS], [['d', 'a']])
 })
 
 test('contextual bindings are inferred from action scopes', () => {

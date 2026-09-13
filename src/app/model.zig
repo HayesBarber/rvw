@@ -203,6 +203,7 @@ pub const Request = union(enum) {
         body: []const u8,
     },
     delete_comment: struct { comment_id: []const u8 },
+    clear_comments,
 };
 
 pub const CopyCommentsResult = struct {
@@ -211,6 +212,10 @@ pub const CopyCommentsResult = struct {
 
 pub const DeleteCommentResult = struct {
     commentId: []const u8,
+};
+
+pub const ClearCommentsResult = struct {
+    commentCount: usize,
 };
 
 pub const Response = union(enum) {
@@ -223,6 +228,7 @@ pub const Response = union(enum) {
     comment: Comment,
     delete_comment_result: DeleteCommentResult,
     copy_comments_result: CopyCommentsResult,
+    clear_comments_result: ClearCommentsResult,
 };
 
 pub const AppError = error{

@@ -12,6 +12,7 @@ pub const CommentProvider = struct {
         getComments: *const fn (*anyopaque, Io) anyerror![]const model.Comment,
         editComment: *const fn (*anyopaque, Io, []const u8, []const u8) anyerror!model.Comment,
         deleteComment: *const fn (*anyopaque, Io, []const u8) anyerror!void,
+        clearComments: *const fn (*anyopaque, Io) anyerror!usize,
     };
 
     /// The provider owns the returned comment and any strings within it.
@@ -42,5 +43,10 @@ pub const CommentProvider = struct {
 
     pub fn deleteComment(self: CommentProvider, io: Io, comment_id: []const u8) !void {
         return self.vtable.deleteComment(self.context, io, comment_id);
+    }
+
+    /// Removes every comment and returns the number that were cleared.
+    pub fn clearComments(self: CommentProvider, io: Io) !usize {
+        return self.vtable.clearComments(self.context, io);
     }
 };

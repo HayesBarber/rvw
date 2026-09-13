@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  clearAllComments,
   createCommentMutationTracker,
   isCurrentCommentFetch,
   removeDeletedComment,
@@ -34,6 +35,11 @@ test('successful edits replace only the intended comment', () => {
 test('successful deletes remove only the intended comment', () => {
   assert.deepEqual(removeDeletedComment(original, 'comment-1'), [original[1]])
   assert.deepEqual(removeDeletedComment(original, 'stale-comment'), original)
+})
+
+test('clearing removes every comment', () => {
+  assert.deepEqual(clearAllComments(original), [])
+  assert.deepEqual(clearAllComments([]), [])
 })
 
 test('a fetch started before a successful mutation cannot restore stale state', () => {

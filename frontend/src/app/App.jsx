@@ -5,6 +5,7 @@ import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeyboardStatus from '../components/KeyboardStatus.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
+import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { useReviewSession } from '../review/review-session.js'
@@ -42,6 +43,8 @@ export default function App() {
     activePath,
     allFilesRequest,
     canCommentOnFile,
+    clearComments: handleClearComments,
+    clearRequest,
     closeFileFinder,
     comments,
     copyComments: handleCopyComments,
@@ -66,6 +69,7 @@ export default function App() {
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace })
   const copyMessage = copyRequestMessage(copyRequest)
+  const clearMessage = clearRequestMessage(clearRequest)
   const closeKeymapReference = () => {
     dispatchWorkspace({ type: 'keymap_reference_closed' })
   }
@@ -92,6 +96,7 @@ export default function App() {
     reviewAvailable: Boolean(overview),
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
+    clearComments: handleClearComments,
     navigateFile,
     openFileFinder,
     openFileFinderAll,
@@ -218,6 +223,14 @@ export default function App() {
             >
               Find file
             </button>
+            {clearMessage && (
+              <span
+                className={`clear-status ${clearRequest.status}`}
+                role={clearRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
+              >
+                {clearMessage}
+              </span>
+            )}
             {copyMessage && (
               <span
                 className={`copy-status ${copyRequest.status}`}
