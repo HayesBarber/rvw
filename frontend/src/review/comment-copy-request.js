@@ -1,66 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { copyCommentsAsMarkdown } from './api.js'
-import { RequestStatus } from './request-state.js'
+import { transientRequestMessage, useTransientRequest } from './transient-request.js'
 
-const idleCopyRequest = Object.freeze({
-  status: RequestStatus.IDLE,
-  data: null,
-  error: null,
+export const copyRequestMessage = (request) => transientRequestMessage(request, {
+  inProgress: 'Copying…',
+  completed: 'Copied',
 })
 
-export const COPY_MESSAGE_TIMEOUT_MS = 3_000
-
-export function copyRequestMessage(request) {
-  if (request.status === RequestStatus.LOADING) return 'Copying…'
-  if (request.status === RequestStatus.ERROR) return request.error
-  if (request.status !== RequestStatus.SUCCESS) return ''
-  const suffix = request.data.commentCount === 1 ? 'comment' : 'comments'
-  return `Copied ${request.data.commentCount} ${suffix}`
-}
-
 export function useCopyComments() {
-  const [request, setRequest] = useState(idleCopyRequest)
-
-  useEffect(() => {
-    if (request.status !== RequestStatus.SUCCESS) return undefined
-
-    const timeout = setTimeout(() => {
-      setRequest(idleCopyRequest)
-    }, COPY_MESSAGE_TIMEOUT_MS)
-    return () => clearTimeout(timeout)
-  }, [request.status])
+  const transient = useTransientRequest()
 
   const copy = useCallback(async () => {
-    setRequest({
-      status: RequestStatus.LOADING,
-      data: null,
-      error: null,
-    })
+    transient.start()
     try {
       const result = await copyCommentsAsMarkdown()
-      setRequest({
-        status: RequestStatus.SUCCESS,
-        data: result,
-        error: null,
-      })
+      transient.succeed(result)
       return result
     } catch (error) {
-      setRequest({
-        status: RequestStatus.ERROR,
-        data: null,
-        error: error.message,
-      })
+      transient.fail(error)
       throw error
     }
-  }, [])
-
-  const reset = useCallback(() => {
-    setRequest(idleCopyRequest)
-  }, [])
+  }, [transient])
 
   return useMemo(
-    () => ({ ...request, copy, reset }),
-    [copy, request, reset],
+    () => ({ ...transient, copy }),
+    [copy, transient],
   )
 }
