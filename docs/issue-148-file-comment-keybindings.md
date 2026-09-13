@@ -75,9 +75,9 @@ which React re-renders would wipe out).
   to `SavedComment`; add to the callback's dependency array.
 - `SavedComment`: accept an `active` prop; set `data-active=""` on the
   `<article>` when active.
-- `index.css`: scope the highlight to file comments (line comments already get
-  the diff-line highlight), e.g.
-  `.saved-comment[data-comment-kind='file'][data-active] {
+- `index.css`: apply the highlight to any active comment card (line comments
+  already get the diff-line highlight, so this is just additive), e.g.
+  `.saved-comment[data-active] {
     outline: 2px solid #69b1ff; outline-offset: 1px; }`
 
 ### 5. Tests
