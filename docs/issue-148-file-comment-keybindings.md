@@ -40,6 +40,9 @@ Add a synthetic first cursor row for file-level comments, represented as
 - `centerDiffCursor`: for line 0, delegate to the scroll-into-view path above.
 - Note: special-casing keys off `lineNumber === 0` explicitly — test mocks
   return positions for line 0, so position-based checks alone will not trigger.
+- `createDiffCursorRows` has exactly two callers (`useDiffCursor`.
+  `handlePostRender` and `diff-cursor-actions.test.js`) — safe to extend the
+  signature with the `{ includeFileComment }` option.
 
 ### 2. `frontend/src/actions/comment-actions.js`
 
@@ -97,6 +100,25 @@ which React re-renders would wipe out).
   - `useDiffCursor` exposes reactive `activeCommentId` that updates on cursor
     activation and is stable across comment-less rows;
   - `SavedComment` sets `data-active` for the active comment.
+
+## Implementation notes
+
+- **Tests run with `node --test`, pure logic only** — there is no DOM or React
+  test infrastructure. The reactive `activeCommentId` state and the
+  `SavedComment` `data-active` prop cannot be exercised by the test runner;
+  verify those manually in dev (`npm run dev`). All logic-level changes
+  (`createDiffCursorRows`, `commentAtCursor`, `diff-cursor-actions`) are
+  covered by unit tests.
+- **Verification — the file-comment DOM slot**: `scrollDiffCursorIntoView`
+  relies on `node.querySelector('.saved-comment[data-comment-kind="file"]')`.
+  This assumes the React-rendered annotation is slotted into the web
+  component's light DOM. If the query comes back empty, fall back to
+  `container.scrollTo({ top: 0 })` on the `.diff-scroll` element (the card is
+  always the first content).
+- **Guard order in `moveDiffCursorByPage`**: keep the `viewportHeight <= 0 →
+  null` check before the `center: 0` fallback, and preserve the existing `null`
+  return for other unpositioned rows (only `row.fileCommentRow` gets the
+  synthesized center).
 
 ## Behavior
 
