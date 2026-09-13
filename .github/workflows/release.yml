@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build Rvw
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_ENV"
+          zig build -Dversion="${VERSION}" -Doptimize=ReleaseFast
+
+      - name: Package Rvw.app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent zig-out/Rvw.app "Rvw-${{ env.version }}.zip"
+          shasum -a 256 "Rvw-${{ env.version }}.zip"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "Rvw-${{ env.version }}.zip" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "Rvw-${{ env.version }}.zip" \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
