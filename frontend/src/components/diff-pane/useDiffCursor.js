@@ -19,10 +19,12 @@ import {
   commentTargetAtCursor,
 } from '../../actions/comment-actions.js'
 import { normalizeCommentRange } from './comment-annotations.js'
+import { createInitialFilePosition } from './initial-file-position.js'
 
 export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const renderedFileRef = useRef(null)
   const renderInstanceRef = useRef(null)
+  const cursorInstanceRef = useRef(null)
   const cursorRowsRef = useRef([])
   const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
@@ -31,6 +33,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
   const cursorVisibleRef = useRef(isCursorVisible)
+  const [initialPosition] = useState(createInitialFilePosition)
 
   const updateActiveCommentId = useCallback((commentId) => {
     activeCommentIdRef.current = commentId
@@ -94,6 +97,8 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
 
   const handlePostRender = useCallback((node, instance, phase) => {
     if (phase === 'unmount') {
+      initialPosition.unmounted(instance)
+      if (renderInstanceRef.current !== instance) return
       finishScrollGuard()
       renderedFileRef.current = null
       renderInstanceRef.current = null
@@ -101,6 +106,11 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
       return
     }
 
+    if (!initialPosition.rendered(node, instance)) return
+    if (cursorInstanceRef.current !== instance) {
+      cursorRef.current = null
+      cursorInstanceRef.current = instance
+    }
     renderedFileRef.current = node
     renderInstanceRef.current = instance
     const includeFileComment = commentsRef.current.some((comment) => (
@@ -113,7 +123,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     cursorRef.current = cursor
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
     finishScrollGuard()
-  }, [finishScrollGuard])
+  }, [finishScrollGuard, initialPosition])
 
   const guardNextAnnotationRender = useCallback(() => {
     if (scrollGuardRef.current) return
