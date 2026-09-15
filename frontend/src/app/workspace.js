@@ -28,6 +28,7 @@ export const initialWorkspaceState = Object.freeze({
   finderMode: null,
   keymapReferenceOpen: false,
   activeSurface: ActiveSurface.DIFF_PANE,
+  relativeLineNumbers: false,
   wrapLines: true,
 })
 
@@ -115,6 +116,13 @@ export function workspaceReducer(state, action) {
       return state.wrapLines === action.wrapLines
         ? state
         : { ...state, wrapLines: action.wrapLines }
+    case 'relative_line_numbers_toggled':
+      return { ...state, relativeLineNumbers: !state.relativeLineNumbers }
+    case 'relative_line_numbers_set':
+      if (typeof action.relativeLineNumbers !== 'boolean') return state
+      return state.relativeLineNumbers === action.relativeLineNumbers
+        ? state
+        : { ...state, relativeLineNumbers: action.relativeLineNumbers }
     default:
       return state
   }

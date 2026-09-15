@@ -118,6 +118,7 @@ const SchemaError = error{
     diff_not_object,
     unknown_diff_field,
     wrap_lines_not_boolean,
+    relative_line_numbers_not_boolean,
 };
 
 fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!ParseResult {
@@ -144,9 +145,12 @@ fn validateConfiguration(value: std.json.Value) SchemaError!void {
             .object => |object| object,
             else => return error.diff_not_object,
         };
-        if (!onlyFields(diff, &.{"wrapLines"})) return error.unknown_diff_field;
+        if (!onlyFields(diff, &.{ "wrapLines", "relativeLineNumbers" })) return error.unknown_diff_field;
         if (diff.get("wrapLines")) |wrap_lines_value| {
             if (wrap_lines_value != .bool) return error.wrap_lines_not_boolean;
+        }
+        if (diff.get("relativeLineNumbers")) |relative_line_numbers_value| {
+            if (relative_line_numbers_value != .bool) return error.relative_line_numbers_not_boolean;
         }
     }
 
@@ -231,6 +235,7 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.diff_not_object => "user configuration diff must be a JSON object",
         error.unknown_diff_field => "user configuration diff contains an unsupported field",
         error.wrap_lines_not_boolean => "user configuration diff.wrapLines must be a boolean",
+        error.relative_line_numbers_not_boolean => "user configuration diff.relativeLineNumbers must be a boolean",
     };
 }
 
@@ -347,18 +352,19 @@ test "leader diagnostics describe the invalid keybindings field" {
     );
 }
 
-test "diff.wrapLines is preserved and schema-validated" {
+test "diff settings are preserved and schema-validated" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
     const valid = try parseConfiguration(arena.allocator(),
-        \\{"diff":{"wrapLines":false}}
+        \\{"diff":{"wrapLines":false,"relativeLineNumbers":true}}
     );
     const configuration = switch (valid) {
         .configuration => |value| value,
         else => return error.TestUnexpectedResult,
     };
     try std.testing.expect(!configuration.object.get("diff").?.object.get("wrapLines").?.bool);
+    try std.testing.expect(configuration.object.get("diff").?.object.get("relativeLineNumbers").?.bool);
 
     const not_object = try parseConfiguration(arena.allocator(),
         \\{"diff":[]}
@@ -377,6 +383,12 @@ test "diff.wrapLines is preserved and schema-validated" {
     );
     try std.testing.expect(not_boolean == .invalid_schema);
     try std.testing.expectEqual(error.wrap_lines_not_boolean, not_boolean.invalid_schema);
+
+    const relative_not_boolean = try parseConfiguration(arena.allocator(),
+        \\{"diff":{"relativeLineNumbers":"yes"}}
+    );
+    try std.testing.expect(relative_not_boolean == .invalid_schema);
+    try std.testing.expectEqual(error.relative_line_numbers_not_boolean, relative_not_boolean.invalid_schema);
 }
 
 test "diff diagnostics describe the invalid diff field" {
@@ -392,6 +404,10 @@ test "diff diagnostics describe the invalid diff field" {
         "user configuration diff.wrapLines must be a boolean",
         schemaErrorMessage(error.wrap_lines_not_boolean),
     );
+    try std.testing.expectEqualStrings(
+        "user configuration diff.relativeLineNumbers must be a boolean",
+        schemaErrorMessage(error.relative_line_numbers_not_boolean),
+    );
 }
 
 test "loader reads and serializes the user configuration file" {
@@ -403,7 +419,7 @@ test "loader reads and serializes the user configuration file" {
     try temporary.dir.writeFile(std.testing.io, .{
         .sub_path = relative_configuration_path,
         .data =
-        \\{"keybindings":{"normal":{"focus.file_tree":[["g","t"]]}}}
+        \\{"keybindings":{"normal":{"focus.file_tree":[["g","t"]]}},"diff":{"relativeLineNumbers":true}}
         ,
     });
 
@@ -416,7 +432,7 @@ test "loader reads and serializes the user configuration file" {
     );
     defer std.testing.allocator.free(encoded);
     try std.testing.expectEqualStrings(
-        "{\"configuration\":{\"keybindings\":{\"normal\":{\"focus.file_tree\":[[\"g\",\"t\"]]}}},\"diagnostic\":null}",
+        "{\"configuration\":{\"keybindings\":{\"normal\":{\"focus.file_tree\":[[\"g\",\"t\"]]}},\"diff\":{\"relativeLineNumbers\":true}},\"diagnostic\":null}",
         encoded,
     );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import {
+  DEFAULT_RELATIVE_LINE_NUMBERS,
   DEFAULT_WRAP_LINES,
   loadConfiguration,
 } from './configuration.js'
@@ -14,6 +15,7 @@ export function useConfiguration(vimController) {
     diagnostic: null,
     keymap: defaultNormalKeymap,
     leader: DEFAULT_LEADER_KEY,
+    relativeLineNumbers: DEFAULT_RELATIVE_LINE_NUMBERS,
     wrapLines: DEFAULT_WRAP_LINES,
   })
 
@@ -29,6 +31,7 @@ export function useConfiguration(vimController) {
         diagnostic: configuration.diagnostic,
         keymap: configuration.keymap ?? current.keymap,
         leader: configuration.leader ?? current.leader,
+        relativeLineNumbers: configuration.relativeLineNumbers ?? current.relativeLineNumbers,
         wrapLines: configuration.wrapLines ?? current.wrapLines,
       }))
     })

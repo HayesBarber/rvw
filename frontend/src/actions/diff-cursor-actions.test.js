@@ -15,6 +15,7 @@ import {
   restoreDiffLayoutAnchor,
   scrollDiffCursorIntoView,
   syncDiffCursorPresentation,
+  syncRelativeLineNumbers,
 } from './diff-cursor-actions.js'
 
 function diffInstance(oldContents, newContents, renderable = () => true) {
@@ -293,6 +294,75 @@ test('diff cursor presentation follows visibility without changing its location'
     [null],
   ])
   assert.deepEqual(cursor, { lineNumber: 8, side: DiffCursorSide.DELETIONS })
+})
+
+function gutter(lineNumber, side, text = `${lineNumber}`) {
+  const content = { textContent: text }
+  return {
+    content,
+    closest: (selector) => (
+      selector === '[data-deletions]' && side === DiffCursorSide.DELETIONS
+        ? {}
+        : null
+    ),
+    getAttribute: (name) => (
+      name === 'data-column-number' ? `${lineNumber}` : null
+    ),
+    querySelector: (selector) => (
+      selector === '[data-line-number-content]' ? content : null
+    ),
+  }
+}
+
+test('relative gutter numbers use navigable visual-row distance without changing source data', () => {
+  const rows = [
+    { index: 4, additions: 10, deletions: 8 },
+    { index: 5, deletions: 9 },
+    { index: 6, additions: 11 },
+    { index: 7, additions: 12, deletions: 10 },
+  ]
+  const gutters = [
+    gutter(8, DiffCursorSide.DELETIONS),
+    gutter(10, DiffCursorSide.ADDITIONS),
+    gutter(9, DiffCursorSide.DELETIONS),
+    gutter(11, DiffCursorSide.ADDITIONS),
+    gutter(10, DiffCursorSide.DELETIONS),
+    gutter(12, DiffCursorSide.ADDITIONS),
+  ]
+  const node = { shadowRoot: { querySelectorAll: () => gutters } }
+  const cursor = { lineNumber: 11, side: DiffCursorSide.ADDITIONS }
+
+  assert.equal(syncRelativeLineNumbers(node, rows, cursor, true), true)
+  assert.deepEqual(gutters.map((item) => item.content.textContent), [
+    '2', '2', '1', '11', '1', '1',
+  ])
+  assert.deepEqual(gutters.map((item) => item.getAttribute('data-column-number')), [
+    '8', '10', '9', '11', '10', '12',
+  ])
+
+  assert.equal(syncRelativeLineNumbers(node, rows, cursor, false), true)
+  assert.deepEqual(gutters.map((item) => item.content.textContent), [
+    '8', '10', '9', '11', '10', '12',
+  ])
+})
+
+test('relative gutters remain absolute until a code cursor exists and for unknown rows', () => {
+  const known = gutter(20, DiffCursorSide.ADDITIONS, '1')
+  const annotation = gutter(99, DiffCursorSide.ADDITIONS, '7')
+  const node = { shadowRoot: { querySelectorAll: () => [known, annotation] } }
+  const rows = [{ index: 0, additions: 20 }]
+
+  syncRelativeLineNumbers(node, rows, null, true)
+  assert.equal(known.content.textContent, '20')
+  assert.equal(annotation.content.textContent, '99')
+
+  syncRelativeLineNumbers(node, rows, {
+    lineNumber: 0,
+    side: DiffCursorSide.ADDITIONS,
+  }, true)
+  assert.equal(known.content.textContent, '20')
+  assert.equal(annotation.content.textContent, '99')
+  assert.equal(syncRelativeLineNumbers(null, rows, null, true), false)
 })
 
 test('the action adapter handles first, last, centered, repeated movement, and empty content', () => {

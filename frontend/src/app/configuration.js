@@ -8,6 +8,7 @@ import {
 export const USER_CONFIGURATION_PATH = '~/.config/rvw/config.json'
 
 export const DEFAULT_WRAP_LINES = true
+export const DEFAULT_RELATIVE_LINE_NUMBERS = false
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -21,14 +22,18 @@ function configuredDiffSettings(diff) {
   if (!isObject(diff)) {
     throw new TypeError('User configuration diff must be a JSON object')
   }
-  if (!onlyFields(diff, ['wrapLines'])) {
+  if (!onlyFields(diff, ['wrapLines', 'relativeLineNumbers'])) {
     throw new TypeError('User configuration diff contains an unsupported field')
   }
   const wrapLines = diff.wrapLines ?? DEFAULT_WRAP_LINES
   if (typeof wrapLines !== 'boolean') {
     throw new TypeError('User configuration diff.wrapLines must be a boolean')
   }
-  return wrapLines
+  const relativeLineNumbers = diff.relativeLineNumbers ?? DEFAULT_RELATIVE_LINE_NUMBERS
+  if (typeof relativeLineNumbers !== 'boolean') {
+    throw new TypeError('User configuration diff.relativeLineNumbers must be a boolean')
+  }
+  return { relativeLineNumbers, wrapLines }
 }
 
 function configuredKeyboardConfiguration(configuration) {
@@ -109,14 +114,17 @@ export function resolveConfiguration(snapshot) {
 
   try {
     const keyboard = configuredKeyboardConfiguration(snapshot.configuration)
-    const wrapLines = snapshot.configuration.diff === undefined
-      ? DEFAULT_WRAP_LINES
+    const diff = snapshot.configuration.diff === undefined
+      ? {
+          relativeLineNumbers: DEFAULT_RELATIVE_LINE_NUMBERS,
+          wrapLines: DEFAULT_WRAP_LINES,
+        }
       : configuredDiffSettings(snapshot.configuration.diff)
     return {
       bindings: compileApplicationKeymap(keyboard.keymap, { leader: keyboard.leader }),
       keymap: keyboard.keymap,
       leader: keyboard.leader,
-      wrapLines,
+      ...diff,
       diagnostic: null,
     }
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   defaultApplicationBindings,
 } from '../actions/application-actions.js'
 import {
+  DEFAULT_RELATIVE_LINE_NUMBERS,
   DEFAULT_WRAP_LINES,
   USER_CONFIGURATION_PATH,
   loadConfiguration,
@@ -108,6 +109,8 @@ test('wrapLines defaults to wrapping when the diff section is omitted', () => {
   assert.equal(result.diagnostic, null)
   assert.equal(result.wrapLines, DEFAULT_WRAP_LINES)
   assert.equal(result.wrapLines, true)
+  assert.equal(result.relativeLineNumbers, DEFAULT_RELATIVE_LINE_NUMBERS)
+  assert.equal(result.relativeLineNumbers, false)
 })
 
 test('configured diff.wrapLines controls the startup default', () => {
@@ -128,11 +131,28 @@ test('configured diff.wrapLines controls the startup default', () => {
   assert.equal(enabled.wrapLines, true)
 })
 
+test('configured diff.relativeLineNumbers controls the startup default', () => {
+  const enabled = resolveConfiguration({
+    configuration: { diff: { relativeLineNumbers: true } },
+    diagnostic: null,
+  })
+  assert.equal(enabled.diagnostic, null)
+  assert.equal(enabled.relativeLineNumbers, true)
+  assert.equal(enabled.wrapLines, DEFAULT_WRAP_LINES)
+
+  const disabled = resolveConfiguration({
+    configuration: { diff: { relativeLineNumbers: false } },
+    diagnostic: null,
+  })
+  assert.equal(disabled.relativeLineNumbers, false)
+})
+
 test('an invalid diff schema produces a diagnostic without installable bindings', () => {
   for (const [configuration, message] of [
     [{ diff: [] }, 'diff must be a JSON object'],
     [{ diff: { wrap: true } }, 'diff contains an unsupported field'],
     [{ diff: { wrapLines: 'yes' } }, 'diff.wrapLines must be a boolean'],
+    [{ diff: { relativeLineNumbers: 'yes' } }, 'diff.relativeLineNumbers must be a boolean'],
   ]) {
     const result = resolveConfiguration({ configuration, diagnostic: null })
 

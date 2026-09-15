@@ -15,6 +15,7 @@ import {
   restoreDiffLayoutAnchor,
   scrollDiffCursorIntoView,
   syncDiffCursorPresentation,
+  syncRelativeLineNumbers,
 } from '../../actions/diff-cursor-actions.js'
 import {
   commentAtCursor,
@@ -23,7 +24,12 @@ import {
 import { normalizeCommentRange } from './comment-annotations.js'
 import { createInitialFilePosition } from './initial-file-position.js'
 
-export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
+export default function useDiffCursor({
+  comments,
+  fileDiff,
+  isCursorVisible,
+  relativeLineNumbers,
+}) {
   const renderedFileRef = useRef(null)
   const renderInstanceRef = useRef(null)
   const cursorInstanceRef = useRef(null)
@@ -31,11 +37,13 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
   const layoutAnchorRef = useRef(null)
+  const gutterObserverRef = useRef(null)
   const [activeCommentId, setActiveCommentIdState] = useState(null)
   const activeCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
   const pathRef = useRef(fileDiff?.path ?? null)
   const cursorVisibleRef = useRef(isCursorVisible)
+  const relativeLineNumbersRef = useRef(relativeLineNumbers)
   const [initialPosition] = useState(createInitialFilePosition)
 
   const updateActiveCommentId = useCallback((commentId) => {
@@ -66,6 +74,12 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
       cursor,
     )?.id ?? null)
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
+    syncRelativeLineNumbers(
+      node,
+      cursorRowsRef.current,
+      cursor,
+      relativeLineNumbersRef.current,
+    )
     if (scroll) scrollDiffCursorIntoView(instance, node, cursor)
     return true
   }, [updateActiveCommentId])
@@ -78,6 +92,16 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
       isCursorVisible,
     )
   }, [isCursorVisible])
+
+  useLayoutEffect(() => {
+    relativeLineNumbersRef.current = relativeLineNumbers
+    syncRelativeLineNumbers(
+      renderedFileRef.current,
+      cursorRowsRef.current,
+      cursorRef.current,
+      relativeLineNumbers,
+    )
+  }, [relativeLineNumbers])
 
   const centerCursor = useCallback((cursor) => centerDiffCursor(
     renderInstanceRef.current,
@@ -102,6 +126,8 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     if (phase === 'unmount') {
       initialPosition.unmounted(instance)
       if (renderInstanceRef.current !== instance) return
+      gutterObserverRef.current?.disconnect()
+      gutterObserverRef.current = null
       finishScrollGuard()
       renderedFileRef.current = null
       renderInstanceRef.current = null
@@ -125,6 +151,29 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     cursorRowsRef.current = rows
     cursorRef.current = cursor
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
+    syncRelativeLineNumbers(
+      node,
+      rows,
+      cursor,
+      relativeLineNumbersRef.current,
+    )
+    if (!gutterObserverRef.current && node.shadowRoot) {
+      const MutationObserver = node.ownerDocument?.defaultView?.MutationObserver
+      if (MutationObserver) {
+        gutterObserverRef.current = new MutationObserver(() => {
+          syncRelativeLineNumbers(
+            renderedFileRef.current,
+            cursorRowsRef.current,
+            cursorRef.current,
+            relativeLineNumbersRef.current,
+          )
+        })
+        gutterObserverRef.current.observe(node.shadowRoot, {
+          childList: true,
+          subtree: true,
+        })
+      }
+    }
     restoreDiffLayoutAnchor(
       layoutAnchorRef.current,
       instance,

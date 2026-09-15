@@ -10,6 +10,7 @@ import {
 function adapter(contentKind) {
   const calls = []
   let expanded = false
+  let relative = false
   let wrapped = true
   const actions = createDiffViewActionAdapter({
     contentKind,
@@ -17,6 +18,10 @@ function adapter(contentKind) {
     toggleExpandUnchanged: () => {
       expanded = !expanded
       calls.push(['expanded', expanded])
+    },
+    toggleRelativeLineNumbers: () => {
+      relative = !relative
+      calls.push(['relative', relative])
     },
     toggleWrapLines: () => {
       wrapped = !wrapped
@@ -33,11 +38,15 @@ test('diff display actions toggle expansion and wrapping in both directions', ()
   assert.equal(actions[ApplicationAction.DIFF_EXPAND_TOGGLE](), true)
   assert.equal(actions[ApplicationAction.DIFF_WRAP_TOGGLE](), true)
   assert.equal(actions[ApplicationAction.DIFF_WRAP_TOGGLE](), true)
+  assert.equal(actions[ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE](), true)
+  assert.equal(actions[ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE](), true)
   assert.deepEqual(calls, [
     'prepare', ['expanded', true],
     'prepare', ['expanded', false],
     'prepare', ['wrapped', false],
     'prepare', ['wrapped', true],
+    ['relative', true],
+    ['relative', false],
   ])
 })
 
@@ -45,10 +54,14 @@ test('full files support wrapping while unavailable views ignore display actions
   const fullFile = adapter(RenderableFileKind.FILE)
   assert.equal(fullFile.actions[ApplicationAction.DIFF_EXPAND_TOGGLE](), false)
   assert.equal(fullFile.actions[ApplicationAction.DIFF_WRAP_TOGGLE](), true)
-  assert.deepEqual(fullFile.calls, ['prepare', ['wrapped', false]])
+  assert.equal(fullFile.actions[ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE](), true)
+  assert.deepEqual(fullFile.calls, [
+    'prepare', ['wrapped', false], ['relative', true],
+  ])
 
   const unavailable = adapter('unavailable')
   assert.equal(unavailable.actions[ApplicationAction.DIFF_EXPAND_TOGGLE](), false)
   assert.equal(unavailable.actions[ApplicationAction.DIFF_WRAP_TOGGLE](), false)
+  assert.equal(unavailable.actions[ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE](), false)
   assert.deepEqual(unavailable.calls, [])
 })

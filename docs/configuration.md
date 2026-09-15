@@ -29,6 +29,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
 | `diff.expand.toggle` | `<leader> e` | Expand all unchanged regions in the active diff; repeat to restore collapsed context. |
+| `diff.relative_line_numbers.toggle` | `<leader> n` | Toggle relative line numbers in the active diff or full-file text view. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
@@ -57,9 +58,9 @@ Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
 The JSON root accepts one optional `keybindings` object and one optional `diff` object. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
 
-`diff` accepts one optional `wrapLines` key, a boolean that selects the starting text wrapping of diff and full-file text views. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. The `diff.wrap.toggle` action flips wrapping for the current session only and is active while the diff pane has focus. `diff.expand.toggle` affects only the open diff and each newly opened file starts with collapsed context.
+`diff` accepts optional `wrapLines` and `relativeLineNumbers` boolean keys. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. Line numbers are absolute by default; set `"relativeLineNumbers": true` to show the cursor row's source line and each other code row's vertical movement distance. The `diff.wrap.toggle` and `diff.relative_line_numbers.toggle` actions change their settings for the current session only, apply to subsequently opened files, and are active while the diff pane has focus. `diff.expand.toggle` affects only the open diff and each newly opened file starts with collapsed context.
 
-This complete example replaces four actions, disables one action, starts with wrapping disabled, selects `\` as the leader key, and leaves every other action at its default binding:
+This complete example replaces four actions, disables one action, starts with wrapping disabled and relative line numbers enabled, selects `\` as the leader key, and leaves every other action at its default binding:
 
 ```json
 {
@@ -74,6 +75,7 @@ This complete example replaces four actions, disables one action, starts with wr
     }
   },
   "diff": {
+    "relativeLineNumbers": true,
     "wrapLines": false
   }
 }

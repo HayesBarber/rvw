@@ -10,6 +10,7 @@ export function createDiffViewActionAdapter({
   contentKind,
   prepareLayoutChange,
   toggleExpandUnchanged,
+  toggleRelativeLineNumbers,
   toggleWrapLines,
 }) {
   const applyLayoutChange = (toggle) => {
@@ -22,6 +23,11 @@ export function createDiffViewActionAdapter({
     [ApplicationAction.DIFF_EXPAND_TOGGLE]: () => (
       contentKind === RenderableFileKind.DIFF &&
       applyLayoutChange(toggleExpandUnchanged)
+    ),
+    [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE]: () => (
+      (contentKind === RenderableFileKind.DIFF ||
+        contentKind === RenderableFileKind.FILE) &&
+      (toggleRelativeLineNumbers(), true)
     ),
     [ApplicationAction.DIFF_WRAP_TOGGLE]: () => (
       (contentKind === RenderableFileKind.DIFF ||
