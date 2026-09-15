@@ -9,7 +9,36 @@ import {
   editComment,
   getConfiguration,
   getFilesNotIgnored,
+  reloadReview,
 } from './api.js'
+
+test('review reload uses equivalent native and HTTP requests', async () => {
+  const nativeRequests = []
+  globalThis.window = {
+    webkit: { messageHandlers: { native: { postMessage(request) {
+      nativeRequests.push(request)
+      return Promise.resolve({ generation: 1 })
+    } } } },
+  }
+  assert.deepEqual(await reloadReview(), { generation: 1 })
+  assert.deepEqual(nativeRequests, [{ type: 'reload_review' }])
+
+  const httpRequests = []
+  globalThis.window = {}
+  globalThis.fetch = async (url, options) => {
+    httpRequests.push({ url, options })
+    return { ok: true, status: 200, json: async () => ({ generation: 2 }) }
+  }
+  try {
+    assert.deepEqual(await reloadReview(), { generation: 2 })
+    assert.equal(httpRequests[0].url, '/api/review/reload')
+    assert.equal(httpRequests[0].options.method, 'POST')
+    assert.deepEqual(JSON.parse(httpRequests[0].options.body), { type: 'reload_review' })
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
 
 test('file path copies use the same request through the native bridge', async () => {
   const requests = []

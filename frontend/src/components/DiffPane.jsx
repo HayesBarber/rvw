@@ -29,6 +29,7 @@ export default function DiffPane({
   onCreateComment,
   onEditComment,
   onDeleteComment,
+  onDraftStateChange,
   onCopyFilePath,
   onFocusFileTree,
   onToggleRelativeLineNumbers,
@@ -53,6 +54,7 @@ export default function DiffPane({
     onCreateComment,
     onDeleteComment,
     onEditComment,
+    onDraftStateChange,
   })
   const toggleExpandUnchanged = useCallback(() => {
     setExpandUnchanged((expanded) => !expanded)

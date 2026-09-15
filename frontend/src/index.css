@@ -256,7 +256,8 @@ textarea {
   gap: 10px;
 }
 
-.copy-status.success {
+.copy-status.success,
+.reload-status.success {
   color: #63d488;
 }
 
@@ -265,6 +266,7 @@ textarea {
 }
 
 .copy-status.error,
+.reload-status.error,
 .file-path-copy-status.error,
 .clear-status.error {
   max-width: 300px;
@@ -286,6 +288,7 @@ textarea {
   cursor: pointer;
 }
 
+.reload-button,
 .file-finder-button,
 .file-comment-button {
   padding: 5px 10px;
@@ -296,6 +299,7 @@ textarea {
   cursor: pointer;
 }
 
+.reload-button:hover:not(:disabled),
 .file-finder-button:hover,
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
@@ -305,6 +309,11 @@ textarea {
   color: #737378;
   cursor: default;
   opacity: 0.7;
+}
+
+.reload-button:disabled {
+  color: #737378;
+  cursor: default;
 }
 
 .copy-markdown-button:hover:not(:disabled) {

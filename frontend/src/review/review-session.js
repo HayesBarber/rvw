@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { FinderMode, TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
@@ -12,6 +12,7 @@ import { useReviewComments } from './comments-request.js'
 import { useReviewOverview } from './overview-request.js'
 import { useRepositoryFiles, useNotIgnoredFiles } from './repository-files-request.js'
 import { RequestStatus } from './request-state.js'
+import { useReloadReview } from './reload-request.js'
 import { useReviewFile } from './selected-file-request.js'
 
 export function createFilesModeEntries(overview, repositoryPaths) {
@@ -62,7 +63,8 @@ export function selectEmptyReviewTreeMode(overview, treeMode) {
   return treeMode
 }
 
-export function useReviewSession({ workspace, dispatchWorkspace }) {
+export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft }) {
+  const [generation, setGeneration] = useState(0)
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
   const notIgnoredFilesRequest = useNotIgnoredFiles()
@@ -70,9 +72,12 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
   const copyRequest = useCopyComments()
   const clearRequest = useClearComments()
   const overview = overviewRequest.data
+  const loadedReview = useRef(false)
 
   useEffect(() => {
     if (!overview) return
+    if (loadedReview.current) return
+    loadedReview.current = true
     dispatchWorkspace({
       type: 'review_loaded',
       initialPath: overview.initialPath,
@@ -84,11 +89,13 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     [overview],
   )
   const filesModeEntries = useMemo(
-    () => includeSelectedFile(
-      createFilesModeEntries(overview, allFilesRequest.data),
-      workspace.selectedPath,
-    ),
-    [allFilesRequest.data, overview, workspace.selectedPath],
+    () => {
+      const entries = createFilesModeEntries(overview, allFilesRequest.data)
+      return allFilesRequest.status === RequestStatus.SUCCESS
+        ? entries
+        : includeSelectedFile(entries, workspace.selectedPath)
+    },
+    [allFilesRequest.data, allFilesRequest.status, overview, workspace.selectedPath],
   )
   const notIgnoredFilesEntries = useMemo(
     () => createFilesModeEntries(overview, notIgnoredFilesRequest.data),
@@ -114,6 +121,20 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     diffId: overview?.id ?? null,
     path: activePath,
     changed: changedPaths.has(activePath),
+    generation,
+  })
+
+  const handleReloaded = useCallback((result) => {
+    setGeneration(result.generation)
+    return Promise.all([
+      overviewRequest.load(),
+      allFilesRequest.load(),
+      notIgnoredFilesRequest.load(),
+    ])
+  }, [allFilesRequest, notIgnoredFilesRequest, overviewRequest])
+  const reloadRequest = useReloadReview({
+    hasUnsavedDraft,
+    onReloaded: handleReloaded,
   })
 
   const openFileFinder = useCallback(() => {
@@ -266,6 +287,22 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     }
   }, [changeTreeMode, overview, workspace.treeMode])
 
+  useEffect(() => {
+    const listReady = workspace.treeMode === TreeMode.CHANGES
+      ? Boolean(overview)
+      : allFilesRequest.status === RequestStatus.SUCCESS
+    if (listReady && workspace.selectedPath !== activePath) {
+      dispatchWorkspace({ type: 'file_selected', path: activePath })
+    }
+  }, [
+    activePath,
+    allFilesRequest.status,
+    dispatchWorkspace,
+    overview,
+    workspace.selectedPath,
+    workspace.treeMode,
+  ])
+
   return {
     activePath,
     allFilesRequest,
@@ -287,6 +324,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
       ? fileRequest.data
       : null,
     filesModeEntries,
+    generation,
     navigateFile,
     notIgnoredFilesEntries,
     notIgnoredFilesRequest,
@@ -295,6 +333,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     openFinderFile,
     overview,
     overviewRequest,
+    reloadRequest,
     selectFile,
     changeTreeMode,
     visibleFiles,

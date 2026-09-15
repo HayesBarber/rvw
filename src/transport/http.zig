@@ -71,6 +71,20 @@ fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !
     return handler.dispatchRequest(res, .get_diff_overview);
 }
 
+fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .reload_review => return handler.dispatchRequest(res, request),
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
 fn getFiles(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(res, .get_files);
 }
@@ -230,6 +244,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     const router = try server.router(.{});
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
+    router.post("/api/review/reload", reloadReview, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
     router.get("/api/files", getFiles, .{});
     router.get("/api/files/not-ignored", getFilesNotIgnored, .{});

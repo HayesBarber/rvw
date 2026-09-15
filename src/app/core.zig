@@ -12,39 +12,28 @@ const Io = std.Io;
 pub const Core = struct {
     allocator: Allocator,
     io: Io,
-    diff_provider: provider_module.diff.DiffProvider,
-    file_provider: provider_module.file.FileProvider,
-    all_files_tree_provider: provider_module.filetree.FileTreeProvider,
-    visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
+    review_provider: provider_module.review.ReviewProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
-    repository_root: []const u8,
+    review_generation: usize = 0,
     logger: log.Logger,
     configuration: config.Snapshot,
 
     pub fn init(
         allocator: Allocator,
         io: Io,
-        diff_provider: provider_module.diff.DiffProvider,
-        file_provider: provider_module.file.FileProvider,
-        all_files_tree_provider: provider_module.filetree.FileTreeProvider,
-        visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
+        review_provider: provider_module.review.ReviewProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
-        repository_root: []const u8,
         logger: log.Logger,
         configuration: config.Snapshot,
     ) Core {
         return .{
             .allocator = allocator,
             .io = io,
-            .diff_provider = diff_provider,
-            .file_provider = file_provider,
-            .all_files_tree_provider = all_files_tree_provider,
-            .visible_files_tree_provider = visible_files_tree_provider,
+            .review_provider = review_provider,
             .comment_provider = comment_provider,
             .clipboard = clipboard,
-            .repository_root = repository_root,
             .logger = logger,
             .configuration = configuration,
         };
@@ -72,16 +61,21 @@ pub const Core = struct {
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .get_configuration => .{ .configuration = self.configuration },
-            .get_diff_overview => .{ .diff_overview = try self.diff_provider.getDiffOverview(self.io) },
-            .get_files => .{ .files = try self.all_files_tree_provider.getFiles(self.io) },
-            .get_files_not_ignored => .{ .files = try self.visible_files_tree_provider.getFiles(self.io) },
+            .reload_review => blk: {
+                self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
+                self.review_generation +%= 1;
+                break :blk .{ .reload_review_result = .{ .generation = self.review_generation } };
+            },
+            .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
+            .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
+            .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
             .get_file => |details| .{ .file = .{
                 .path = details.path,
                 .status = .unchanged,
-                .content = try self.file_provider.getFile(self.io, details.path),
+                .content = try self.review_provider.getFile(self.io, details.path),
             } },
             .get_file_diff => |details| .{
-                .file_diff = try self.diff_provider.getFileDiff(self.io, details.diff_id, details.path),
+                .file_diff = try self.review_provider.getFileDiff(self.io, details.diff_id, details.path),
             },
             .get_comments => .{ .comments = try self.comment_provider.getComments(self.io) },
             .copy_comments_as_markdown => blk: {
@@ -98,7 +92,7 @@ pub const Core = struct {
                 const copied_path = switch (details.format) {
                     .relative => details.path,
                     .absolute => try std.fs.path.join(self.allocator, &.{
-                        self.repository_root,
+                        self.review_provider.repositoryRoot(),
                         details.path,
                     }),
                 };
@@ -143,6 +137,7 @@ pub const Core = struct {
 fn operationName(request: model.Request) []const u8 {
     return switch (request) {
         .get_configuration => "get_configuration",
+        .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
         .get_files => "get_files",
         .get_files_not_ignored => "get_files_not_ignored",
@@ -160,7 +155,7 @@ fn operationName(request: model.Request) []const u8 {
 
 fn shouldLogRequestFailure(err: anyerror) bool {
     return switch (model.errorCode(err)) {
-        .clipboard_unavailable, .internal_error => true,
+        .reload_unavailable, .clipboard_unavailable, .internal_error => true,
         else => false,
     };
 }
@@ -288,36 +283,59 @@ test "request failure logging records only operation and error code" {
 }
 
 test "core routes file listing variants through their tree providers" {
-    const TreeStub = struct {
-        paths: []const []const u8,
+    const ReviewStub = struct {
+        all_paths: []const []const u8,
+        visible_paths: []const []const u8,
 
+        fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
+            return error.TestUnexpectedResult;
+        }
+        fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
+            return error.TestUnexpectedResult;
+        }
         fn getFiles(context: *anyopaque, _: Io) ![]const []const u8 {
             const self: *@This() = @ptrCast(@alignCast(context));
-            return self.paths;
+            return self.all_paths;
         }
-
-        fn interface(self: *@This()) provider_module.filetree.FileTreeProvider {
-            return .{ .context = self, .vtable = &.{ .getFiles = getFiles } };
+        fn getFilesNotIgnored(context: *anyopaque, _: Io) ![]const []const u8 {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            return self.visible_paths;
+        }
+        fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
+            return error.UnknownFile;
+        }
+        fn reload(_: *anyopaque, _: Io) !void {}
+        fn repositoryRoot(_: *anyopaque) []const u8 {
+            return "/repository";
+        }
+        fn interface(self: *@This()) provider_module.review.ReviewProvider {
+            return .{ .context = self, .vtable = &.{
+                .getDiffOverview = getDiffOverview,
+                .getFileDiff = getFileDiff,
+                .getFiles = getFiles,
+                .getFilesNotIgnored = getFilesNotIgnored,
+                .getFile = getFile,
+                .reload = reload,
+                .repositoryRoot = repositoryRoot,
+            } };
         }
     };
 
     var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
     defer threaded.deinit();
     var all_context: u8 = 0;
-    var all_tree: TreeStub = .{ .paths = &.{ "a.txt", "ignored.txt" } };
-    var visible_tree: TreeStub = .{ .paths = &.{"a.txt"} };
+    var review: ReviewStub = .{
+        .all_paths = &.{ "a.txt", "ignored.txt" },
+        .visible_paths = &.{"a.txt"},
+    };
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
-        .{ .context = &all_context, .vtable = &failed_diff_vtable },
-        .{ .context = &all_context, .vtable = &empty_file_vtable },
-        all_tree.interface(),
-        visible_tree.interface(),
+        review.interface(),
         comments.interface(),
         .{ .context = &all_context, .vtable = &noop_clipboard_vtable },
-        "/repository",
         .{
             .allocator = std.testing.allocator,
             .context = &all_context,
@@ -335,12 +353,104 @@ test "core routes file listing variants through their tree providers" {
     try std.testing.expectEqualStrings("a.txt", visible_files[0]);
 }
 
-const empty_file_vtable: provider_module.file.FileProvider.VTable = .{
-    .getFile = emptyGetFile,
-};
+test "core reload replaces the review snapshot without touching comments and preserves it on failure" {
+    const ReviewStub = struct {
+        version: usize = 1,
+        fail_reload: bool = false,
 
-fn emptyGetFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
-    return error.UnknownFile;
+        const first_files = [_]model.FileSummary{.{
+            .path = "before.txt",
+            .status = .modified,
+            .additions = 1,
+            .deletions = 0,
+        }};
+        const second_files = [_]model.FileSummary{.{
+            .path = "after.txt",
+            .status = .added,
+            .additions = 1,
+            .deletions = 0,
+        }};
+
+        fn getDiffOverview(context: *anyopaque, _: Io) !model.DiffOverview {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            return if (self.version == 1) .{
+                .id = "snapshot-1",
+                .repository = .{ .name = "repository" },
+                .source = .{ .working_tree = .{ .base = "base" } },
+                .initialPath = "before.txt",
+                .files = &first_files,
+            } else .{
+                .id = "snapshot-2",
+                .repository = .{ .name = "repository" },
+                .source = .{ .working_tree = .{ .base = "base" } },
+                .initialPath = "after.txt",
+                .files = &second_files,
+            };
+        }
+        fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
+            return error.UnknownFile;
+        }
+        fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
+            return &.{};
+        }
+        fn getFilesNotIgnored(context: *anyopaque, io: Io) ![]const []const u8 {
+            return getFiles(context, io);
+        }
+        fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
+            return error.UnknownFile;
+        }
+        fn reload(context: *anyopaque, _: Io) !void {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            if (self.fail_reload) return error.SnapshotBuildFailed;
+            self.version += 1;
+        }
+        fn repositoryRoot(_: *anyopaque) []const u8 {
+            return "/repository";
+        }
+        const vtable: provider_module.review.ReviewProvider.VTable = .{
+            .getDiffOverview = getDiffOverview,
+            .getFileDiff = getFileDiff,
+            .getFiles = getFiles,
+            .getFilesNotIgnored = getFilesNotIgnored,
+            .getFile = getFile,
+            .reload = reload,
+            .repositoryRoot = repositoryRoot,
+        };
+    };
+
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var review: ReviewStub = .{};
+    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+    defer comments.deinit();
+    var context: u8 = 0;
+    var core = Core.init(
+        std.testing.allocator,
+        threaded.io(),
+        .{ .context = &review, .vtable = &ReviewStub.vtable },
+        comments.interface(),
+        .{ .context = &context, .vtable = &noop_clipboard_vtable },
+        .{
+            .allocator = std.testing.allocator,
+            .context = &context,
+            .vtable = &silent_logger_vtable,
+        },
+        .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+    );
+
+    _ = try core.dispatch(.{ .create_comment = .{
+        .body = "keep me",
+        .target = .{ .file = .{ .path = "before.txt" } },
+    } });
+    const result = (try core.dispatch(.reload_review)).reload_review_result;
+    try std.testing.expectEqual(@as(usize, 1), result.generation);
+    try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
+    try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
+
+    review.fail_reload = true;
+    try std.testing.expectError(error.ReloadUnavailable, core.dispatch(.reload_review));
+    try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
+    try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
 }
 
 const noop_clipboard_vtable: output.Clipboard.VTable = .{
@@ -355,19 +465,6 @@ const silent_logger_vtable: log.Logger.VTable = .{
 
 fn silentLog(_: *anyopaque, _: Io, _: log.Event) !void {}
 
-const failed_diff_vtable: provider_module.diff.DiffProvider.VTable = .{
-    .getDiffOverview = failedDiffOverview,
-    .getFileDiff = failedFileDiff,
-};
-
-fn failedDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
-    return error.TestUnexpectedResult;
-}
-
-fn failedFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
-    return error.TestUnexpectedResult;
-}
-
 test "core edits and deletes only the requested comment with useful errors" {
     const TestDependencies = struct {
         fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
@@ -381,23 +478,29 @@ test "core edits and deletes only the requested comment with useful errors" {
         fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
             return &.{};
         }
+        fn getFilesNotIgnored(context: *anyopaque, io: Io) ![]const []const u8 {
+            return getFiles(context, io);
+        }
 
         fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
             return error.UnknownFile;
         }
 
         fn copy(_: *anyopaque, _: Io, _: []const u8) !void {}
+        fn reload(_: *anyopaque, _: Io) !void {}
+        fn repositoryRoot(_: *anyopaque) []const u8 {
+            return "/repository";
+        }
         fn writeLog(_: *anyopaque, _: Io, _: log.Event) !void {}
 
-        const diff_vtable: provider_module.diff.DiffProvider.VTable = .{
+        const review_vtable: provider_module.review.ReviewProvider.VTable = .{
             .getDiffOverview = getDiffOverview,
             .getFileDiff = getFileDiff,
-        };
-        const tree_vtable: provider_module.filetree.FileTreeProvider.VTable = .{
             .getFiles = getFiles,
-        };
-        const file_vtable: provider_module.file.FileProvider.VTable = .{
+            .getFilesNotIgnored = getFilesNotIgnored,
             .getFile = getFile,
+            .reload = reload,
+            .repositoryRoot = repositoryRoot,
         };
         const clipboard_vtable: output.Clipboard.VTable = .{ .copy = copy };
         const logger_vtable: log.Logger.VTable = .{ .write = writeLog };
@@ -411,13 +514,9 @@ test "core edits and deletes only the requested comment with useful errors" {
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
-        .{ .context = &context, .vtable = &TestDependencies.diff_vtable },
-        .{ .context = &context, .vtable = &TestDependencies.file_vtable },
-        .{ .context = &context, .vtable = &TestDependencies.tree_vtable },
-        .{ .context = &context, .vtable = &TestDependencies.tree_vtable },
+        .{ .context = &context, .vtable = &TestDependencies.review_vtable },
         comments.interface(),
         .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
-        "/repository",
         .{
             .allocator = std.testing.allocator,
             .context = &context,
@@ -491,6 +590,9 @@ test "core copies validated file paths exactly without accessing the file" {
         fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
             return &.{};
         }
+        fn getFilesNotIgnored(context: *anyopaque, io: Io) ![]const []const u8 {
+            return getFiles(context, io);
+        }
         fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
             return error.TestUnexpectedResult;
         }
@@ -500,17 +602,20 @@ test "core copies validated file paths exactly without accessing the file" {
             @memcpy(self.copied[0..text.len], text);
             self.copied_len = text.len;
         }
+        fn reload(_: *anyopaque, _: Io) !void {}
+        fn repositoryRoot(_: *anyopaque) []const u8 {
+            return "/repo root";
+        }
         fn writeLog(_: *anyopaque, _: Io, _: log.Event) !void {}
 
-        const diff_vtable: provider_module.diff.DiffProvider.VTable = .{
+        const review_vtable: provider_module.review.ReviewProvider.VTable = .{
             .getDiffOverview = getDiffOverview,
             .getFileDiff = getFileDiff,
-        };
-        const tree_vtable: provider_module.filetree.FileTreeProvider.VTable = .{
             .getFiles = getFiles,
-        };
-        const file_vtable: provider_module.file.FileProvider.VTable = .{
+            .getFilesNotIgnored = getFilesNotIgnored,
             .getFile = getFile,
+            .reload = reload,
+            .repositoryRoot = repositoryRoot,
         };
         const clipboard_vtable: output.Clipboard.VTable = .{ .copy = copy };
         const logger_vtable: log.Logger.VTable = .{ .write = writeLog };
@@ -524,13 +629,9 @@ test "core copies validated file paths exactly without accessing the file" {
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
-        .{ .context = &dependencies, .vtable = &TestDependencies.diff_vtable },
-        .{ .context = &dependencies, .vtable = &TestDependencies.file_vtable },
-        .{ .context = &dependencies, .vtable = &TestDependencies.tree_vtable },
-        .{ .context = &dependencies, .vtable = &TestDependencies.tree_vtable },
+        .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
         comments.interface(),
         .{ .context = &dependencies, .vtable = &TestDependencies.clipboard_vtable },
-        "/repo root",
         .{
             .allocator = std.testing.allocator,
             .context = &dependencies,

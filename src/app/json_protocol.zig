@@ -45,6 +45,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
 
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
+    if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
     if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
@@ -169,6 +170,17 @@ test "comment mutation requests decode IDs and edited bodies" {
     defer parsed_clear.deinit();
     const clear = try decodeRequestValue(parsed_clear.value);
     try std.testing.expectEqual(model.Request.clear_comments, clear);
+}
+
+test "reload review request decodes" {
+    var parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"reload_review\"}",
+        .{},
+    );
+    defer parsed.deinit();
+    try std.testing.expectEqual(model.Request.reload_review, try decodeRequestValue(parsed.value));
 }
 
 test "file path copy requests require a supported format" {

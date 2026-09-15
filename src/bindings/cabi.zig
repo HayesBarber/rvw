@@ -5,10 +5,7 @@ const allocator = std.heap.page_allocator;
 
 const RvwCore = struct {
     threaded: std.Io.Threaded,
-    git: rvw.provider.diff.git.GitProvider,
-    all_files_tree: rvw.provider.filetree.walk.WalkFileTreeProvider,
-    visible_files_tree: rvw.provider.filetree.gitignore.GitignoreFileTreeProvider,
-    files: rvw.provider.file.filesystem.FilesystemFileProvider,
+    review: rvw.provider.review.git.GitReviewProvider,
     comments: rvw.provider.comment.memory.MemoryProvider,
     clipboard: rvw.output.SystemClipboard,
     default_logger: rvw.log.DefaultLogger,
@@ -41,7 +38,7 @@ pub export fn rvw_core_create(
         .temporary_directory = environmentVariable("TMPDIR"),
     });
     handle.logger = handle.default_logger.interface();
-    handle.git = rvw.provider.diff.git.GitProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         rvw.startup.logApplicationStartFailed(
             handle.logger,
             handle.threaded.io(),
@@ -57,73 +54,6 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    handle.all_files_tree = rvw.provider.filetree.walk.WalkFileTreeProvider.init(
-        allocator,
-        handle.threaded.io(),
-        directory,
-    ) catch |err| {
-        rvw.startup.logApplicationStartFailed(
-            handle.logger,
-            handle.threaded.io(),
-            "file_tree_provider",
-            err,
-        );
-        handle.git.deinit();
-        handle.default_logger.deinit();
-        handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to enumerate repository files: {t}", .{err}) catch null;
-        if (message) |value| {
-            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
-        }
-        allocator.destroy(handle);
-        return null;
-    };
-    handle.visible_files_tree = rvw.provider.filetree.gitignore.GitignoreFileTreeProvider.init(
-        allocator,
-        handle.threaded.io(),
-        directory,
-    ) catch |err| {
-        rvw.startup.logApplicationStartFailed(
-            handle.logger,
-            handle.threaded.io(),
-            "gitignore_tree_provider",
-            err,
-        );
-        handle.all_files_tree.deinit();
-        handle.git.deinit();
-        handle.default_logger.deinit();
-        handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to enumerate repository files: {t}", .{err}) catch null;
-        if (message) |value| {
-            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
-        }
-        allocator.destroy(handle);
-        return null;
-    };
-    handle.files = rvw.provider.file.filesystem.FilesystemFileProvider.init(
-        allocator,
-        handle.threaded.io(),
-        directory,
-        handle.all_files_tree.interface(),
-    ) catch |err| {
-        rvw.startup.logApplicationStartFailed(
-            handle.logger,
-            handle.threaded.io(),
-            "file_provider",
-            err,
-        );
-        handle.visible_files_tree.deinit();
-        handle.all_files_tree.deinit();
-        handle.git.deinit();
-        handle.default_logger.deinit();
-        handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to enumerate repository files: {t}", .{err}) catch null;
-        if (message) |value| {
-            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
-        }
-        allocator.destroy(handle);
-        return null;
-    };
     handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
         .home = environmentVariable("HOME"),
     }) catch |err| {
@@ -133,10 +63,7 @@ pub export fn rvw_core_create(
             "configuration",
             err,
         );
-        handle.files.deinit();
-        handle.visible_files_tree.deinit();
-        handle.all_files_tree.deinit();
-        handle.git.deinit();
+        handle.review.deinit();
         handle.default_logger.deinit();
         handle.threaded.deinit();
         allocator.destroy(handle);
@@ -152,13 +79,9 @@ pub export fn rvw_core_create(
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),
-        handle.git.interface(),
-        handle.files.interface(),
-        handle.all_files_tree.interface(),
-        handle.visible_files_tree.interface(),
+        handle.review.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
-        handle.git.repository_root,
         handle.logger,
         handle.configuration.snapshot,
     );
@@ -188,10 +111,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
     core.comments.deinit();
-    core.files.deinit();
-    core.visible_files_tree.deinit();
-    core.all_files_tree.deinit();
-    core.git.deinit();
+    core.review.deinit();
     core.configuration.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getDiffOverview } from './api.js'
 import { RequestStatus } from './request-state.js'
@@ -11,13 +11,18 @@ const loadingOverview = Object.freeze({
 
 export function useReviewOverview() {
   const [request, setRequest] = useState(loadingOverview)
+  const latestRequest = useRef(0)
 
-  useEffect(() => {
-    let active = true
-
-    getDiffOverview()
+  const load = useCallback(() => {
+    const requestId = ++latestRequest.current
+    setRequest((current) => ({
+      status: RequestStatus.LOADING,
+      data: current.data,
+      error: null,
+    }))
+    return getDiffOverview()
       .then((overview) => {
-        if (active) {
+        if (requestId === latestRequest.current) {
           setRequest({
             status: RequestStatus.SUCCESS,
             data: overview,
@@ -26,7 +31,30 @@ export function useReviewOverview() {
         }
       })
       .catch((error) => {
-        if (active) {
+        if (requestId === latestRequest.current) {
+          setRequest((current) => ({
+            status: RequestStatus.ERROR,
+            data: current.data,
+            error: error.message,
+          }))
+        }
+      })
+  }, [])
+
+  useEffect(() => {
+    const requestId = ++latestRequest.current
+    getDiffOverview()
+      .then((overview) => {
+        if (requestId === latestRequest.current) {
+          setRequest({
+            status: RequestStatus.SUCCESS,
+            data: overview,
+            error: null,
+          })
+        }
+      })
+      .catch((error) => {
+        if (requestId === latestRequest.current) {
           setRequest({
             status: RequestStatus.ERROR,
             data: null,
@@ -36,9 +64,9 @@ export function useReviewOverview() {
       })
 
     return () => {
-      active = false
+      latestRequest.current += 1
     }
   }, [])
 
-  return request
+  return useMemo(() => ({ ...request, load }), [load, request])
 }

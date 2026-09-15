@@ -26,6 +26,7 @@ export const applicationActionGroups = Object.freeze([
 
 export const ApplicationAction = Object.freeze({
   CLOSE_APPLICATION: 'application.close',
+  RELOAD_REVIEW: 'review.reload',
   OPEN_KEYMAP_REFERENCE: 'keymap_reference.open',
   CURSOR_UP: 'cursor.up',
   CURSOR_DOWN: 'cursor.down',
@@ -62,6 +63,7 @@ export const ApplicationAction = Object.freeze({
 
 const actionDefinitions = [
   [ApplicationAction.CLOSE_APPLICATION, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Close the application.'],
+  [ApplicationAction.RELOAD_REVIEW, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Reload repository files and changes.'],
   [ApplicationAction.OPEN_KEYMAP_REFERENCE, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Show the effective keyboard bindings.'],
   [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor up.'],
   [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor down.'],
@@ -120,6 +122,7 @@ export const APPLICATION_DISPATCH_COMMAND = 'application.dispatch'
 /** Built-in Normal-mode bindings, grouped by semantic application action. */
 export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLOSE_APPLICATION]: actionBindings(keySequence('q')),
+  [ApplicationAction.RELOAD_REVIEW]: actionBindings(keySequence(LEADER_KEY, 'r')),
   [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
