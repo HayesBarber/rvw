@@ -32,6 +32,7 @@ function takeOption(args, index, name) {
 function parseDevArguments(args) {
   let directory
   let range
+  let logLevel
   const fixtureArguments = []
 
   for (let index = 0; index < args.length; index += 1) {
@@ -44,6 +45,10 @@ function parseDevArguments(args) {
       if (range !== undefined) throw new Error('--range may only be provided once')
       range = takeOption(args, index, argument)
       index += 1
+    } else if (argument === '--log-level') {
+      if (logLevel !== undefined) throw new Error('--log-level may only be provided once')
+      logLevel = takeOption(args, index, argument)
+      index += 1
     } else {
       fixtureArguments.push(argument)
     }
@@ -55,7 +60,7 @@ function parseDevArguments(args) {
   if (directory !== undefined && fixtureArguments.length > 0) {
     throw new Error('--directory cannot be combined with fixture options')
   }
-  return { directory, range, fixtureArguments }
+  return { directory, range, logLevel, fixtureArguments }
 }
 
 let options
@@ -146,6 +151,7 @@ function cancelCleanupGuardian() {
 const environment = { ...process.env, RVW_PORT: port }
 const serverArguments = ['serve', '--directory', review.path]
 if (review.range !== undefined) serverArguments.push('--range', review.range)
+if (options.logLevel !== undefined) serverArguments.push('--log-level', options.logLevel)
 const children = [
   {
     name: 'rvw',

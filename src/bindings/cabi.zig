@@ -71,11 +71,6 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    rvw.startup.logApplicationStarted(
-        handle.logger,
-        handle.threaded.io(),
-        handle.configuration.snapshot,
-    );
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
     handle.core = rvw.core.Core.init(

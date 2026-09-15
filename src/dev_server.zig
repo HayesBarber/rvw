@@ -6,6 +6,7 @@ const Options = struct {
     port: u16 = 7331,
     directory: ?[]const u8 = null,
     range: ?[]const u8 = null,
+    log_level: ?[]const u8 = null,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -18,6 +19,7 @@ pub fn main(init: std.process.Init) !void {
             error.ExpectedServe => "expected serve command",
             error.MissingDirectory => "missing required --directory DIR",
             error.DuplicateDirectory => "--directory may only be provided once",
+            error.DuplicateLogLevel => "--log-level may only be provided once",
             error.DuplicateRange => "--range may only be provided once",
         }});
         usage();
@@ -34,7 +36,7 @@ pub fn main(init: std.process.Init) !void {
         .temporary_directory = init.environ_map.get("TMPDIR"),
     });
     defer default_logger.deinit();
-    default_logger.minimum_level = rvw.log.Level.resolve(init.io, init.environ_map.get("LOG_LEVEL"));
+    default_logger.minimum_level = rvw.log.Level.resolve(init.io, options.log_level orelse init.environ_map.get("LOG_LEVEL"));
     const logger = default_logger.interface();
     var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
         rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
@@ -49,7 +51,6 @@ pub fn main(init: std.process.Init) !void {
         .home = init.environ_map.get("HOME"),
     });
     defer configuration.deinit();
-    rvw.startup.logApplicationStarted(logger, init.io, configuration.snapshot);
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
@@ -99,6 +100,11 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
             if (options.range != null) return error.DuplicateRange;
             options.range = args[index];
             index += 1;
+        } else if (std.mem.eql(u8, argument, "--log-level")) {
+            if (index == args.len) return error.MissingValue;
+            if (options.log_level != null) return error.DuplicateLogLevel;
+            options.log_level = args[index];
+            index += 1;
         } else {
             return error.UnknownArgument;
         }
@@ -109,7 +115,7 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
 
 fn usage() void {
     std.debug.print(
-        "usage: rvw-server serve --directory DIR [--range A..B] [--host HOST] [--port PORT]\n" ++
+        "usage: rvw-server serve --directory DIR [--range A..B] [--host HOST] [--port PORT] [--log-level LEVEL]\n" ++
             "       defaults may also be set with RVW_HOST and RVW_PORT\n",
         .{},
     );

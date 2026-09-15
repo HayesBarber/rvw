@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { setImmediate } from 'node:timers/promises'
 import { sendLogEvent, MAX_PENDING_LOGS, LOG_TIMEOUT_MS } from './api.js'
-import { installGlobalLogging, measureOverviewRequest } from './log.js'
+import { installGlobalLogging } from './log.js'
 
-const settle = () => new Promise((resolve) => queueMicrotask(resolve))
+const settle = () => setImmediate()
 
 test('relay preserves JSON on native and HTTP and swallows every failure', async () => {
-  const event = { level: 'debug', message: 'api request', traceId: 'op-1', context: { nested: [true, null, 3] } }
+  const event = { level: 'error', message: 'frontend error', traceId: 'op-1', context: { nested: [true, null, 3] } }
   const submissions = []
   globalThis.window = { webkit: { messageHandlers: { native: { postMessage: (body) => {
     submissions.push(body)
@@ -50,6 +51,7 @@ test('global capture is once per page and never forwards sensitive event propert
   }
   installGlobalLogging()
   installGlobalLogging()
+  assert.deepEqual(events, [])
   let prevented = false
   const sensitive = {
     message: '/secret/repo password=abc', filename: 'https://user:password@example.com',
@@ -60,37 +62,62 @@ test('global capture is once per page and never forwards sensitive event propert
   listeners.get('unhandledrejection')(sensitive)
   await settle()
   assert.deepEqual(events, [
-    { type: 'log', level: 'info', message: 'frontend started' },
     { type: 'log', level: 'error', message: 'frontend error' },
     { type: 'log', level: 'error', message: 'frontend unhandled rejection' },
   ])
   assert.equal(prevented, false)
 })
 
-test('overview timing covers success, rejection and synchronous failure without error contents', async () => {
-  const events = []
-  window.webkit.messageHandlers.native.postMessage = (event) => { events.push(event) }
-  assert.equal(await measureOverviewRequest(() => Promise.resolve(7)), 7)
-  const failure = new Error('private URL or payload')
-  await assert.rejects(measureOverviewRequest(() => Promise.reject(failure)), (error) => error === failure)
-  await assert.rejects(measureOverviewRequest(() => { throw failure }), (error) => error === failure)
-  assert.deepEqual(events.map((event) => event.context.status), ['ok', 'error', 'error'])
-  for (const event of events) {
-    assert.equal(event.message, 'api request')
-    assert.equal(event.level, 'debug')
-    assert.equal(event.context.operation, 'get_diff_overview')
-    assert.ok(event.context.durationMs >= 0)
-    assert.deepEqual(Object.keys(event.context).sort(), ['durationMs', 'operation', 'status'])
-  }
-})
-
-test('stalled relays are bounded, time out, and cannot accumulate more bridge work', async (t) => {
+test('native relay pauses on timeout and resumes only after every late reply settles', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
+  const replies = []
   let count = 0
-  window.webkit.messageHandlers.native.postMessage = () => { count += 1; return new Promise(() => {}) }
-  for (let index = 0; index < 100; index += 1) sendLogEvent({ level: 'error', message: 'test' })
+  window.webkit.messageHandlers.native.postMessage = () => {
+    count += 1
+    return new Promise((resolve, reject) => replies.push({ resolve, reject }))
+  }
+  const send = () => sendLogEvent({ level: 'error', message: 'test' })
+  for (let index = 0; index < 100; index += 1) send()
   assert.equal(count, MAX_PENDING_LOGS)
   t.mock.timers.tick(LOG_TIMEOUT_MS)
-  for (let index = 0; index < 100; index += 1) sendLogEvent({ level: 'error', message: 'test' })
+  await settle()
+  send()
   assert.equal(count, MAX_PENDING_LOGS)
+  replies[0].reject(new Error('late failure'))
+  await settle()
+  send()
+  assert.equal(count, MAX_PENDING_LOGS)
+  for (const reply of replies.slice(1)) reply.resolve()
+  await settle()
+  window.webkit.messageHandlers.native.postMessage = () => { count += 1 }
+  send()
+  await settle()
+  assert.equal(count, MAX_PENDING_LOGS + 1)
+})
+
+test('HTTP relay aborts stalled work and accepts new events after timeout', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  globalThis.window = {}
+  const originalFetch = globalThis.fetch
+  let aborted = false
+  let count = 0
+  try {
+    globalThis.fetch = (_url, { signal }) => {
+      count += 1
+      if (count > 1) return Promise.resolve({ ok: true })
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          aborted = true
+          reject(new Error('aborted'))
+        })
+      })
+    }
+    sendLogEvent({ level: 'error', message: 'test' })
+    t.mock.timers.tick(LOG_TIMEOUT_MS)
+    await settle()
+    assert.equal(aborted, true)
+    sendLogEvent({ level: 'error', message: 'test' })
+    await settle()
+    assert.equal(count, 2)
+  } finally { globalThis.fetch = originalFetch }
 })

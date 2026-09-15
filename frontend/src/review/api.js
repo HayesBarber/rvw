@@ -262,34 +262,26 @@ export const MAX_PENDING_LOGS = 8
 export const LOG_TIMEOUT_MS = 5000
 const MAX_LOG_BYTES = 16 * 1024
 let pendingLogs = 0
-let relayStalled = false
+let stalledNativeLogs = 0
 
 /** Best-effort relay; deliberately bypasses ordinary request instrumentation. */
 export function sendLogEvent(event) {
-  if (relayStalled || pendingLogs >= MAX_PENDING_LOGS) return
-  let timer
-  let active = false
-  const release = () => {
-    if (!active) return
-    active = false
-    clearTimeout(timer)
-    pendingLogs -= 1
-  }
+  if (stalledNativeLogs > 0 || pendingLogs >= MAX_PENDING_LOGS) return
   try {
     const body = JSON.stringify({ ...event, type: 'log' })
     if (new TextEncoder().encode(body).length > MAX_LOG_BYTES) return
+    relayLog(body).catch(() => {})
+  } catch { /* Serialization must never interrupt application work. */ }
+}
+
+async function relayLog(body) {
+  pendingLogs += 1
+  let timer
+  let timedOut = false
+  try {
     const native = window.webkit?.messageHandlers?.native
-    const controller = native ? null : new AbortController()
-    active = true
-    pendingLogs += 1
-    timer = setTimeout(() => {
-      // WebKit replies cannot be cancelled. Stop submitting after a timeout so
-      // unresolved bridge work cannot accumulate across successive timeouts.
-      relayStalled = true
-      release()
-      controller?.abort()
-    }, LOG_TIMEOUT_MS)
-    const result = native
+    const controller = new AbortController()
+    const request = native
       ? native.postMessage(JSON.parse(body))
       : fetch('/api/log', {
           method: 'POST',
@@ -297,8 +289,21 @@ export function sendLogEvent(event) {
           body,
           signal: controller.signal,
         })
-    Promise.resolve(result).then(release, release)
-  } catch {
-    release()
+    const settled = Promise.resolve(request).finally(() => {
+      if (native && timedOut) stalledNativeLogs -= 1
+    })
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        timedOut = true
+        // Native requests cannot be cancelled: pause until late replies settle.
+        if (native) stalledNativeLogs += 1
+        else controller.abort()
+        resolve()
+      }, LOG_TIMEOUT_MS)
+    })
+    await Promise.race([settled, timeout])
+  } finally {
+    clearTimeout(timer)
+    pendingLogs -= 1
   }
 }

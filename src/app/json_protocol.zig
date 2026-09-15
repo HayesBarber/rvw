@@ -215,34 +215,29 @@ pub const maximum_log_bytes = 16 * 1024;
 pub const maximum_log_string_bytes = 4096;
 pub const maximum_trace_bytes = 128;
 pub const maximum_log_depth = 8;
-pub const maximum_log_nodes = 512;
 
 pub fn validateLogPayload(input: []const u8) DecodeError!void {
     if (input.len > maximum_log_bytes) return error.MalformedRequest;
 }
 
-fn validateLogValue(value: std.json.Value, depth: usize, nodes: *usize, bytes: *usize) DecodeError!void {
-    if (depth > maximum_log_depth or nodes.* == maximum_log_nodes) return error.MalformedRequest;
-    nodes.* += 1;
-    bytes.* += 1;
+fn validateLogValue(value: std.json.Value, depth: usize) DecodeError!void {
+    if (depth > maximum_log_depth) return error.MalformedRequest;
     switch (value) {
         .string, .number_string => |string| {
             if (string.len > maximum_log_string_bytes) return error.MalformedRequest;
-            bytes.* += string.len;
         },
         .object => |object| {
             var iterator = object.iterator();
             while (iterator.next()) |entry| {
-                try validateLogValue(.{ .string = entry.key_ptr.* }, depth + 1, nodes, bytes);
-                try validateLogValue(entry.value_ptr.*, depth + 1, nodes, bytes);
+                try validateLogValue(.{ .string = entry.key_ptr.* }, depth + 1);
+                try validateLogValue(entry.value_ptr.*, depth + 1);
             }
         },
         .array => |array| for (array.items) |item| {
-            try validateLogValue(item, depth + 1, nodes, bytes);
+            try validateLogValue(item, depth + 1);
         },
         else => {},
     }
-    if (bytes.* > maximum_log_bytes) return error.MalformedRequest;
 }
 
 fn blankMessage(message: []const u8) DecodeError!bool {
@@ -258,9 +253,7 @@ fn blankMessage(message: []const u8) DecodeError!bool {
 }
 
 fn decodeLog(value: std.json.Value) DecodeError!model.Request {
-    var nodes: usize = 0;
-    var bytes: usize = 0;
-    try validateLogValue(value, 0, &nodes, &bytes);
+    try validateLogValue(value, 0);
     const object = value.object;
     const level = @import("../log/interface.zig").Level.parse(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse return error.MalformedRequest;
     const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
@@ -309,7 +302,7 @@ test "log relay validates fields and preserves context and trace" {
     }
 }
 
-test "log payload string trace depth and node limits are finite and inclusive" {
+test "log payload string trace and depth limits are finite and inclusive" {
     const a = std.testing.allocator;
     const payload = try a.alloc(u8, maximum_log_bytes + 1);
     defer a.free(payload);
@@ -318,17 +311,10 @@ test "log payload string trace depth and node limits are finite and inclusive" {
     const string = try a.alloc(u8, maximum_log_string_bytes + 1);
     defer a.free(string);
     @memset(string, 'x');
-    var nodes: usize = 0;
-    var bytes: usize = 0;
-    try validateLogValue(.{ .string = string[0..maximum_log_string_bytes] }, 0, &nodes, &bytes);
-    try std.testing.expectError(error.MalformedRequest, validateLogValue(.{ .string = string }, 0, &nodes, &bytes));
-    nodes = 0;
-    bytes = 0;
-    try validateLogValue(.null, maximum_log_depth, &nodes, &bytes);
-    try std.testing.expectError(error.MalformedRequest, validateLogValue(.null, maximum_log_depth + 1, &nodes, &bytes));
-    nodes = maximum_log_nodes - 1;
-    try validateLogValue(.null, 0, &nodes, &bytes);
-    try std.testing.expectError(error.MalformedRequest, validateLogValue(.null, 0, &nodes, &bytes));
+    try validateLogValue(.{ .string = string[0..maximum_log_string_bytes] }, 0);
+    try std.testing.expectError(error.MalformedRequest, validateLogValue(.{ .string = string }, 0));
+    try validateLogValue(.null, maximum_log_depth);
+    try std.testing.expectError(error.MalformedRequest, validateLogValue(.null, maximum_log_depth + 1));
     for ([_]usize{ maximum_trace_bytes, maximum_trace_bytes + 1 }) |size| {
         const input = try std.fmt.allocPrint(a, "{{\"type\":\"log\",\"level\":\"debug\",\"message\":\"test\",\"traceId\":\"{s}\"}}", .{string[0..size]});
         defer a.free(input);
