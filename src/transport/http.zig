@@ -242,6 +242,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     defer server.stop();
 
     const router = try server.router(.{});
+    router.post("/api/log", submitLog, .{});
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.post("/api/review/reload", reloadReview, .{});
@@ -270,4 +271,13 @@ test "HTTP comment mutation errors distinguish invalid and stale IDs" {
     try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_comment));
     try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_comment_id));
     try std.testing.expectEqual(std.http.Status.not_found, errorStatus(.unknown_comment));
+}
+
+fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);
+    if (request != .log) return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(res, request);
 }

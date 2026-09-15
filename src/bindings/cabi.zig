@@ -22,6 +22,7 @@ pub const RvwBuffer = extern struct {
 pub export fn rvw_core_create(
     directory_ptr: ?[*:0]const u8,
     range_ptr: ?[*:0]const u8,
+    log_level_ptr: ?[*:0]const u8,
     error_out: ?*RvwBuffer,
 ) callconv(.c) ?*RvwCore {
     if (error_out) |output| output.* = emptyBuffer();
@@ -37,6 +38,7 @@ pub export fn rvw_core_create(
         .xdg_state_home = environmentVariable("XDG_STATE_HOME"),
         .temporary_directory = environmentVariable("TMPDIR"),
     });
+    handle.default_logger.minimum_level = rvw.log.Level.resolve(handle.threaded.io(), if (log_level_ptr) |value| std.mem.span(value) else null);
     handle.logger = handle.default_logger.interface();
     handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         rvw.startup.logApplicationStartFailed(
@@ -69,11 +71,6 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    rvw.startup.logApplicationStarted(
-        handle.logger,
-        handle.threaded.io(),
-        handle.configuration.snapshot,
-    );
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
     handle.core = rvw.core.Core.init(

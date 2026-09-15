@@ -2,7 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 
 const usage =
-    \\usage: rvw [DIR] [-r RANGE | --range RANGE]
+    \\usage: rvw [DIR] [-r RANGE | --range RANGE] [--log-level LEVEL]
     \\       rvw -h | --help
     \\       rvw -v | --version
     \\
@@ -11,6 +11,7 @@ const usage =
 const Options = struct {
     directory: []const u8 = ".",
     range: ?[]const u8 = null,
+    log_level: ?[]const u8 = null,
 };
 
 const Command = union(enum) {
@@ -22,6 +23,8 @@ const Command = union(enum) {
 const ParseError = error{
     DuplicateDirectory,
     DuplicateRange,
+    DuplicateLogLevel,
+    MissingLogLevel,
     EmptyRange,
     MissingRange,
     UnknownArgument,
@@ -66,7 +69,7 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("invalid directory '{s}': {t}", .{ options.directory, err });
         return 2;
     };
-    launch(init.io, allocator, directory, options.range) catch |err| {
+    launch(init.io, allocator, directory, options.range, options.log_level orelse init.environ_map.get("LOG_LEVEL")) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -107,6 +110,13 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
             has_range = true;
             continue;
         }
+        if (!positional_only and std.mem.eql(u8, argument, "--log-level")) {
+            if (options.log_level != null) return error.DuplicateLogLevel;
+            index += 1;
+            if (index == args.len) return error.MissingLogLevel;
+            options.log_level = args[index];
+            continue;
+        }
         if (!positional_only and std.mem.startsWith(u8, argument, "-")) {
             return error.UnknownArgument;
         }
@@ -124,6 +134,8 @@ fn parseErrorMessage(err: ParseError) []const u8 {
         error.DuplicateRange => "the commit range may only be provided once",
         error.EmptyRange => "the commit range cannot be empty",
         error.MissingRange => "missing value for commit range",
+        error.DuplicateLogLevel => "--log-level may only be provided once",
+        error.MissingLogLevel => "missing value for --log-level",
         error.UnknownArgument => "unknown command-line argument",
     };
 }
@@ -144,13 +156,14 @@ fn launch(
     allocator: std.mem.Allocator,
     directory: []const u8,
     range: ?[]const u8,
+    log_level: ?[]const u8,
 ) !void {
     // Zig resolves the running executable through symlinks here. A CLI invoked
     // as /usr/local/bin/rvw therefore finds rvw-cli inside the installed app.
     const executable_dir = try std.process.executableDirPathAlloc(io, allocator);
     const bundle_path = try appBundlePath(executable_dir);
-    var buffer: [9][]const u8 = undefined;
-    const argv = launchArguments(&buffer, bundle_path, directory, range);
+    var buffer: [11][]const u8 = undefined;
+    const argv = launchArguments(&buffer, bundle_path, directory, range, log_level);
 
     var child = try std.process.spawn(io, .{ .argv = argv });
     const result = try child.wait(io);
@@ -168,10 +181,11 @@ fn appBundlePath(executable_dir: []const u8) ![]const u8 {
 }
 
 fn launchArguments(
-    buffer: *[9][]const u8,
+    buffer: *[11][]const u8,
     bundle_path: []const u8,
     directory: []const u8,
     range: ?[]const u8,
+    log_level: ?[]const u8,
 ) []const []const u8 {
     buffer[0..7].* = .{
         "/usr/bin/open",
@@ -182,12 +196,18 @@ fn launchArguments(
         "--directory",
         directory,
     };
+    var count: usize = 7;
     if (range) |value| {
         buffer[7] = "--range";
         buffer[8] = value;
-        return buffer[0..9];
+        count = 9;
     }
-    return buffer[0..7];
+    if (log_level) |value| {
+        buffer[count] = "--log-level";
+        buffer[count + 1] = value;
+        count += 2;
+    }
+    return buffer[0..count];
 }
 
 test "CLI parsing preserves directory, range, help, and positional-only arguments" {
@@ -268,11 +288,12 @@ test "CLI launch arguments target the containing app and forward the optional ra
     );
     try std.testing.expectError(error.InvalidBundleLayout, appBundlePath("Rvw"));
 
-    var without_range_buffer: [9][]const u8 = undefined;
+    var without_range_buffer: [11][]const u8 = undefined;
     const without_range = launchArguments(
         &without_range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
+        null,
         null,
     );
     try expectArguments(&.{
@@ -285,12 +306,13 @@ test "CLI launch arguments target the containing app and forward the optional ra
         "/tmp/repository",
     }, without_range);
 
-    var range_buffer: [9][]const u8 = undefined;
+    var range_buffer: [11][]const u8 = undefined;
     const with_range = launchArguments(
         &range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
         "main..feature",
+        null,
     );
     try expectArguments(&.{
         "/usr/bin/open",
@@ -310,4 +332,29 @@ fn expectArguments(expected: []const []const u8, actual: []const []const u8) !vo
     for (expected, actual) |expected_argument, actual_argument| {
         try std.testing.expectEqualStrings(expected_argument, actual_argument);
     }
+}
+
+test "CLI forwards raw logging configuration with and without range" {
+    for ([_]?[]const u8{ null, "main..HEAD" }) |range| {
+        for ([_][]const u8{ "debug", "", "invalid-secret" }) |level| {
+            var buffer: [11][]const u8 = undefined;
+            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, level);
+            try std.testing.expectEqualStrings("--log-level", args[args.len - 2]);
+            try std.testing.expectEqualStrings(level, args[args.len - 1]);
+            if (range) |value| try std.testing.expectEqualStrings(value, args[8]);
+        }
+    }
+}
+
+test "public log-level option preserves raw values and rejects missing or duplicate options" {
+    for ([_][]const u8{ "debug", "", "invalid" }) |value| {
+        const options = (try parseArgs(&.{ "rvw", "--log-level", value, "/tmp/repo", "--range", "main..HEAD" })).launch;
+        try std.testing.expectEqualStrings(value, options.log_level.?);
+        try std.testing.expectEqualStrings("main..HEAD", options.range.?);
+        try std.testing.expectEqualStrings("/tmp/repo", options.directory);
+    }
+    try std.testing.expectError(error.MissingLogLevel, parseArgs(&.{ "rvw", "--log-level" }));
+    try std.testing.expectError(error.DuplicateLogLevel, parseArgs(&.{ "rvw", "--log-level", "info", "--log-level", "debug" }));
+    const positional = (try parseArgs(&.{ "rvw", "--", "--log-level" })).launch;
+    try std.testing.expect(positional.log_level == null);
 }

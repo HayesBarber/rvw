@@ -1,5 +1,6 @@
 const std = @import("std");
 const config = @import("../config/config.zig");
+const logging = @import("../log/interface.zig");
 
 pub const FileStatus = enum {
     modified,
@@ -183,6 +184,7 @@ pub const FileDiff = struct {
 };
 
 pub const Request = union(enum) {
+    log: logging.Event,
     get_configuration,
     reload_review,
     get_diff_overview,
@@ -237,7 +239,12 @@ pub const ReloadReviewResult = struct {
     generation: usize,
 };
 
+pub const LogResult = struct {
+    accepted: bool,
+};
+
 pub const Response = union(enum) {
+    log_result: LogResult,
     configuration: config.Snapshot,
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,

@@ -257,3 +257,15 @@ export async function copyFilePath(path, format) {
     body: JSON.stringify(request),
   })
 }
+
+/** Fire-and-forget logging; failures must not interrupt application work. */
+export function sendLogEvent(event) {
+  try {
+    const body = JSON.stringify({ ...event, type: 'log' })
+    requestJson('/api/log', JSON.parse(body), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).catch(() => {})
+  } catch { /* Ignore serialization failures. */ }
+}

@@ -24,6 +24,19 @@ func testLaunchConfiguration() {
         fatalError("working-tree CLI launch arguments should be accepted")
     }
 
+    for range in [[], ["--range", "main..HEAD"]] {
+        for level in ["debug", "warn", "", "invalid-secret"] {
+            let args = ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository"]
+                + range + ["--log-level", level]
+            switch LaunchConfiguration.parse(arguments: args) {
+            case let .configuration(configuration):
+                expect(configuration.logLevel == level, "Swift must carry the raw level unchanged")
+                expect(configuration.range == range.last, "range must survive logging options")
+            default: fatalError("logging configuration must not prevent launch")
+            }
+        }
+    }
+
     let invalidArguments = [
         ["Rvw", "--rvw-cli-launch"],
         ["Rvw", "--rvw-cli-launch", "--directory"],

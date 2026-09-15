@@ -9,6 +9,20 @@ pub const Level = enum {
     warning,
     err,
 
+    pub fn parse(value: []const u8) ?Level {
+        inline for (.{ .{ "debug", Level.debug }, .{ "info", Level.info }, .{ "warning", Level.warning }, .{ "warn", Level.warning }, .{ "error", Level.err }, .{ "err", Level.err } }) |entry| {
+            if (std.mem.eql(u8, value, entry[0])) return entry[1];
+        }
+        return null;
+    }
+
+    pub fn resolve(io: Io, value: ?[]const u8) Level {
+        return parse(value orelse return .err) orelse blk: {
+            Io.File.stderr().writeStreamingAll(io, "invalid LOG_LEVEL; using error\n") catch {};
+            break :blk .err;
+        };
+    }
+
     pub fn jsonStringify(self: Level, writer: *std.json.Stringify) !void {
         try writer.write(switch (self) {
             .debug => "debug",
@@ -21,6 +35,7 @@ pub const Level = enum {
 
 pub const Source = enum {
     backend,
+    frontend,
 };
 
 pub const Event = struct {
@@ -28,12 +43,14 @@ pub const Event = struct {
     source: Source,
     message: []const u8,
     context: ?std.json.Value = null,
+    traceId: ?[]const u8 = null,
 };
 
 pub const Logger = struct {
     allocator: Allocator,
     context: *anyopaque,
     vtable: *const VTable,
+    minimum_level: Level = .err,
 
     pub const VTable = struct {
         write: *const fn (*anyopaque, Io, Event) anyerror!void,
@@ -42,6 +59,7 @@ pub const Logger = struct {
     /// Logging is intentionally non-fatal. A sink failure is reported to
     /// stderr, along with the original event when it can be encoded.
     pub fn log(self: Logger, io: Io, event: Event) void {
+        if (@intFromEnum(event.level) < @intFromEnum(self.minimum_level)) return;
         self.vtable.write(self.context, io, event) catch |err| {
             writeFallback(self.allocator, io, event, err);
         };
@@ -55,6 +73,7 @@ pub fn encodeEvent(allocator: Allocator, io: Io, event: Event) ![]u8 {
         .source = event.source,
         .message = event.message,
         .context = event.context,
+        .traceId = event.traceId,
     }, .{ .emit_null_optional_fields = false });
 }
 
@@ -84,4 +103,25 @@ test "encoded events omit absent optional context" {
     try std.testing.expectEqualStrings("application started", object.get("message").?.string);
     try std.testing.expect(object.get("timestamp") != null);
     try std.testing.expect(object.get("context") == null);
+    try std.testing.expect(object.get("traceId") == null);
+}
+
+test "severity aliases and authoritative threshold cover every event level" {
+    try std.testing.expectEqual(Level.warning, Level.parse("warn").?);
+    try std.testing.expectEqual(Level.err, Level.parse("err").?);
+    try std.testing.expectEqual(Level.err, Level.resolve(std.testing.io, null));
+    for ([_][]const u8{ "", "ERROR", "secret-token", " info" }) |invalid| try std.testing.expect(Level.parse(invalid) == null);
+    const Counter = struct {
+        count: usize = 0,
+        fn write(ptr: *anyopaque, _: Io, _: Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(ptr));
+            self.count += 1;
+        }
+    };
+    for (std.enums.values(Level)) |threshold| {
+        var counter: Counter = .{};
+        const logger: Logger = .{ .allocator = std.testing.allocator, .context = &counter, .vtable = &.{ .write = Counter.write }, .minimum_level = threshold };
+        for (std.enums.values(Level)) |level| logger.log(std.testing.io, .{ .level = level, .source = .frontend, .message = "test" });
+        try std.testing.expectEqual(4 - @as(usize, @intFromEnum(threshold)), counter.count);
+    }
 }

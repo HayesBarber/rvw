@@ -1,6 +1,7 @@
 const std = @import("std");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
+const log = @import("../log/interface.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -44,6 +45,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     };
     const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
 
+    if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
@@ -203,4 +205,63 @@ test "file path copy requests require a supported format" {
     );
     defer parsed_invalid.deinit();
     try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed_invalid.value));
+}
+
+fn decodeLog(value: std.json.Value) DecodeError!model.Request {
+    const object = value.object;
+    const level = log.Level.parse(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse return error.MalformedRequest;
+    const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
+    if (std.mem.trim(u8, message, &std.ascii.whitespace).len == 0) return error.MalformedRequest;
+    var trace: ?[]const u8 = null;
+    if (object.get("traceId")) |field| {
+        if (field != .null) {
+            trace = jsonString(field) orelse return error.MalformedRequest;
+            if (trace.?.len == 0) return error.MalformedRequest;
+        }
+    }
+    var context: ?std.json.Value = null;
+    if (object.get("context")) |field| {
+        if (field != .null) {
+            if (field != .object) return error.MalformedRequest;
+            context = field;
+        }
+    }
+    return .{ .log = .{ .level = level, .source = .frontend, .message = message, .context = context, .traceId = trace } };
+}
+
+test "log relay validates fields and preserves context and trace" {
+    const input =
+        \\{"type":"log","level":"warn","message":"frontend error","traceId":"op-7","source":"backend","timestamp":1,"context":{"nested":{"count":2,"ok":true},"array":[null,3]}}
+    ;
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+    defer parsed.deinit();
+    const event = (try decodeRequestValue(parsed.value)).log;
+    try std.testing.expectEqual(log.Source.frontend, event.source);
+    const encoded = try log.encodeEvent(std.testing.allocator, std.testing.io, event);
+    defer std.testing.allocator.free(encoded);
+    var retained = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, encoded, .{});
+    defer retained.deinit();
+    try std.testing.expectEqualStrings("warning", retained.value.object.get("level").?.string);
+    try std.testing.expectEqualStrings("op-7", retained.value.object.get("traceId").?.string);
+    try std.testing.expect(retained.value.object.get("timestamp").?.integer != 1);
+    try std.testing.expectEqual(@as(i64, 2), retained.value.object.get("context").?.object.get("nested").?.object.get("count").?.integer);
+    for ([_][]const u8{
+        "{}",                                                                        "{\"type\":\"log\",\"message\":\"x\"}",
+        "{\"type\":\"log\",\"level\":\"ERROR\",\"message\":\"x\"}",                  "{\"type\":\"log\",\"level\":\"error\",\"message\":\" \"}",
+        "{\"type\":\"log\",\"level\":\"error\",\"message\":\"x\",\"traceId\":\"\"}", "{\"type\":\"log\",\"level\":\"error\",\"message\":\"x\",\"context\":[]}",
+    }) |invalid| {
+        var bad = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, invalid, .{});
+        defer bad.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeRequestValue(bad.value));
+    }
+}
+
+test "null relay options are omitted" {
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator,
+        \\{"type":"log","level":"err","message":"event","context":null,"traceId":null}
+    , .{});
+    defer parsed.deinit();
+    const event = (try decodeRequestValue(parsed.value)).log;
+    try std.testing.expect(event.context == null);
+    try std.testing.expect(event.traceId == null);
 }

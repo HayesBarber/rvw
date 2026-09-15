@@ -49,6 +49,10 @@ pub const Core = struct {
     }
 
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
+        if (request == .log) {
+            self.logger.log(self.io, request.log);
+            return .{ .log_result = .{ .accepted = true } };
+        }
         const operation = operationName(request);
         return self.dispatchRequest(request) catch |err| {
             if (shouldLogRequestFailure(err)) {
@@ -60,6 +64,7 @@ pub const Core = struct {
 
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
+            .log => unreachable,
             .get_configuration => .{ .configuration = self.configuration },
             .reload_review => blk: {
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
@@ -136,6 +141,7 @@ pub const Core = struct {
 
 fn operationName(request: model.Request) []const u8 {
     return switch (request) {
+        .log => "log",
         .get_configuration => "get_configuration",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
@@ -678,4 +684,26 @@ test "core copies validated file paths exactly without accessing the file" {
         .path = "README.md",
         .format = .relative,
     } }));
+}
+
+test "relay acknowledges filtered events and writes once without recursive instrumentation" {
+    const Recorder = struct {
+        count: usize = 0,
+        fn write(ptr: *anyopaque, _: Io, event: log.Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(ptr));
+            self.count += 1;
+            try std.testing.expectEqual(log.Source.frontend, event.source);
+            try std.testing.expectEqualStrings("relay test event", event.message);
+        }
+    };
+    var recorder: Recorder = .{};
+    var core: Core = undefined;
+    core.io = std.testing.io;
+    core.logger = .{ .allocator = std.testing.allocator, .context = &recorder, .vtable = &.{ .write = Recorder.write } };
+    const request: model.Request = .{ .log = .{ .level = .info, .source = .frontend, .message = "relay test event" } };
+    try std.testing.expect((try core.dispatch(request)).log_result.accepted);
+    try std.testing.expectEqual(@as(usize, 0), recorder.count);
+    core.logger.minimum_level = .debug;
+    try std.testing.expect((try core.dispatch(request)).log_result.accepted);
+    try std.testing.expectEqual(@as(usize, 1), recorder.count);
 }

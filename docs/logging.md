@@ -1,46 +1,20 @@
-# Logging and troubleshooting
+# Logging
 
-Rvw writes structured application events as newline-delimited JSON (JSONL). A
-new file is created for each application launch. The preferred directory is:
+Frontend and backend errors share one JSONL file per launch:
 
 - macOS: `~/Library/Logs/rvw`
-- Linux: `$XDG_STATE_HOME/rvw`, or `~/.local/state/rvw` when
-  `XDG_STATE_HOME` is unset
+- Linux: `$XDG_STATE_HOME/rvw` or `~/.local/state/rvw`
+- Fallback: the temporary directory, then stderr if no file can be opened.
 
-Other platforms, or a failure to use the preferred directory, fall back to the
-operating-system temporary directory. If no file can be created, events are
-written to stderr. Logging failures are reported to stderr and never stop the
-application. Rvw retains the 10 newest `rvw-*.jsonl` files in each directory it
-uses.
+The 10 newest log files are retained; individual file sizes are not capped.
+Logging failures do not stop the application. CLI and development-transport
+diagnostics remain on stderr.
 
-## V1 event contract
+Frontend code uses `logError(message, context?, traceId?)`; the shared
+`sendLogEvent` API relays through `/api/log` or the native bridge. Use fixed
+messages and selected diagnostic fields, never user content or raw exceptions.
+Delivery is fire-and-forget; failures are ignored and there are no retries.
 
-Each structured line has these fields:
-
-- `timestamp`: Unix time in milliseconds, assigned by the backend when the event is written.
-- `level`: `debug`, `info`, `warning`, or `error`; the event's diagnostic severity.
-- `source`: the component that emitted the event.
-- `message`: a short, stable event description. It must not contain user or repository content.
-- `context`: optional event-specific diagnostic dimensions. It is an object and is omitted when the event has no dimensions.
-
-The retained V1 events are limited to:
-
-| Event | Level | Context | Purpose |
-| --- | --- | --- | --- |
-| `application started` | `info` | `configurationStatus`; when configuration fallback is used, `configurationDiagnosticCode`, `configurationDiagnosticMessage`, and `configurationPath` | Confirm launch and diagnose rejected or unreadable configuration. |
-| `application start failed` | `error` | `stage`, `errorCode` | Identify which production initialization stage failed without exposing the repository path. |
-| `request failed` | `error` | `operation`, `errorCode` | Diagnose unexpected backend failures without recording request payloads. Expected validation and not-found responses are not logged. |
-
-`configurationPath` intentionally exposes the path of the configuration file
-that could not be used; it is needed to correct that file. Structured events do
-not include repository or file paths, request URLs, comment bodies, file
-contents, configuration contents, credentials, or environment values.
-
-## stderr diagnostics
-
-Command-line parsing and launch errors, development-server listener status,
-unexpected HTTP failures, and Unix-socket diagnostics stay on stderr through
-Zig's standard logger. They describe the CLI or development transport rather
-than the application session, so they are not duplicated in application JSONL
-files. Development commands may intentionally print a selected repository or
-temporary worktree path to make the active fixture unambiguous.
+Application events are errors only. The shared API supports other severities for
+future instrumentation. `--log-level` overrides `LOG_LEVEL`, defaulting to `error`;
+supported values are `error`/`err`, `warning`/`warn`, `info`, and `debug`.
