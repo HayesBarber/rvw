@@ -232,6 +232,26 @@ test('configured wrapLines applies the startup default only for real booleans', 
   }
 })
 
+test('relative line numbers start absolute, toggle, and accept boolean configuration', () => {
+  assert.equal(initialWorkspaceState.relativeLineNumbers, false)
+  const toggled = workspaceReducer(initialWorkspaceState, {
+    type: 'relative_line_numbers_toggled',
+  })
+  assert.equal(toggled.relativeLineNumbers, true)
+
+  const configured = workspaceReducer(toggled, {
+    type: 'relative_line_numbers_set',
+    relativeLineNumbers: false,
+  })
+  assert.equal(configured.relativeLineNumbers, false)
+  for (const value of [undefined, null, 1, 'yes']) {
+    assert.equal(workspaceReducer(configured, {
+      type: 'relative_line_numbers_set',
+      relativeLineNumbers: value,
+    }), configured)
+  }
+})
+
 test('keyboard reference visibility is idempotent and preserves workspace context', () => {
   const opened = workspaceReducer(initialWorkspaceState, {
     type: 'keymap_reference_opened',

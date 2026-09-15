@@ -73,6 +73,7 @@ test('application close does not throw when the native host is exiting', async (
 
 const configurationSnapshot = {
   configuration: {
+    diff: { relativeLineNumbers: true },
     keybindings: {
       normal: {
         'focus.file_tree': [['g', 't']],

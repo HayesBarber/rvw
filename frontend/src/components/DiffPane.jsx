@@ -27,12 +27,19 @@ export default function DiffPane({
   onEditComment,
   onDeleteComment,
   onFocusFileTree,
+  onToggleRelativeLineNumbers,
   onToggleWrapLines,
   registerActionAdapter,
+  relativeLineNumbers,
   wrapLines,
 }) {
   const [expandUnchanged, setExpandUnchanged] = useState(false)
-  const cursor = useDiffCursor({ comments, fileDiff, isCursorVisible })
+  const cursor = useDiffCursor({
+    comments,
+    fileDiff,
+    isCursorVisible,
+    relativeLineNumbers,
+  })
   const commentReview = useDiffComments({
     comments,
     cursor,
@@ -52,6 +59,7 @@ export default function DiffPane({
       contentKind: fileDiff?.content.kind,
       prepareLayoutChange: cursor.guardNextLayoutRender,
       toggleExpandUnchanged,
+      toggleRelativeLineNumbers: onToggleRelativeLineNumbers,
       toggleWrapLines: onToggleWrapLines,
     }),
     ...createDiffCursorActionAdapter({
@@ -85,6 +93,7 @@ export default function DiffPane({
     cursor.guardNextLayoutRender,
     fileDiff,
     onFocusFileTree,
+    onToggleRelativeLineNumbers,
     onToggleWrapLines,
     registerActionAdapter,
     toggleExpandUnchanged,

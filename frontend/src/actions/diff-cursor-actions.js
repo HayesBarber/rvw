@@ -28,6 +28,49 @@ export function syncDiffCursorPresentation(instance, cursor, visible) {
   return true
 }
 
+function gutterSide(gutter) {
+  return gutter.closest?.('[data-deletions]')
+    ? DiffCursorSide.DELETIONS
+    : DiffCursorSide.ADDITIONS
+}
+
+/**
+ * Updates only Pierre's visible gutter text. Numeric data attributes remain the
+ * source of truth for selection, comments, and renderer interactions.
+ */
+export function syncRelativeLineNumbers(node, rows, cursor, enabled) {
+  const gutters = node?.shadowRoot?.querySelectorAll?.('[data-column-number]')
+  if (!gutters) return false
+
+  const cursorIndex = cursor?.lineNumber === 0
+    ? -1
+    : rowIndexForCursor(rows, cursor)
+  const rowIndexes = new Map()
+  if (enabled && cursorIndex !== -1) {
+    rows.forEach((row, index) => {
+      for (const side of [DiffCursorSide.DELETIONS, DiffCursorSide.ADDITIONS]) {
+        if (row[side] !== undefined) rowIndexes.set(`${side}:${row[side]}`, index)
+      }
+    })
+  }
+
+  for (const gutter of gutters) {
+    const sourceText = gutter.getAttribute('data-column-number')
+    const content = gutter.querySelector?.('[data-line-number-content]')
+    if (!content || !/^\d+$/.test(sourceText ?? '')) continue
+
+    let displayText = sourceText
+    if (enabled && cursorIndex !== -1) {
+      const index = rowIndexes.get(`${gutterSide(gutter)}:${sourceText}`)
+      if (index !== undefined && index !== cursorIndex) {
+        displayText = `${Math.abs(index - cursorIndex)}`
+      }
+    }
+    if (content.textContent !== displayText) content.textContent = displayText
+  }
+  return true
+}
+
 function normalizedCount(count) {
   return Number.isSafeInteger(count) && count > 0 ? count : 1
 }

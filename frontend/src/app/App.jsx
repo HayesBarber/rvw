@@ -32,6 +32,9 @@ export default function App() {
   const toggleWrapLines = useCallback(() => {
     dispatchWorkspace({ type: 'wrap_lines_toggled' })
   }, [])
+  const toggleRelativeLineNumbers = useCallback(() => {
+    dispatchWorkspace({ type: 'relative_line_numbers_toggled' })
+  }, [])
   const vimController = useVimController()
   const vimState = useVimState()
   const keyboardConfiguration = useConfiguration(vimController)
@@ -42,6 +45,12 @@ export default function App() {
       wrapLines: keyboardConfiguration.wrapLines,
     })
   }, [keyboardConfiguration.wrapLines])
+  useEffect(() => {
+    dispatchWorkspace({
+      type: 'relative_line_numbers_set',
+      relativeLineNumbers: keyboardConfiguration.relativeLineNumbers,
+    })
+  }, [keyboardConfiguration.relativeLineNumbers])
   const {
     activePath,
     allFilesRequest,
@@ -268,7 +277,9 @@ export default function App() {
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
             onFocusFileTree={focusFileTree}
+            onToggleRelativeLineNumbers={toggleRelativeLineNumbers}
             onToggleWrapLines={toggleWrapLines}
+            relativeLineNumbers={workspace.relativeLineNumbers}
             registerActionAdapter={registerDiffPaneActions}
             wrapLines={workspace.wrapLines}
           />
