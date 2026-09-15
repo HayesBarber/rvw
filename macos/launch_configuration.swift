@@ -11,6 +11,7 @@ enum LaunchConfigurationResult {
 struct LaunchConfiguration: Equatable {
     let directory: URL
     let range: String?
+    var logLevel: String? = nil
 
     static func parse(arguments: [String]) -> LaunchConfigurationResult {
         guard let markerIndex = arguments.firstIndex(of: launchMarker) else {
@@ -29,8 +30,7 @@ struct LaunchConfiguration: Equatable {
         index = arguments.index(after: index)
 
         let range: String?
-        if index < arguments.endIndex {
-            guard arguments[index] == "--range" else { return .invalid }
+        if index < arguments.endIndex, arguments[index] == "--range" {
             index = arguments.index(after: index)
             guard index < arguments.endIndex, !arguments[index].isEmpty else {
                 return .invalid
@@ -41,7 +41,14 @@ struct LaunchConfiguration: Equatable {
             range = nil
         }
 
+        var logLevel: String? = nil
+        if index < arguments.endIndex, arguments[index] == "--log-level" {
+            index = arguments.index(after: index)
+            guard index < arguments.endIndex else { return .invalid }
+            logLevel = arguments[index]
+            index = arguments.index(after: index)
+        }
         guard index == arguments.endIndex else { return .invalid }
-        return .configuration(LaunchConfiguration(directory: directory, range: range))
+        return .configuration(LaunchConfiguration(directory: directory, range: range, logLevel: logLevel))
     }
 }

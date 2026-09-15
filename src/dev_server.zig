@@ -28,7 +28,16 @@ pub fn main(init: std.process.Init) !void {
         return error.InvalidHost;
     };
 
+    var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
+        .home = init.environ_map.get("HOME"),
+        .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
+        .temporary_directory = init.environ_map.get("TMPDIR"),
+    });
+    defer default_logger.deinit();
+    default_logger.minimum_level = rvw.log.Level.resolve(init.io, init.environ_map.get("LOG_LEVEL"));
+    const logger = default_logger.interface();
     var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
+        rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
         std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
         return err;
     };
@@ -36,13 +45,6 @@ pub fn main(init: std.process.Init) !void {
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
-    var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
-        .home = init.environ_map.get("HOME"),
-        .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
-        .temporary_directory = init.environ_map.get("TMPDIR"),
-    });
-    defer default_logger.deinit();
-    const logger = default_logger.interface();
     var configuration = try rvw.config.load(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
     });

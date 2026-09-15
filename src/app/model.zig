@@ -183,6 +183,7 @@ pub const FileDiff = struct {
 };
 
 pub const Request = union(enum) {
+    log: @import("../log/interface.zig").Event,
     get_configuration,
     reload_review,
     get_diff_overview,
@@ -238,6 +239,7 @@ pub const ReloadReviewResult = struct {
 };
 
 pub const Response = union(enum) {
+    log_result: struct { accepted: bool },
     configuration: config.Snapshot,
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,

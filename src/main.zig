@@ -66,7 +66,7 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("invalid directory '{s}': {t}", .{ options.directory, err });
         return 2;
     };
-    launch(init.io, allocator, directory, options.range) catch |err| {
+    launch(init.io, allocator, directory, options.range, init.environ_map.get("LOG_LEVEL")) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -144,13 +144,14 @@ fn launch(
     allocator: std.mem.Allocator,
     directory: []const u8,
     range: ?[]const u8,
+    log_level: ?[]const u8,
 ) !void {
     // Zig resolves the running executable through symlinks here. A CLI invoked
     // as /usr/local/bin/rvw therefore finds rvw-cli inside the installed app.
     const executable_dir = try std.process.executableDirPathAlloc(io, allocator);
     const bundle_path = try appBundlePath(executable_dir);
-    var buffer: [9][]const u8 = undefined;
-    const argv = launchArguments(&buffer, bundle_path, directory, range);
+    var buffer: [11][]const u8 = undefined;
+    const argv = launchArguments(&buffer, bundle_path, directory, range, log_level);
 
     var child = try std.process.spawn(io, .{ .argv = argv });
     const result = try child.wait(io);
@@ -168,10 +169,11 @@ fn appBundlePath(executable_dir: []const u8) ![]const u8 {
 }
 
 fn launchArguments(
-    buffer: *[9][]const u8,
+    buffer: *[11][]const u8,
     bundle_path: []const u8,
     directory: []const u8,
     range: ?[]const u8,
+    log_level: ?[]const u8,
 ) []const []const u8 {
     buffer[0..7].* = .{
         "/usr/bin/open",
@@ -182,12 +184,18 @@ fn launchArguments(
         "--directory",
         directory,
     };
+    var count: usize = 7;
     if (range) |value| {
         buffer[7] = "--range";
         buffer[8] = value;
-        return buffer[0..9];
+        count = 9;
     }
-    return buffer[0..7];
+    if (log_level) |value| {
+        buffer[count] = "--log-level";
+        buffer[count + 1] = value;
+        count += 2;
+    }
+    return buffer[0..count];
 }
 
 test "CLI parsing preserves directory, range, help, and positional-only arguments" {
@@ -268,11 +276,12 @@ test "CLI launch arguments target the containing app and forward the optional ra
     );
     try std.testing.expectError(error.InvalidBundleLayout, appBundlePath("Rvw"));
 
-    var without_range_buffer: [9][]const u8 = undefined;
+    var without_range_buffer: [11][]const u8 = undefined;
     const without_range = launchArguments(
         &without_range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
+        null,
         null,
     );
     try expectArguments(&.{
@@ -285,12 +294,13 @@ test "CLI launch arguments target the containing app and forward the optional ra
         "/tmp/repository",
     }, without_range);
 
-    var range_buffer: [9][]const u8 = undefined;
+    var range_buffer: [11][]const u8 = undefined;
     const with_range = launchArguments(
         &range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
         "main..feature",
+        null,
     );
     try expectArguments(&.{
         "/usr/bin/open",
@@ -309,5 +319,17 @@ fn expectArguments(expected: []const []const u8, actual: []const []const u8) !vo
     try std.testing.expectEqual(expected.len, actual.len);
     for (expected, actual) |expected_argument, actual_argument| {
         try std.testing.expectEqualStrings(expected_argument, actual_argument);
+    }
+}
+
+test "CLI forwards raw logging configuration with and without range" {
+    for ([_]?[]const u8{ null, "main..HEAD" }) |range| {
+        for ([_][]const u8{ "debug", "", "invalid-secret" }) |level| {
+            var buffer: [11][]const u8 = undefined;
+            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, level);
+            try std.testing.expectEqualStrings("--log-level", args[args.len - 2]);
+            try std.testing.expectEqualStrings(level, args[args.len - 1]);
+            if (range) |value| try std.testing.expectEqualStrings(value, args[8]);
+        }
     }
 }

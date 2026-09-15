@@ -135,6 +135,7 @@ const RecordingLogger = struct {
             .allocator = std.testing.allocator,
             .context = self,
             .vtable = &.{ .write = write },
+            .minimum_level = .info,
         };
     }
 
@@ -161,4 +162,15 @@ fn jsonString(value: ?std.json.Value) ?[]const u8 {
         .string => |string| string,
         else => null,
     };
+}
+
+test "default threshold omits configuration path exception" {
+    var recorder: RecordingLogger = .{};
+    var logger = recorder.interface();
+    logger.minimum_level = .err;
+    logApplicationStarted(logger, std.testing.io, .{
+        .configuration = .{ .object = .empty },
+        .diagnostic = .{ .code = .invalid_schema, .message = "configuration is invalid", .path = "/sensitive/config.json" },
+    });
+    try std.testing.expectEqual(@as(usize, 0), recorder.count);
 }

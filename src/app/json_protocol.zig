@@ -17,6 +17,7 @@ pub fn encodeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
 }
 
 pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatcher, input: []const u8) ![]u8 {
+    if (input.len > maximum_request_bytes) return encodeEnvelopeError(allocator, .malformed_request);
     var parsed = std.json.parseFromSlice(std.json.Value, allocator, input, .{}) catch {
         return encodeEnvelopeError(allocator, .malformed_request);
     };
@@ -27,6 +28,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         if (err == error.UnknownOperation) .unknown_operation else .malformed_request,
     );
 
+    if (request == .log) validateLogPayload(input) catch return encodeEnvelopeError(allocator, .malformed_request);
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
@@ -44,6 +46,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     };
     const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
 
+    if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
@@ -203,4 +206,148 @@ test "file path copy requests require a supported format" {
     );
     defer parsed_invalid.deinit();
     try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed_invalid.value));
+}
+
+// The native JSON boundary caps every request before parsing; log shape limits
+// additionally apply identically to HTTP and native submissions.
+pub const maximum_request_bytes = 1024 * 1024;
+pub const maximum_log_bytes = 16 * 1024;
+pub const maximum_log_string_bytes = 4096;
+pub const maximum_trace_bytes = 128;
+pub const maximum_log_depth = 8;
+pub const maximum_log_nodes = 512;
+
+pub fn validateLogPayload(input: []const u8) DecodeError!void {
+    if (input.len > maximum_log_bytes) return error.MalformedRequest;
+}
+
+fn validateLogValue(value: std.json.Value, depth: usize, nodes: *usize, bytes: *usize) DecodeError!void {
+    if (depth > maximum_log_depth or nodes.* == maximum_log_nodes) return error.MalformedRequest;
+    nodes.* += 1;
+    bytes.* += 1;
+    switch (value) {
+        .string, .number_string => |string| {
+            if (string.len > maximum_log_string_bytes) return error.MalformedRequest;
+            bytes.* += string.len;
+        },
+        .object => |object| {
+            var iterator = object.iterator();
+            while (iterator.next()) |entry| {
+                try validateLogValue(.{ .string = entry.key_ptr.* }, depth + 1, nodes, bytes);
+                try validateLogValue(entry.value_ptr.*, depth + 1, nodes, bytes);
+            }
+        },
+        .array => |array| for (array.items) |item| {
+            try validateLogValue(item, depth + 1, nodes, bytes);
+        },
+        else => {},
+    }
+    if (bytes.* > maximum_log_bytes) return error.MalformedRequest;
+}
+
+fn blankMessage(message: []const u8) DecodeError!bool {
+    const view = std.unicode.Utf8View.init(message) catch return error.MalformedRequest;
+    var iterator = view.iterator();
+    while (iterator.nextCodepoint()) |codepoint| {
+        switch (codepoint) {
+            0x09...0x0d, 0x20, 0x85, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000 => {},
+            else => return false,
+        }
+    }
+    return true;
+}
+
+fn decodeLog(value: std.json.Value) DecodeError!model.Request {
+    var nodes: usize = 0;
+    var bytes: usize = 0;
+    try validateLogValue(value, 0, &nodes, &bytes);
+    const object = value.object;
+    const level = @import("../log/interface.zig").Level.parse(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse return error.MalformedRequest;
+    const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
+    if (try blankMessage(message)) return error.MalformedRequest;
+    var trace: ?[]const u8 = null;
+    if (object.get("traceId")) |field| {
+        if (field != .null) {
+            trace = jsonString(field) orelse return error.MalformedRequest;
+            if (trace.?.len == 0 or trace.?.len > maximum_trace_bytes) return error.MalformedRequest;
+        }
+    }
+    var context: ?std.json.Value = null;
+    if (object.get("context")) |field| {
+        if (field != .null) {
+            if (field != .object) return error.MalformedRequest;
+            context = field;
+        }
+    }
+    return .{ .log = .{ .level = level, .source = .frontend, .message = message, .context = context, .traceId = trace } };
+}
+
+test "log relay validates fields and preserves context and trace" {
+    const input =
+        \\{"type":"log","level":"warn","message":"frontend error","traceId":"op-7","source":"backend","timestamp":1,"context":{"nested":{"count":2,"ok":true},"array":[null,3]}}
+    ;
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+    defer parsed.deinit();
+    const event = (try decodeRequestValue(parsed.value)).log;
+    try std.testing.expectEqual(@import("../log/interface.zig").Source.frontend, event.source);
+    const encoded = try @import("../log/interface.zig").encodeEvent(std.testing.allocator, std.testing.io, event);
+    defer std.testing.allocator.free(encoded);
+    var retained = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, encoded, .{});
+    defer retained.deinit();
+    try std.testing.expectEqualStrings("warning", retained.value.object.get("level").?.string);
+    try std.testing.expectEqualStrings("op-7", retained.value.object.get("traceId").?.string);
+    try std.testing.expect(retained.value.object.get("timestamp").?.integer != 1);
+    try std.testing.expectEqual(@as(i64, 2), retained.value.object.get("context").?.object.get("nested").?.object.get("count").?.integer);
+    for ([_][]const u8{
+        "{}",                                                                        "{\"type\":\"log\",\"message\":\"x\"}",
+        "{\"type\":\"log\",\"level\":\"ERROR\",\"message\":\"x\"}",                  "{\"type\":\"log\",\"level\":\"error\",\"message\":\" \"}",
+        "{\"type\":\"log\",\"level\":\"error\",\"message\":\"x\",\"traceId\":\"\"}", "{\"type\":\"log\",\"level\":\"error\",\"message\":\"x\",\"context\":[]}",
+    }) |invalid| {
+        var bad = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, invalid, .{});
+        defer bad.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeRequestValue(bad.value));
+    }
+}
+
+test "log payload string trace depth and node limits are finite and inclusive" {
+    const a = std.testing.allocator;
+    const payload = try a.alloc(u8, maximum_log_bytes + 1);
+    defer a.free(payload);
+    try validateLogPayload(payload[0..maximum_log_bytes]);
+    try std.testing.expectError(error.MalformedRequest, validateLogPayload(payload));
+    const string = try a.alloc(u8, maximum_log_string_bytes + 1);
+    defer a.free(string);
+    @memset(string, 'x');
+    var nodes: usize = 0;
+    var bytes: usize = 0;
+    try validateLogValue(.{ .string = string[0..maximum_log_string_bytes] }, 0, &nodes, &bytes);
+    try std.testing.expectError(error.MalformedRequest, validateLogValue(.{ .string = string }, 0, &nodes, &bytes));
+    nodes = 0;
+    bytes = 0;
+    try validateLogValue(.null, maximum_log_depth, &nodes, &bytes);
+    try std.testing.expectError(error.MalformedRequest, validateLogValue(.null, maximum_log_depth + 1, &nodes, &bytes));
+    nodes = maximum_log_nodes - 1;
+    try validateLogValue(.null, 0, &nodes, &bytes);
+    try std.testing.expectError(error.MalformedRequest, validateLogValue(.null, 0, &nodes, &bytes));
+    for ([_]usize{ maximum_trace_bytes, maximum_trace_bytes + 1 }) |size| {
+        const input = try std.fmt.allocPrint(a, "{{\"type\":\"log\",\"level\":\"debug\",\"message\":\"test\",\"traceId\":\"{s}\"}}", .{string[0..size]});
+        defer a.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, a, input, .{});
+        defer parsed.deinit();
+        if (size == maximum_trace_bytes) {
+            _ = try decodeRequestValue(parsed.value);
+        } else try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
+    }
+}
+
+test "null relay options are omitted and Unicode whitespace is blank" {
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator,
+        \\{"type":"log","level":"err","message":"event","context":null,"traceId":null}
+    , .{});
+    defer parsed.deinit();
+    const event = (try decodeRequestValue(parsed.value)).log;
+    try std.testing.expect(event.context == null);
+    try std.testing.expect(event.traceId == null);
+    try std.testing.expect(try blankMessage(" \t\n\u{a0}\u{3000}"));
+    try std.testing.expect(!try blankMessage("event"));
 }

@@ -20,6 +20,7 @@ pub const stderrLogger = stderr.logger;
 pub const DefaultLogger = struct {
     allocator: std.mem.Allocator,
     file_logger: ?FileLogger,
+    minimum_level: Level = .err,
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, environment: Environment) DefaultLogger {
         const file_logger = FileLogger.init(allocator, io, environment) catch |err| {
@@ -30,8 +31,9 @@ pub const DefaultLogger = struct {
     }
 
     pub fn interface(self: *DefaultLogger) Logger {
-        if (self.file_logger) |*file_logger| return file_logger.interface();
-        return stderrLogger(self.allocator);
+        var logger = if (self.file_logger) |*file_logger| file_logger.interface() else stderrLogger(self.allocator);
+        logger.minimum_level = self.minimum_level;
+        return logger;
     }
 
     pub fn deinit(self: *DefaultLogger) void {

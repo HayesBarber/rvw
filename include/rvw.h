@@ -22,7 +22,8 @@ typedef struct rvw_buffer {
  * `error_out` receives UTF-8 text that may be freed with rvw_buffer_free(NULL,
  * ...).
  */
-rvw_core *rvw_core_create(const char *directory, const char *range, rvw_buffer *error_out);
+/* log_level is an optional raw LOG_LEVEL value; NULL defaults to error. */
+rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, rvw_buffer *error_out);
 
 /*
  * Dispatches a length-delimited UTF-8 JSON request. Supported request types are

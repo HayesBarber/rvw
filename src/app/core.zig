@@ -49,8 +49,15 @@ pub const Core = struct {
     }
 
     pub fn dispatch(self: *Core, request: model.Request) !model.Response {
+        if (request == .log) {
+            self.logger.log(self.io, request.log);
+            return .{ .log_result = .{ .accepted = true } };
+        }
+        const started = Io.Timestamp.now(self.io, .awake);
         const operation = operationName(request);
-        return self.dispatchRequest(request) catch |err| {
+        const result = self.dispatchRequest(request);
+        logRequestCompleted(self.logger, self.io, operation, started, if (result) |_| null else |err| err);
+        return result catch |err| {
             if (shouldLogRequestFailure(err)) {
                 logRequestFailed(self.logger, self.io, operation, err);
             }
@@ -60,6 +67,7 @@ pub const Core = struct {
 
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
+            .log => unreachable,
             .get_configuration => .{ .configuration = self.configuration },
             .reload_review => blk: {
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
@@ -136,6 +144,7 @@ pub const Core = struct {
 
 fn operationName(request: model.Request) []const u8 {
     return switch (request) {
+        .log => "log",
         .get_configuration => "get_configuration",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
@@ -678,4 +687,66 @@ test "core copies validated file paths exactly without accessing the file" {
         .path = "README.md",
         .format = .relative,
     } }));
+}
+
+fn logRequestCompleted(logger: log.Logger, io: Io, operation: []const u8, started: Io.Timestamp, failure: ?anyerror) void {
+    const duration_ms = @max(0, Io.Timestamp.now(io, .awake).toMilliseconds() - started.toMilliseconds());
+    var context: std.json.ObjectMap = .empty;
+    defer context.deinit(logger.allocator);
+    context.put(logger.allocator, "operation", .{ .string = operation }) catch return;
+    context.put(logger.allocator, "durationMs", .{ .integer = @intCast(duration_ms) }) catch return;
+    context.put(logger.allocator, "ok", .{ .bool = failure == null }) catch return;
+    if (failure) |err| context.put(logger.allocator, "errorCode", .{ .string = @errorName(err) }) catch return;
+    logger.log(io, .{ .level = .debug, .source = .backend, .message = "request completed", .context = .{ .object = context } });
+}
+
+test "relay acknowledges filtered events and writes once without recursive completion" {
+    const Recorder = struct {
+        count: usize = 0,
+        fn write(ptr: *anyopaque, _: Io, event: log.Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(ptr));
+            self.count += 1;
+            try std.testing.expectEqual(log.Source.frontend, event.source);
+            try std.testing.expectEqualStrings("frontend started", event.message);
+        }
+    };
+    var recorder: Recorder = .{};
+    var core: Core = undefined;
+    core.io = std.testing.io;
+    core.logger = .{ .allocator = std.testing.allocator, .context = &recorder, .vtable = &.{ .write = Recorder.write } };
+    const request: model.Request = .{ .log = .{ .level = .info, .source = .frontend, .message = "frontend started" } };
+    try std.testing.expect((try core.dispatch(request)).log_result.accepted);
+    try std.testing.expectEqual(@as(usize, 0), recorder.count);
+    core.logger.minimum_level = .debug;
+    try std.testing.expect((try core.dispatch(request)).log_result.accepted);
+    try std.testing.expectEqual(@as(usize, 1), recorder.count);
+}
+
+test "debug dispatch completion records success and expected failure without error diagnostics" {
+    const Recorder = struct {
+        count: usize = 0,
+        fn write(ptr: *anyopaque, _: Io, event: log.Event) !void {
+            const self: *@This() = @ptrCast(@alignCast(ptr));
+            try std.testing.expectEqual(log.Level.debug, event.level);
+            try std.testing.expectEqualStrings("request completed", event.message);
+            const context = event.context.?.object;
+            try std.testing.expect(context.get("durationMs").?.integer >= 0);
+            try std.testing.expectEqual(self.count == 0, context.get("ok").?.bool);
+            if (self.count == 0) {
+                try std.testing.expectEqualStrings("get_configuration", context.get("operation").?.string);
+                try std.testing.expect(context.get("errorCode") == null);
+            } else {
+                try std.testing.expectEqualStrings("InvalidFilePath", context.get("errorCode").?.string);
+            }
+            self.count += 1;
+        }
+    };
+    var recorder: Recorder = .{};
+    var core: Core = undefined;
+    core.io = std.testing.io;
+    core.configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null };
+    core.logger = .{ .allocator = std.testing.allocator, .context = &recorder, .vtable = &.{ .write = Recorder.write }, .minimum_level = .debug };
+    _ = try core.dispatch(.get_configuration);
+    try std.testing.expectError(error.InvalidFilePath, core.dispatch(.{ .copy_file_path = .{ .path = "../secret", .format = .relative } }));
+    try std.testing.expectEqual(@as(usize, 2), recorder.count);
 }

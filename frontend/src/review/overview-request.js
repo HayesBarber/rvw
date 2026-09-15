@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { measureOverviewRequest } from './log.js'
 import { getDiffOverview } from './api.js'
 import { RequestStatus } from './request-state.js'
 
@@ -20,7 +21,7 @@ export function useReviewOverview() {
       data: current.data,
       error: null,
     }))
-    return getDiffOverview()
+    return measureOverviewRequest(getDiffOverview)
       .then((overview) => {
         if (requestId === latestRequest.current) {
           setRequest({
@@ -43,7 +44,7 @@ export function useReviewOverview() {
 
   useEffect(() => {
     const requestId = ++latestRequest.current
-    getDiffOverview()
+    measureOverviewRequest(getDiffOverview)
       .then((overview) => {
         if (requestId === latestRequest.current) {
           setRequest({
