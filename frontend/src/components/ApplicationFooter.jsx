@@ -48,18 +48,18 @@ export default function ApplicationFooter({
             {clearMessage}
           </span>
         )}
+        {reloadMessage && (
+          <span
+            className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadStatus}`}
+            role={reloadMessageIsError ? 'alert' : 'status'}
+          >
+            {reloadMessage}
+          </span>
+        )}
       </span>
       {repositoryName && (
         <>
           <span className="footer-reload-action">
-            {reloadMessage && (
-              <span
-                className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadStatus}`}
-                role={reloadMessageIsError ? 'alert' : 'status'}
-              >
-                {reloadMessage}
-              </span>
-            )}
             <button
               className="reload-button"
               type="button"

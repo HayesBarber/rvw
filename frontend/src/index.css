@@ -75,7 +75,10 @@ textarea {
 }
 
 .application-status {
+  display: flex;
   min-width: 0;
+  align-items: center;
+  gap: 10px;
   overflow: hidden;
 }
 
@@ -168,7 +171,7 @@ textarea {
   min-width: 0;
   align-items: center;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 6px;
 }
 
 .tree-mode-toggle {
@@ -306,7 +309,8 @@ textarea {
   white-space: nowrap;
 }
 
-.footer-reload-action .reload-status,
+.application-status .reload-status,
+.application-status .clear-status,
 .footer-copy-action .copy-status {
   max-width: 220px;
 }
@@ -326,7 +330,6 @@ textarea {
 }
 
 .reload-button,
-.file-finder-button,
 .file-comment-button {
   padding: 5px 10px;
   border: 1px solid #414145;
@@ -337,9 +340,35 @@ textarea {
 }
 
 .reload-button:hover:not(:disabled),
-.file-finder-button:hover,
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
+}
+
+.file-finder-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 6px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #adadb1;
+  cursor: pointer;
+}
+
+.file-finder-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentcolor;
+}
+
+.file-finder-button:hover,
+.file-finder-button:focus-visible {
+  border-color: #414145;
+  background: #202022;
+  color: #fafafa;
 }
 
 .file-comment-button:disabled {
@@ -392,7 +421,8 @@ textarea {
     max-width: 130px;
   }
 
-  .footer-reload-action .reload-status,
+  .application-status .reload-status,
+  .application-status .clear-status,
   .footer-copy-action .copy-status {
     max-width: 120px;
   }

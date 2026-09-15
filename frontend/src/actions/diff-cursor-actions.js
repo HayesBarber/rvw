@@ -308,6 +308,21 @@ function viewportState(viewport) {
   }
 }
 
+function renderedCursorBounds(node) {
+  const elements = node?.shadowRoot?.querySelectorAll?.('[data-editor-active-line]')
+  if (!elements || elements.length === 0) return null
+
+  let top = Infinity
+  let bottom = -Infinity
+  for (const element of elements) {
+    const rect = element.getBoundingClientRect?.()
+    if (!rect || !Number.isFinite(rect.top) || !Number.isFinite(rect.bottom)) continue
+    top = Math.min(top, rect.top)
+    bottom = Math.max(bottom, rect.bottom)
+  }
+  return Number.isFinite(top) && Number.isFinite(bottom) ? { top, bottom } : null
+}
+
 /** Capture the active logical row's viewport position before a diff layout rebuild. */
 export function captureDiffLayoutAnchor(instance, node, cursor) {
   const viewport = instance?.getEditorViewport?.()
@@ -360,7 +375,7 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
 
   const position = instance?.getLinePosition?.(cursor.lineNumber, cursor.side)
   const viewport = instance?.getEditorViewport?.()
-  if (!position || position.height <= 0 || !viewport || !node) return false
+  if (!viewport || !node) return false
 
   const nodeTop = node.getBoundingClientRect().top
   const isDocument = viewport.nodeType === 9
@@ -373,12 +388,42 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
   const viewportHeight = isDocument
     ? viewport.documentElement.clientHeight
     : viewport.clientHeight
+  const stickyHeader = node.shadowRoot?.querySelector?.(
+    '[data-diffs-header][data-sticky]',
+  )
+  const stickyHeaderHeight = stickyHeader?.getBoundingClientRect?.().height ?? 0
+  const renderedBounds = renderedCursorBounds(node)
+  const viewportContentTop = viewportTop + stickyHeaderHeight
+  const viewportBottomEdge = viewportTop + viewportHeight
+
+  if (renderedBounds) {
+    let nextScrollTop
+    if (renderedBounds.top < viewportContentTop) {
+      nextScrollTop = Math.max(
+        0,
+        scrollTop + renderedBounds.top - viewportContentTop,
+      )
+    } else if (renderedBounds.bottom > viewportBottomEdge) {
+      nextScrollTop = scrollTop + renderedBounds.bottom - viewportBottomEdge
+    } else {
+      return true
+    }
+
+    if (isDocument) viewport.defaultView?.scrollTo({ top: nextScrollTop })
+    else viewport.scrollTo({ top: nextScrollTop })
+    return true
+  }
+
+  if (!position || position.height <= 0 || !Number.isFinite(position.top)) return false
   const rowTop = scrollTop + nodeTop - viewportTop + position.top
   const rowBottom = rowTop + position.height
   const viewportBottom = scrollTop + viewportHeight
+  const estimatedContentTop = scrollTop + stickyHeaderHeight
 
   let nextScrollTop
-  if (rowTop < scrollTop) nextScrollTop = rowTop
+  if (rowTop < estimatedContentTop) {
+    nextScrollTop = Math.max(0, rowTop - stickyHeaderHeight)
+  }
   else if (rowBottom > viewportBottom) nextScrollTop = rowBottom - viewportHeight
   else return true
 

@@ -201,9 +201,12 @@ export default function App() {
               type="button"
               aria-keyshortcuts="Meta+P Control+P"
               title="Find file"
+              aria-label="Find file"
               onClick={openFileFinder}
             >
-              Find file
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M6.75 1a5.75 5.75 0 1 0 3.58 10.25l3.71 3.71a.75.75 0 1 0 1.06-1.06l-3.7-3.71A5.75 5.75 0 0 0 6.75 1Zm-4.25 5.75a4.25 4.25 0 1 1 8.5 0 4.25 4.25 0 0 1-8.5 0Z" />
+              </svg>
             </button>
           </div>
         </header>

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 
 const diffCursorCSS = `
@@ -36,6 +37,11 @@ const baseOptions = {
   unsafeCSS: diffCursorCSS,
 }
 
+const metrics = {
+  ...DEFAULT_VIRTUAL_FILE_METRICS,
+  diffHeaderHeight: 52,
+}
+
 export default function DiffSurface({
   expandUnchanged = false,
   fileDiff,
@@ -68,6 +74,7 @@ export default function DiffSurface({
           oldFile={fileDiff.content.oldFile}
           newFile={fileDiff.content.newFile}
           lineAnnotations={lineAnnotations}
+          metrics={metrics}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
           renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
@@ -78,6 +85,7 @@ export default function DiffSurface({
         <File
           file={fileDiff.content.file}
           lineAnnotations={lineAnnotations}
+          metrics={metrics}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
           renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
