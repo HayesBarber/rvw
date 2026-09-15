@@ -9,8 +9,10 @@ import {
 
 import {
   centerDiffCursor,
+  captureDiffLayoutAnchor,
   createDiffCursorRows,
   reconcileDiffCursor,
+  restoreDiffLayoutAnchor,
   scrollDiffCursorIntoView,
   syncDiffCursorPresentation,
 } from '../../actions/diff-cursor-actions.js'
@@ -28,6 +30,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
   const cursorRowsRef = useRef([])
   const cursorRef = useRef(null)
   const scrollGuardRef = useRef(null)
+  const layoutAnchorRef = useRef(null)
   const [activeCommentId, setActiveCommentIdState] = useState(null)
   const activeCommentIdRef = useRef(null)
   const commentsRef = useRef(comments)
@@ -122,8 +125,24 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     cursorRowsRef.current = rows
     cursorRef.current = cursor
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
+    restoreDiffLayoutAnchor(
+      layoutAnchorRef.current,
+      instance,
+      node,
+      cursor,
+    )
+    layoutAnchorRef.current = null
     finishScrollGuard()
   }, [finishScrollGuard, initialPosition])
+
+  const guardNextLayoutRender = useCallback(() => {
+    if (layoutAnchorRef.current) return
+    layoutAnchorRef.current = captureDiffLayoutAnchor(
+      renderInstanceRef.current,
+      renderedFileRef.current,
+      cursorRef.current,
+    )
+  }, [])
 
   const guardNextAnnotationRender = useCallback(() => {
     if (scrollGuardRef.current) return
@@ -195,6 +214,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     getCursor,
     getInstance,
     getRows,
+    guardNextLayoutRender,
     guardNextAnnotationRender,
     handlePostRender,
     setActiveCommentId,
@@ -208,6 +228,7 @@ export default function useDiffCursor({ comments, fileDiff, isCursorVisible }) {
     getCursor,
     getInstance,
     getRows,
+    guardNextLayoutRender,
     guardNextAnnotationRender,
     handlePostRender,
     setActiveCommentId,

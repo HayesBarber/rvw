@@ -80,6 +80,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_PREVIOUS_FILE], [['[', 'b']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER], [['<C-p>'], ['<D-p>'], ['<leader>', 'f']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_FILE_FINDER_ALL], [['<leader>', 'F']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_EXPAND_TOGGLE], [['<leader>', 'e']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_WRAP_TOGGLE], [['<leader>', 'w']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
@@ -116,6 +117,14 @@ test('contextual bindings are inferred from action scopes', () => {
   assert.equal(
     applicationActionCatalog[ApplicationAction.FOCUS_DIFF_PANE].scope,
     ActionScope.FILE_TREE,
+  )
+  assert.equal(
+    applicationActionCatalog[ApplicationAction.DIFF_EXPAND_TOGGLE].scope,
+    ActionScope.DIFF_PANE,
+  )
+  assert.equal(
+    applicationActionCatalog[ApplicationAction.DIFF_WRAP_TOGGLE].scope,
+    ActionScope.DIFF_PANE,
   )
 })
 

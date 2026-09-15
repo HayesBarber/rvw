@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { ApplicationAction } from '../actions/application-actions.js'
 import { createCommentActionAdapter, openFileCommentTarget } from '../actions/comment-actions.js'
 import { createDiffCursorActionAdapter } from '../actions/diff-cursor-actions.js'
+import { createDiffViewActionAdapter } from '../actions/diff-view-actions.js'
 import DiffSurface from './diff-pane/DiffSurface.jsx'
 import useDiffComments from './diff-pane/useDiffComments.jsx'
 import useDiffCursor from './diff-pane/useDiffCursor.js'
@@ -26,9 +27,11 @@ export default function DiffPane({
   onEditComment,
   onDeleteComment,
   onFocusFileTree,
+  onToggleWrapLines,
   registerActionAdapter,
   wrapLines,
 }) {
+  const [expandUnchanged, setExpandUnchanged] = useState(false)
   const cursor = useDiffCursor({ comments, fileDiff, isCursorVisible })
   const commentReview = useDiffComments({
     comments,
@@ -39,9 +42,18 @@ export default function DiffPane({
     onDeleteComment,
     onEditComment,
   })
+  const toggleExpandUnchanged = useCallback(() => {
+    setExpandUnchanged((expanded) => !expanded)
+  }, [])
 
   useEffect(() => registerActionAdapter({
     [ApplicationAction.FOCUS_FILE_TREE]: onFocusFileTree,
+    ...createDiffViewActionAdapter({
+      contentKind: fileDiff?.content.kind,
+      prepareLayoutChange: cursor.guardNextLayoutRender,
+      toggleExpandUnchanged,
+      toggleWrapLines: onToggleWrapLines,
+    }),
     ...createDiffCursorActionAdapter({
       getRows: cursor.getRows,
       getCursor: cursor.getCursor,
@@ -70,9 +82,12 @@ export default function DiffPane({
     cursor.getCursor,
     cursor.getInstance,
     cursor.getRows,
+    cursor.guardNextLayoutRender,
     fileDiff,
     onFocusFileTree,
+    onToggleWrapLines,
     registerActionAdapter,
+    toggleExpandUnchanged,
   ])
 
   if (loading) return <PaneStatus>Loading file…</PaneStatus>
@@ -85,6 +100,7 @@ export default function DiffPane({
 
   return (
     <DiffSurface
+      expandUnchanged={expandUnchanged}
       fileDiff={fileDiff}
       lineAnnotations={commentReview.lineAnnotations}
       selectedLines={commentReview.selectedLines}

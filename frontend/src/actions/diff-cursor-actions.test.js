@@ -6,11 +6,13 @@ import { ApplicationAction } from './application-actions.js'
 import {
   DiffCursorSide,
   centerDiffCursor,
+  captureDiffLayoutAnchor,
   createDiffCursorActionAdapter,
   createDiffCursorRows,
   moveDiffCursor,
   moveDiffCursorByPage,
   reconcileDiffCursor,
+  restoreDiffLayoutAnchor,
   scrollDiffCursorIntoView,
   syncDiffCursorPresentation,
 } from './diff-cursor-actions.js'
@@ -426,6 +428,61 @@ test('scrolling uses public line positions and keeps visible rows stationary', (
     side: DiffCursorSide.ADDITIONS,
   }), true)
   assert.deepEqual(scrolls, [{ top: 170 }])
+})
+
+test('layout anchors preserve a logical row position and reconcile hidden rows', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1,
+    scrollLeft: 25,
+    scrollTop: 100,
+    clientHeight: 80,
+    getBoundingClientRect: () => ({ top: 20 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const node = { getBoundingClientRect: () => ({ top: -30 }) }
+  const before = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 180, height: 20 }),
+  }
+  const cursor = { lineNumber: 12, side: DiffCursorSide.ADDITIONS }
+  const anchor = captureDiffLayoutAnchor(before, node, cursor)
+
+  assert.deepEqual(anchor, { left: 25, rowOffset: 130, top: 100 })
+
+  const after = {
+    getEditorViewport: () => viewport,
+    getLinePosition: (lineNumber) => ({
+      top: lineNumber === 12 ? 300 : 260,
+      height: 20,
+    }),
+  }
+  assert.equal(restoreDiffLayoutAnchor(anchor, after, node, cursor), true)
+  assert.deepEqual(scrolls.pop(), { left: 25, top: 220 })
+
+  const nearest = { lineNumber: 11, side: DiffCursorSide.ADDITIONS }
+  assert.equal(restoreDiffLayoutAnchor(anchor, after, node, nearest), true)
+  assert.deepEqual(scrolls.pop(), { left: 25, top: 180 })
+})
+
+test('layout anchors fall back to exact scroll offsets without a positioned cursor', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1,
+    scrollLeft: 12,
+    scrollTop: 90,
+    clientHeight: 80,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const instance = { getEditorViewport: () => viewport }
+  const node = { getBoundingClientRect: () => ({ top: 0 }) }
+  const anchor = captureDiffLayoutAnchor(instance, node, null)
+
+  assert.equal(restoreDiffLayoutAnchor(anchor, instance, node, null), true)
+  assert.deepEqual(scrolls, [{ left: 12, top: 90 }])
+  assert.equal(captureDiffLayoutAnchor(null, node, null), null)
+  assert.equal(restoreDiffLayoutAnchor(null, instance, node, null), false)
 })
 
 test('cursor movement moves to, between, and from the file comment row', () => {
