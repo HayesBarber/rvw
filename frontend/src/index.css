@@ -44,13 +44,13 @@ textarea {
   overflow: hidden;
 }
 
-.keyboard-status {
-  display: flex;
+.application-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, auto);
   min-width: 0;
-  min-height: 28px;
+  min-height: 36px;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   padding: 5px 10px;
   border-top: 1px solid #303033;
   background: #141415;
@@ -60,6 +60,7 @@ textarea {
 }
 
 .keyboard-diagnostic {
+  display: block;
   min-width: 0;
   overflow: hidden;
   color: #ff9c99;
@@ -71,6 +72,30 @@ textarea {
   flex: 0 0 auto;
   align-items: center;
   gap: 9px;
+}
+
+.application-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.footer-reload-action,
+.footer-copy-action {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.repository-name {
+  max-width: 220px;
+  overflow: hidden;
+  color: #fafafa;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
 }
 
 .keyboard-input-status strong {
@@ -140,6 +165,15 @@ textarea {
   padding-left: 76px;
 }
 
+.tree-navigation-actions {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .tree-mode-toggle {
   display: flex;
   flex: 0 0 auto;
@@ -202,17 +236,6 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.file-path-heading {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-}
-
-.file-path-heading strong {
-  min-width: 0;
-}
-
 .file-path-copy-button {
   display: grid;
   width: 26px;
@@ -225,6 +248,14 @@ textarea {
   background: transparent;
   color: #adadb1;
   cursor: pointer;
+}
+
+.file-path-copy-control,
+.file-header-actions {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
 }
 
 .file-path-copy-button svg {
@@ -242,18 +273,6 @@ textarea {
 .file-path-copy-button:disabled {
   color: #737378;
   cursor: default;
-}
-
-.pane-header span {
-  color: #adadb1;
-  font-size: 0.75rem;
-}
-
-.review-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 10px;
 }
 
 .copy-status.success,
@@ -279,7 +298,29 @@ textarea {
   color: #ffa94d;
 }
 
+.reload-status,
+.copy-status,
+.clear-status,
+.file-path-copy-status {
+  overflow: hidden;
+  color: #adadb1;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.application-status .reload-status,
+.application-status .clear-status,
+.footer-copy-action .copy-status {
+  max-width: 220px;
+}
+
+.file-path-copy-status.error {
+  max-width: 180px;
+}
+
 .copy-markdown-button {
+  min-width: 126px;
   padding: 5px 10px;
   border: 1px solid #3da765;
   border-radius: 5px;
@@ -289,7 +330,6 @@ textarea {
 }
 
 .reload-button,
-.file-finder-button,
 .file-comment-button {
   padding: 5px 10px;
   border: 1px solid #414145;
@@ -300,9 +340,35 @@ textarea {
 }
 
 .reload-button:hover:not(:disabled),
-.file-finder-button:hover,
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
+}
+
+.file-finder-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 6px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #adadb1;
+  cursor: pointer;
+}
+
+.file-finder-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentcolor;
+}
+
+.file-finder-button:hover,
+.file-finder-button:focus-visible {
+  border-color: #414145;
+  background: #202022;
+  color: #fafafa;
 }
 
 .file-comment-button:disabled {
@@ -344,6 +410,22 @@ textarea {
 
 .diff-pane > .pane-body {
   overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .application-footer {
+    gap: 6px;
+  }
+
+  .repository-name {
+    max-width: 130px;
+  }
+
+  .application-status .reload-status,
+  .application-status .clear-status,
+  .footer-copy-action .copy-status {
+    max-width: 120px;
+  }
 }
 
 .pane-status,

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import ApplicationFooter from '../components/ApplicationFooter.jsx'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
+import {
+  FileHeaderActions,
+  FilePathCopyControl,
+} from '../components/FileHeaderControls.jsx'
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
-import KeyboardStatus from '../components/KeyboardStatus.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
 import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
-import {
-  filePathCopyRequestMessage,
-  useCopyFilePath,
-} from '../review/file-path-copy-request.js'
+import { useCopyFilePath } from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { reloadRequestMessage } from '../review/reload-request.js'
 import { useReviewSession } from '../review/review-session.js'
@@ -89,7 +90,6 @@ export default function App() {
   } = useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft })
   const copyMessage = copyRequestMessage(copyRequest)
   const filePathCopyRequest = useCopyFilePath()
-  const filePathCopyMessage = filePathCopyRequestMessage(filePathCopyRequest)
   const clearMessage = clearRequestMessage(clearRequest)
   const reloadMessage = hasUnsavedDraft
     ? 'Finish or cancel the comment draft before reloading.'
@@ -129,6 +129,19 @@ export default function App() {
     openKeymapReference,
     selectFile,
   })
+  const renderFilePathCopyControl = useCallback(() => (
+    <FilePathCopyControl
+      path={activePath}
+      request={filePathCopyRequest}
+      onCopy={filePathCopyRequest.copy}
+    />
+  ), [activePath, filePathCopyRequest])
+  const renderFileHeaderActions = useCallback(() => (
+    <FileHeaderActions
+      canCommentOnFile={canCommentOnFile}
+      onCommentOnFile={handleAddFileComment}
+    />
+  ), [canCommentOnFile, handleAddFileComment])
 
   if (overviewRequest.status === RequestStatus.ERROR && !overview) {
     return (
@@ -136,7 +149,7 @@ export default function App() {
         <main className="fatal-error">
           Unable to load review: {overviewRequest.error}
         </main>
-        <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+        <ApplicationFooter diagnostic={configurationDiagnostic} vimState={vimState} />
       </div>
     )
   }
@@ -145,7 +158,7 @@ export default function App() {
     return (
       <div className="application-shell">
         <main className="fatal-error">Loading review…</main>
-        <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+        <ApplicationFooter diagnostic={configurationDiagnostic} vimState={vimState} />
       </div>
     )
   }
@@ -166,21 +179,34 @@ export default function App() {
         onFocusCapture={() => activateSurface(ActiveSurface.FILE_TREE)}
       >
         <header className="pane-header">
-          <strong>{overview.repository.name}</strong>
-          <div className="tree-mode-toggle" role="group" aria-label="File tree mode">
+          <div className="tree-navigation-actions">
+            <div className="tree-mode-toggle" role="group" aria-label="File tree mode">
+              <button
+                type="button"
+                aria-pressed={workspace.treeMode === TreeMode.CHANGES}
+                onClick={() => handleTreeModeChange(TreeMode.CHANGES)}
+              >
+                Changes
+              </button>
+              <button
+                type="button"
+                aria-pressed={workspace.treeMode === TreeMode.FILES}
+                onClick={() => handleTreeModeChange(TreeMode.FILES)}
+              >
+                Files
+              </button>
+            </div>
             <button
+              className="file-finder-button"
               type="button"
-              aria-pressed={workspace.treeMode === TreeMode.CHANGES}
-              onClick={() => handleTreeModeChange(TreeMode.CHANGES)}
+              aria-keyshortcuts="Meta+P Control+P"
+              title="Find file"
+              aria-label="Find file"
+              onClick={openFileFinder}
             >
-              Changes
-            </button>
-            <button
-              type="button"
-              aria-pressed={workspace.treeMode === TreeMode.FILES}
-              onClick={() => handleTreeModeChange(TreeMode.FILES)}
-            >
-              Files
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M6.75 1a5.75 5.75 0 1 0 3.58 10.25l3.71 3.71a.75.75 0 1 0 1.06-1.06l-3.7-3.71A5.75 5.75 0 0 0 6.75 1Zm-4.25 5.75a4.25 4.25 0 1 1 8.5 0 4.25 4.25 0 0 1-8.5 0Z" />
+              </svg>
             </button>
           </div>
         </header>
@@ -230,96 +256,6 @@ export default function App() {
         onPointerDown={() => activateSurface(ActiveSurface.DIFF_PANE)}
         onFocusCapture={() => activateSurface(ActiveSurface.DIFF_PANE)}
       >
-        <header className="pane-header">
-          <div className="file-path-heading">
-            <strong>{activePath ?? 'No file selected'}</strong>
-            <button
-              className="file-path-copy-button"
-              type="button"
-              disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
-              title="Copy repository-relative path"
-              aria-label="Copy repository-relative path"
-              onClick={() => filePathCopyRequest.copy(activePath, 'relative')}
-            >
-              <svg aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M5 1.75A1.75 1.75 0 0 1 6.75 0h7.5A1.75 1.75 0 0 1 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11H13V9.5h1.25a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5a.25.25 0 0 0-.25.25V3H5V1.75Z" />
-                <path d="M1.75 5h7.5A1.75 1.75 0 0 1 11 6.75v7.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5A1.75 1.75 0 0 1 1.75 5Zm0 1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5Z" />
-              </svg>
-            </button>
-            {filePathCopyMessage && (
-              <span
-                className={`file-path-copy-status ${filePathCopyRequest.status}`}
-                role={filePathCopyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
-              >
-                {filePathCopyMessage}
-              </span>
-            )}
-          </div>
-          <div className="review-actions">
-            <button
-              className="reload-button"
-              type="button"
-              disabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
-              title={hasUnsavedDraft ? 'Finish or cancel the comment draft before reloading' : 'Reload review'}
-              onClick={reloadRequest.reload}
-            >
-              Reload
-            </button>
-            {reloadMessage && (
-              <span
-                className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadRequest.status}`}
-                role={reloadMessageIsError ? 'alert' : 'status'}
-              >
-                {reloadMessage}
-              </span>
-            )}
-            <button
-              className="file-comment-button"
-              type="button"
-              disabled={!canCommentOnFile}
-              onClick={handleAddFileComment}
-            >
-              Comment on file
-            </button>
-            <button
-              className="file-finder-button"
-              type="button"
-              aria-keyshortcuts="Meta+P Control+P"
-              title="Find file"
-              onClick={openFileFinder}
-            >
-              Find file
-            </button>
-            {clearMessage && (
-              <span
-                className={`clear-status ${clearRequest.status}`}
-                role={clearRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
-              >
-                {clearMessage}
-              </span>
-            )}
-            {copyMessage && (
-              <span
-                className={`copy-status ${copyRequest.status}`}
-                role={copyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
-              >
-                {copyMessage}
-              </span>
-            )}
-            <button
-              className="copy-markdown-button"
-              type="button"
-              disabled={
-                comments.length === 0 ||
-                copyRequest.status === RequestStatus.LOADING
-              }
-              title={comments.length === 0 ? 'Add a comment before copying' : undefined}
-              onClick={handleCopyComments}
-            >
-              Copy as Markdown
-            </button>
-          </div>
-        </header>
         <div className="pane-body">
           <DiffPane
             key={activePath ?? 'no-file'}
@@ -339,6 +275,8 @@ export default function App() {
             onToggleWrapLines={toggleWrapLines}
             relativeLineNumbers={workspace.relativeLineNumbers}
             registerActionAdapter={registerDiffPaneActions}
+            renderHeaderFilenameSuffix={renderFilePathCopyControl}
+            renderHeaderMetadata={renderFileHeaderActions}
             wrapLines={workspace.wrapLines}
           />
         </div>
@@ -373,7 +311,22 @@ export default function App() {
           onClose={closeKeymapReference}
         />
       )}
-      <KeyboardStatus diagnostic={configurationDiagnostic} vimState={vimState} />
+      <ApplicationFooter
+        clearMessage={clearMessage}
+        clearStatus={clearRequest.status}
+        commentsCount={comments.length}
+        copyMessage={copyMessage}
+        copyRequest={copyRequest}
+        diagnostic={configurationDiagnostic}
+        onCopyComments={handleCopyComments}
+        onReload={reloadRequest.reload}
+        reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
+        reloadMessage={reloadMessage}
+        reloadMessageIsError={reloadMessageIsError}
+        reloadStatus={reloadRequest.status}
+        repositoryName={overview.repository.name}
+        vimState={vimState}
+      />
     </div>
   )
 }

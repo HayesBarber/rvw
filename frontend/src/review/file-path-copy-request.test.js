@@ -9,11 +9,11 @@ test('file path copy status identifies the copied format and failures', () => {
   assert.equal(filePathCopyRequestMessage({
     status: RequestStatus.SUCCESS,
     data: { format: 'relative' },
-  }), 'Copied relative path')
+  }), 'Path copied')
   assert.equal(filePathCopyRequestMessage({
     status: RequestStatus.SUCCESS,
     data: { format: 'absolute' },
-  }), 'Copied absolute path')
+  }), 'Absolute path copied')
   assert.equal(filePathCopyRequestMessage({
     status: RequestStatus.ERROR,
     error: 'Clipboard failed',

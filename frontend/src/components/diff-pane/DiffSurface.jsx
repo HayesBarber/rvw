@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 
 const diffCursorCSS = `
@@ -11,6 +12,20 @@ const diffCursorCSS = `
     box-shadow: inset 0 1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent),
       inset 0 -1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent);
   }
+
+  [data-diffs-header] {
+    min-height: 52px;
+  }
+
+  [data-header-content], [data-title] {
+    min-width: 0;
+  }
+
+  [data-title] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 `
 
 const baseOptions = {
@@ -18,7 +33,13 @@ const baseOptions = {
   enableGutterUtility: true,
   enableLineSelection: true,
   lineHoverHighlight: 'line',
+  stickyHeader: true,
   unsafeCSS: diffCursorCSS,
+}
+
+const metrics = {
+  ...DEFAULT_VIRTUAL_FILE_METRICS,
+  diffHeaderHeight: 52,
 }
 
 export default function DiffSurface({
@@ -27,6 +48,8 @@ export default function DiffSurface({
   lineAnnotations,
   selectedLines,
   renderAnnotation,
+  renderHeaderFilenameSuffix,
+  renderHeaderMetadata,
   onBeginComment,
   onPostRender,
   onSelectLines,
@@ -51,16 +74,22 @@ export default function DiffSurface({
           oldFile={fileDiff.content.oldFile}
           newFile={fileDiff.content.newFile}
           lineAnnotations={lineAnnotations}
+          metrics={metrics}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
+          renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+          renderHeaderMetadata={renderHeaderMetadata}
           options={options}
         />
       ) : (
         <File
           file={fileDiff.content.file}
           lineAnnotations={lineAnnotations}
+          metrics={metrics}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
+          renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+          renderHeaderMetadata={renderHeaderMetadata}
           options={options}
         />
       )}

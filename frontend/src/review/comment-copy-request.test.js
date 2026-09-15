@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { copyRequestMessage } from './comment-copy-request.js'
+import {
+  copyRequestButtonLabel,
+  copyRequestMessage,
+} from './comment-copy-request.js'
 import { RequestStatus } from './request-state.js'
 
 test('comment-copy request states retain their existing status messages', () => {
@@ -19,4 +22,11 @@ test('comment-copy request states retain their existing status messages', () => 
     status: RequestStatus.SUCCESS,
     data: { commentCount: 2 },
   }), 'Copied 2 comments')
+})
+
+test('comment-copy button provides stable local progress and success labels', () => {
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.IDLE }), 'Copy as Markdown')
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.LOADING }), 'Copying…')
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.SUCCESS }), 'Copied')
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.ERROR }), 'Copy as Markdown')
 })

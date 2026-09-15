@@ -500,6 +500,69 @@ test('scrolling uses public line positions and keeps visible rows stationary', (
   assert.deepEqual(scrolls, [{ top: 170 }])
 })
 
+test('scrolling keeps the cursor below a sticky file header', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1,
+    scrollTop: 600,
+    clientHeight: 300,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const node = {
+    getBoundingClientRect: () => ({ top: -600 }),
+    shadowRoot: {
+      querySelector: (selector) => (
+        selector === '[data-diffs-header][data-sticky]'
+          ? { getBoundingClientRect: () => ({ height: 52 }) }
+          : null
+      ),
+    },
+  }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 52, height: 20 }),
+  }
+
+  assert.equal(scrollDiffCursorIntoView(instance, node, {
+    lineNumber: 1,
+    side: DiffCursorSide.ADDITIONS,
+  }), true)
+  assert.deepEqual(scrolls, [{ top: 0 }])
+})
+
+test('scrolling uses rendered cursor bounds for wrapped rows', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1,
+    scrollTop: 38,
+    clientHeight: 614,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => scrolls.push(options),
+  }
+  const node = {
+    getBoundingClientRect: () => ({ top: -38 }),
+    shadowRoot: {
+      querySelector: () => ({ getBoundingClientRect: () => ({ height: 52 }) }),
+      querySelectorAll: () => [
+        { getBoundingClientRect: () => ({ top: 834, bottom: 894 }) },
+        { getBoundingClientRect: () => ({ top: 834, bottom: 894 }) },
+      ],
+    },
+  }
+  const instance = {
+    getEditorViewport: () => viewport,
+    // The estimate still looks visible before Pierre measures the wrapped row.
+    getLinePosition: () => ({ top: 400, height: 20 }),
+  }
+
+  assert.equal(scrollDiffCursorIntoView(instance, node, {
+    lineNumber: 392,
+    side: DiffCursorSide.ADDITIONS,
+  }), true)
+  assert.deepEqual(scrolls, [{ top: 318 }])
+})
+
 test('layout anchors preserve a logical row position and reconcile hidden rows', () => {
   const scrolls = []
   const viewport = {

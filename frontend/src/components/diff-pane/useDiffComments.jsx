@@ -6,6 +6,7 @@ import {
   createCommentAnnotations,
   normalizeCommentRange,
 } from './comment-annotations.js'
+import { createAndActivateComment } from './create-and-activate-comment.js'
 
 export default function useDiffComments({
   activeCommentId,
@@ -78,9 +79,13 @@ export default function useDiffComments({
     })
   }, [cursor])
 
-  const createComment = useCallback((body, target) => (
-    onCreateComment(body, target, cursor.guardNextAnnotationRender)
-  ), [cursor, onCreateComment])
+  const createComment = useCallback((body, target) => createAndActivateComment({
+    activate: cursor.setActiveCommentId,
+    beforeCommit: cursor.guardNextAnnotationRender,
+    body,
+    create: onCreateComment,
+    target,
+  }), [cursor, onCreateComment])
 
   const editComment = useCallback((commentId, body) => (
     onEditComment(commentId, body, cursor.guardNextAnnotationRender)
