@@ -232,3 +232,18 @@ export async function copyCommentsAsMarkdown() {
     body: JSON.stringify(request),
   })
 }
+
+/**
+ * Copies a canonical repository-relative path in the requested format.
+ * @param {string} path
+ * @param {'relative' | 'absolute'} format
+ * @returns {Promise<{ path: string, format: 'relative' | 'absolute' }>}
+ */
+export async function copyFilePath(path, format) {
+  const request = { type: 'copy_file_path', path, format }
+  return requestJson('/api/files/copy-path', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}

@@ -18,6 +18,7 @@ pub const Core = struct {
     visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
+    repository_root: []const u8,
     logger: log.Logger,
     configuration: config.Snapshot,
 
@@ -30,6 +31,7 @@ pub const Core = struct {
         visible_files_tree_provider: provider_module.filetree.FileTreeProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
+        repository_root: []const u8,
         logger: log.Logger,
         configuration: config.Snapshot,
     ) Core {
@@ -42,6 +44,7 @@ pub const Core = struct {
             .visible_files_tree_provider = visible_files_tree_provider,
             .comment_provider = comment_provider,
             .clipboard = clipboard,
+            .repository_root = repository_root,
             .logger = logger,
             .configuration = configuration,
         };
@@ -90,6 +93,23 @@ pub const Core = struct {
                 try self.clipboard.copy(self.io, markdown);
                 break :blk .{ .copy_comments_result = .{ .commentCount = comments.len } };
             },
+            .copy_file_path => |details| blk: {
+                if (!validRepositoryRelativePath(details.path)) return error.InvalidFilePath;
+                const copied_path = switch (details.format) {
+                    .relative => details.path,
+                    .absolute => try std.fs.path.join(self.allocator, &.{
+                        self.repository_root,
+                        details.path,
+                    }),
+                };
+                defer if (details.format == .absolute) self.allocator.free(copied_path);
+                self.clipboard.copy(self.io, copied_path) catch
+                    return error.FilePathClipboardUnavailable;
+                break :blk .{ .copy_file_path_result = .{
+                    .path = details.path,
+                    .format = details.format,
+                } };
+            },
             .create_comment => |details| blk: {
                 if (!validComment(details.body, details.target)) return error.InvalidComment;
                 break :blk .{ .comment = try self.comment_provider.createComment(
@@ -130,6 +150,7 @@ fn operationName(request: model.Request) []const u8 {
         .get_file_diff => "get_file_diff",
         .get_comments => "get_comments",
         .copy_comments_as_markdown => "copy_comments_as_markdown",
+        .copy_file_path => "copy_file_path",
         .create_comment => "create_comment",
         .edit_comment => "edit_comment",
         .delete_comment => "delete_comment",
@@ -194,6 +215,21 @@ fn validCommentId(comment_id: []const u8) bool {
         comment_id.len <= 128 and
         std.mem.trim(u8, comment_id, " \t\r\n").len == comment_id.len and
         std.unicode.utf8ValidateSlice(comment_id);
+}
+
+fn validRepositoryRelativePath(path: []const u8) bool {
+    if (path.len == 0 or !std.unicode.utf8ValidateSlice(path)) return false;
+    if (std.fs.path.isAbsolute(path) or path[0] == '/' or
+        std.mem.indexOfScalar(u8, path, '\\') != null or
+        std.mem.indexOfScalar(u8, path, 0) != null) return false;
+
+    var components = std.mem.splitScalar(u8, path, '/');
+    while (components.next()) |component| {
+        if (component.len == 0 or
+            std.mem.eql(u8, component, ".") or
+            std.mem.eql(u8, component, "..")) return false;
+    }
+    return true;
 }
 
 test "comment mutation validation rejects blank bodies and malformed IDs" {
@@ -281,6 +317,7 @@ test "core routes file listing variants through their tree providers" {
         visible_tree.interface(),
         comments.interface(),
         .{ .context = &all_context, .vtable = &noop_clipboard_vtable },
+        "/repository",
         .{
             .allocator = std.testing.allocator,
             .context = &all_context,
@@ -380,6 +417,7 @@ test "core edits and deletes only the requested comment with useful errors" {
         .{ .context = &context, .vtable = &TestDependencies.tree_vtable },
         comments.interface(),
         .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
+        "/repository",
         .{
             .allocator = std.testing.allocator,
             .context = &context,
@@ -436,4 +474,107 @@ test "core edits and deletes only the requested comment with useful errors" {
     try std.testing.expectEqual(@as(usize, 0), empty.len);
     const cleared_again = (try core.dispatch(.clear_comments)).clear_comments_result;
     try std.testing.expectEqual(@as(usize, 0), cleared_again.commentCount);
+}
+
+test "core copies validated file paths exactly without accessing the file" {
+    const TestDependencies = struct {
+        copied: [256]u8 = undefined,
+        copied_len: usize = 0,
+        fail_copy: bool = false,
+
+        fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
+            return error.TestUnexpectedResult;
+        }
+        fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
+            return error.TestUnexpectedResult;
+        }
+        fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
+            return &.{};
+        }
+        fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
+            return error.TestUnexpectedResult;
+        }
+        fn copy(context: *anyopaque, _: Io, text: []const u8) !void {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            if (self.fail_copy) return error.ClipboardWriteFailed;
+            @memcpy(self.copied[0..text.len], text);
+            self.copied_len = text.len;
+        }
+        fn writeLog(_: *anyopaque, _: Io, _: log.Event) !void {}
+
+        const diff_vtable: provider_module.diff.DiffProvider.VTable = .{
+            .getDiffOverview = getDiffOverview,
+            .getFileDiff = getFileDiff,
+        };
+        const tree_vtable: provider_module.filetree.FileTreeProvider.VTable = .{
+            .getFiles = getFiles,
+        };
+        const file_vtable: provider_module.file.FileProvider.VTable = .{
+            .getFile = getFile,
+        };
+        const clipboard_vtable: output.Clipboard.VTable = .{ .copy = copy };
+        const logger_vtable: log.Logger.VTable = .{ .write = writeLog };
+    };
+
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var dependencies: TestDependencies = .{};
+    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+    defer comments.deinit();
+    var core = Core.init(
+        std.testing.allocator,
+        threaded.io(),
+        .{ .context = &dependencies, .vtable = &TestDependencies.diff_vtable },
+        .{ .context = &dependencies, .vtable = &TestDependencies.file_vtable },
+        .{ .context = &dependencies, .vtable = &TestDependencies.tree_vtable },
+        .{ .context = &dependencies, .vtable = &TestDependencies.tree_vtable },
+        comments.interface(),
+        .{ .context = &dependencies, .vtable = &TestDependencies.clipboard_vtable },
+        "/repo root",
+        .{
+            .allocator = std.testing.allocator,
+            .context = &dependencies,
+            .vtable = &TestDependencies.logger_vtable,
+        },
+        .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+    );
+
+    const relative_path = "nested/deleted ü.txt";
+    const relative = (try core.dispatch(.{ .copy_file_path = .{
+        .path = relative_path,
+        .format = .relative,
+    } })).copy_file_path_result;
+    try std.testing.expectEqualStrings(relative_path, dependencies.copied[0..dependencies.copied_len]);
+    try std.testing.expectEqualStrings(relative_path, relative.path);
+    try std.testing.expectEqual(model.FilePathFormat.relative, relative.format);
+
+    _ = try core.dispatch(.{ .copy_file_path = .{
+        .path = relative_path,
+        .format = .absolute,
+    } });
+    try std.testing.expectEqualStrings(
+        "/repo root/nested/deleted ü.txt",
+        dependencies.copied[0..dependencies.copied_len],
+    );
+
+    const invalid_paths = [_][]const u8{
+        "",
+        "/etc/passwd",
+        "../secret",
+        "nested/../secret",
+        "nested//file",
+        "nested\\file",
+    };
+    for (&invalid_paths) |path| {
+        try std.testing.expectError(error.InvalidFilePath, core.dispatch(.{ .copy_file_path = .{
+            .path = path,
+            .format = .relative,
+        } }));
+    }
+
+    dependencies.fail_copy = true;
+    try std.testing.expectError(error.FilePathClipboardUnavailable, core.dispatch(.{ .copy_file_path = .{
+        .path = "README.md",
+        .format = .relative,
+    } }));
 }

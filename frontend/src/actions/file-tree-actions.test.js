@@ -132,6 +132,43 @@ test('activation opens files without changing selection during focus movement', 
   assert.deepEqual(model.getSelectedPaths(), [])
 })
 
+test('path actions copy the live focused file without opening or selecting it', (t) => {
+  const model = createTree()
+  t.after(() => model.cleanUp())
+  const copies = []
+  const actions = createFileTreeActionAdapter(model, () => {
+    assert.fail('copy must not open a file')
+  }, {
+    copyFilePath: (...args) => (copies.push(args), true),
+  })
+
+  model.focusPath('src/view.js')
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), true)
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_ABSOLUTE](), true)
+  assert.deepEqual(copies, [
+    ['src/view.js', 'relative'],
+    ['src/view.js', 'absolute'],
+  ])
+  assert.deepEqual(model.getSelectedPaths(), [])
+})
+
+test('path actions ignore focused directories and empty trees', (t) => {
+  const model = createTree()
+  const empty = createTree([])
+  t.after(() => {
+    model.cleanUp()
+    empty.cleanUp()
+  })
+  const copyFilePath = () => assert.fail('copy should not be attempted')
+  const actions = createFileTreeActionAdapter(model, () => {}, { copyFilePath })
+  const emptyActions = createFileTreeActionAdapter(empty, () => {}, { copyFilePath })
+
+  model.focusPath('src/')
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), false)
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_ABSOLUTE](), false)
+  assert.equal(emptyActions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), false)
+})
+
 test('half-page actions use the live viewport, scale counts, clamp, and keep focus semantics', (t) => {
   const paths = Array.from({ length: 10 }, (_, index) => `${index}.txt`)
   const model = createTree(paths)

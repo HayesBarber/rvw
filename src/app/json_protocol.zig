@@ -60,6 +60,17 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     }
     if (std.mem.eql(u8, operation, "get_comments")) return .get_comments;
     if (std.mem.eql(u8, operation, "copy_comments_as_markdown")) return .copy_comments_as_markdown;
+    if (std.mem.eql(u8, operation, "copy_file_path")) {
+        const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
+        const format_value = jsonString(object.get("format")) orelse return error.MalformedRequest;
+        const format: model.FilePathFormat = if (std.mem.eql(u8, format_value, "relative"))
+            .relative
+        else if (std.mem.eql(u8, format_value, "absolute"))
+            .absolute
+        else
+            return error.MalformedRequest;
+        return .{ .copy_file_path = .{ .path = path, .format = format } };
+    }
     if (std.mem.eql(u8, operation, "create_comment")) {
         const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
         const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
@@ -158,4 +169,26 @@ test "comment mutation requests decode IDs and edited bodies" {
     defer parsed_clear.deinit();
     const clear = try decodeRequestValue(parsed_clear.value);
     try std.testing.expectEqual(model.Request.clear_comments, clear);
+}
+
+test "file path copy requests require a supported format" {
+    var parsed_relative = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"copy_file_path\",\"path\":\"nested/renamed ü.txt\",\"format\":\"relative\"}",
+        .{},
+    );
+    defer parsed_relative.deinit();
+    const relative = try decodeRequestValue(parsed_relative.value);
+    try std.testing.expectEqualStrings("nested/renamed ü.txt", relative.copy_file_path.path);
+    try std.testing.expectEqual(model.FilePathFormat.relative, relative.copy_file_path.format);
+
+    var parsed_invalid = try std.json.parseFromSlice(
+        std.json.Value,
+        std.testing.allocator,
+        "{\"type\":\"copy_file_path\",\"path\":\"README.md\",\"format\":\"markdown\"}",
+        .{},
+    );
+    defer parsed_invalid.deinit();
+    try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed_invalid.value));
 }

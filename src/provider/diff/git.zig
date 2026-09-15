@@ -11,6 +11,7 @@ const Io = std.Io;
 
 pub const GitProvider = struct {
     arena: std.heap.ArenaAllocator,
+    repository_root: []const u8,
     overview: model.DiffOverview,
     file_contents: []const model.FileContent,
 
@@ -55,6 +56,7 @@ pub const GitProvider = struct {
 
         return .{
             .arena = arena,
+            .repository_root = root,
             .overview = overview,
             .file_contents = try file_contents.toOwnedSlice(allocator),
         };

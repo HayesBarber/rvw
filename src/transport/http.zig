@@ -57,6 +57,7 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .invalid_comment,
         .invalid_comment_id,
         .no_comments,
+        .invalid_file_path,
         => .bad_request,
         else => .internal_server_error,
     };
@@ -192,6 +193,20 @@ fn copyCommentsAsMarkdown(handler: *Handler, req: *httpz.Request, res: *httpz.Re
     }
 }
 
+fn copyFilePath(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .copy_file_path => return handler.dispatchRequest(res, request),
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
 fn clearComments(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const body = req.body() orelse
         return handler.failure(res, .bad_request, .malformed_request);
@@ -219,6 +234,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.get("/api/files", getFiles, .{});
     router.get("/api/files/not-ignored", getFilesNotIgnored, .{});
     router.get("/api/files/content", getFile, .{});
+    router.post("/api/files/copy-path", copyFilePath, .{});
     router.get("/api/comments", getComments, .{});
     router.post("/api/comments", createComment, .{});
     router.patch("/api/comments/:comment_id", editComment, .{});

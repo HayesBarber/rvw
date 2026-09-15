@@ -194,6 +194,10 @@ pub const Request = union(enum) {
     },
     get_comments,
     copy_comments_as_markdown,
+    copy_file_path: struct {
+        path: []const u8,
+        format: FilePathFormat,
+    },
     create_comment: struct {
         body: []const u8,
         target: CommentTarget,
@@ -206,8 +210,18 @@ pub const Request = union(enum) {
     clear_comments,
 };
 
+pub const FilePathFormat = enum {
+    relative,
+    absolute,
+};
+
 pub const CopyCommentsResult = struct {
     commentCount: usize,
+};
+
+pub const CopyFilePathResult = struct {
+    path: []const u8,
+    format: FilePathFormat,
 };
 
 pub const DeleteCommentResult = struct {
@@ -228,6 +242,7 @@ pub const Response = union(enum) {
     comment: Comment,
     delete_comment_result: DeleteCommentResult,
     copy_comments_result: CopyCommentsResult,
+    copy_file_path_result: CopyFilePathResult,
     clear_comments_result: ClearCommentsResult,
 };
 
@@ -238,6 +253,7 @@ pub const AppError = error{
     InvalidCommentId,
     UnknownComment,
     NoComments,
+    InvalidFilePath,
 };
 
 pub const ErrorCode = enum {
@@ -249,6 +265,8 @@ pub const ErrorCode = enum {
     invalid_comment_id,
     unknown_comment,
     no_comments,
+    invalid_file_path,
+    file_path_clipboard_unavailable,
     clipboard_unavailable,
     internal_error,
 };
@@ -261,6 +279,8 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.InvalidCommentId => .invalid_comment_id,
         error.UnknownComment => .unknown_comment,
         error.NoComments => .no_comments,
+        error.InvalidFilePath => .invalid_file_path,
+        error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
         error.ClipboardCommandFailed,
         error.ClipboardToolNotFound,
         error.ClipboardWriteFailed,
@@ -280,6 +300,8 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .invalid_comment_id => "Comment ID is invalid",
         .unknown_comment => "Comment was not found",
         .no_comments => "No review comments to copy",
+        .invalid_file_path => "File path is invalid",
+        .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",
         .internal_error => "Internal error",
     };

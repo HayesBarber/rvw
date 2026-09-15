@@ -83,6 +83,8 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_EXPAND_TOGGLE], [['<leader>', 'e']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE], [['<leader>', 'n']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_WRAP_TOGGLE], [['<leader>', 'w']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_FILE_PATH_RELATIVE], [['<leader>', 'y']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_FILE_PATH_ABSOLUTE], [['<leader>', 'Y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_FILE_COMMENT], [['C']])
