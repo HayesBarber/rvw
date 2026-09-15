@@ -36,6 +36,8 @@ export default function DiffPane({
   onToggleWrapLines,
   registerActionAdapter,
   relativeLineNumbers,
+  renderHeaderFilenameSuffix,
+  renderHeaderMetadata,
   wrapLines,
   filePath,
 }) {
@@ -124,6 +126,8 @@ export default function DiffPane({
       lineAnnotations={commentReview.lineAnnotations}
       selectedLines={commentReview.selectedLines}
       renderAnnotation={commentReview.renderAnnotation}
+      renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+      renderHeaderMetadata={renderHeaderMetadata}
       onBeginComment={commentReview.beginRangeComment}
       onPostRender={cursor.handlePostRender}
       onSelectLines={commentReview.selectLines}

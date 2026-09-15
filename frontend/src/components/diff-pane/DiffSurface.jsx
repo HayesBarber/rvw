@@ -11,6 +11,20 @@ const diffCursorCSS = `
     box-shadow: inset 0 1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent),
       inset 0 -1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent);
   }
+
+  [data-diffs-header] {
+    min-height: 52px;
+  }
+
+  [data-header-content], [data-title] {
+    min-width: 0;
+  }
+
+  [data-title] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 `
 
 const baseOptions = {
@@ -18,6 +32,7 @@ const baseOptions = {
   enableGutterUtility: true,
   enableLineSelection: true,
   lineHoverHighlight: 'line',
+  stickyHeader: true,
   unsafeCSS: diffCursorCSS,
 }
 
@@ -27,6 +42,8 @@ export default function DiffSurface({
   lineAnnotations,
   selectedLines,
   renderAnnotation,
+  renderHeaderFilenameSuffix,
+  renderHeaderMetadata,
   onBeginComment,
   onPostRender,
   onSelectLines,
@@ -53,6 +70,8 @@ export default function DiffSurface({
           lineAnnotations={lineAnnotations}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
+          renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+          renderHeaderMetadata={renderHeaderMetadata}
           options={options}
         />
       ) : (
@@ -61,6 +80,8 @@ export default function DiffSurface({
           lineAnnotations={lineAnnotations}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
+          renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+          renderHeaderMetadata={renderHeaderMetadata}
           options={options}
         />
       )}

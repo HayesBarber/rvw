@@ -9,8 +9,8 @@ export function filePathCopyRequestMessage(request) {
   if (request.status === RequestStatus.ERROR) return request.error
   if (request.status !== RequestStatus.SUCCESS) return ''
   return request.data.format === 'absolute'
-    ? 'Copied absolute path'
-    : 'Copied relative path'
+    ? 'Absolute path copied'
+    : 'Path copied'
 }
 
 export function useCopyFilePath() {
