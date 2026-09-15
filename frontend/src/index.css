@@ -202,6 +202,48 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.file-path-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.file-path-heading strong {
+  min-width: 0;
+}
+
+.file-path-copy-button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 5px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #adadb1;
+  cursor: pointer;
+}
+
+.file-path-copy-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentcolor;
+}
+
+.file-path-copy-button:hover:not(:disabled),
+.file-path-copy-button:focus-visible {
+  background: #303033;
+  color: #fafafa;
+}
+
+.file-path-copy-button:disabled {
+  color: #737378;
+  cursor: default;
+}
+
 .pane-header span {
   color: #adadb1;
   font-size: 0.75rem;
@@ -229,37 +271,6 @@ textarea {
   overflow: hidden;
   color: #ff6762;
   text-overflow: ellipsis;
-}
-
-.file-path-copy-controls {
-  display: flex;
-  flex: 0 0 auto;
-}
-
-.file-path-copy-controls button {
-  padding: 5px 8px;
-  border: 1px solid #414145;
-  background: #202022;
-  color: #fafafa;
-  cursor: pointer;
-}
-
-.file-path-copy-controls button:first-child {
-  border-radius: 5px 0 0 5px;
-}
-
-.file-path-copy-controls button:last-child {
-  border-left: 0;
-  border-radius: 0 5px 5px 0;
-}
-
-.file-path-copy-controls button:hover:not(:disabled) {
-  background: #303033;
-}
-
-.file-path-copy-controls button:disabled {
-  color: #737378;
-  cursor: default;
 }
 
 .clear-status.success {

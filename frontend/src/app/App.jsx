@@ -223,8 +223,21 @@ export default function App() {
         onFocusCapture={() => activateSurface(ActiveSurface.DIFF_PANE)}
       >
         <header className="pane-header">
-          <strong>{activePath ?? 'No file selected'}</strong>
-          <div className="review-actions">
+          <div className="file-path-heading">
+            <strong>{activePath ?? 'No file selected'}</strong>
+            <button
+              className="file-path-copy-button"
+              type="button"
+              disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
+              title="Copy repository-relative path"
+              aria-label="Copy repository-relative path"
+              onClick={() => filePathCopyRequest.copy(activePath, 'relative')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M5 1.75A1.75 1.75 0 0 1 6.75 0h7.5A1.75 1.75 0 0 1 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11H13V9.5h1.25a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5a.25.25 0 0 0-.25.25V3H5V1.75Z" />
+                <path d="M1.75 5h7.5A1.75 1.75 0 0 1 11 6.75v7.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25v-7.5A1.75 1.75 0 0 1 1.75 5Zm0 1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25h-7.5Z" />
+              </svg>
+            </button>
             {filePathCopyMessage && (
               <span
                 className={`file-path-copy-status ${filePathCopyRequest.status}`}
@@ -233,26 +246,8 @@ export default function App() {
                 {filePathCopyMessage}
               </span>
             )}
-            <div className="file-path-copy-controls" role="group" aria-label="Copy open file path">
-              <button
-                type="button"
-                disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
-                title="Copy repository-relative path"
-                aria-label="Copy repository-relative path"
-                onClick={() => filePathCopyRequest.copy(activePath, 'relative')}
-              >
-                Copy path
-              </button>
-              <button
-                type="button"
-                disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
-                title="Copy absolute filesystem path"
-                aria-label="Copy absolute filesystem path"
-                onClick={() => filePathCopyRequest.copy(activePath, 'absolute')}
-              >
-                Absolute
-              </button>
-            </div>
+          </div>
+          <div className="review-actions">
             <button
               className="file-comment-button"
               type="button"
