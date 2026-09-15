@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
@@ -12,6 +12,7 @@ import {
   useCopyFilePath,
 } from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
+import { reloadRequestMessage } from '../review/reload-request.js'
 import { useReviewSession } from '../review/review-session.js'
 import {
   ActiveSurface,
@@ -30,6 +31,7 @@ export default function App() {
     initialWorkspaceState,
   )
   const reviewShellRef = useRef(null)
+  const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false)
   const resizeFileTree = useCallback((width) => {
     dispatchWorkspace({ type: 'file_tree_width_set', width })
   }, [])
@@ -80,14 +82,19 @@ export default function App() {
     openFinderFile: handleFinderOpen,
     overview,
     overviewRequest,
+    reloadRequest,
     selectFile,
     changeTreeMode: handleTreeModeChange,
     visibleFiles,
-  } = useReviewSession({ workspace, dispatchWorkspace })
+  } = useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft })
   const copyMessage = copyRequestMessage(copyRequest)
   const filePathCopyRequest = useCopyFilePath()
   const filePathCopyMessage = filePathCopyRequestMessage(filePathCopyRequest)
   const clearMessage = clearRequestMessage(clearRequest)
+  const reloadMessage = hasUnsavedDraft
+    ? 'Finish or cancel the comment draft before reloading.'
+    : reloadRequestMessage(reloadRequest)
+  const reloadMessageIsError = hasUnsavedDraft || reloadRequest.status === RequestStatus.ERROR
   const closeKeymapReference = () => {
     dispatchWorkspace({ type: 'keymap_reference_closed' })
   }
@@ -112,6 +119,7 @@ export default function App() {
     dispatchWorkspace,
     vimController,
     reviewAvailable: Boolean(overview),
+    reloadReview: reloadRequest.reload,
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
     clearComments: handleClearComments,
@@ -122,7 +130,7 @@ export default function App() {
     selectFile,
   })
 
-  if (overviewRequest.status === RequestStatus.ERROR) {
+  if (overviewRequest.status === RequestStatus.ERROR && !overview) {
     return (
       <div className="application-shell">
         <main className="fatal-error">
@@ -249,6 +257,23 @@ export default function App() {
           </div>
           <div className="review-actions">
             <button
+              className="reload-button"
+              type="button"
+              disabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
+              title={hasUnsavedDraft ? 'Finish or cancel the comment draft before reloading' : 'Reload review'}
+              onClick={reloadRequest.reload}
+            >
+              Reload
+            </button>
+            {reloadMessage && (
+              <span
+                className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadRequest.status}`}
+                role={reloadMessageIsError ? 'alert' : 'status'}
+              >
+                {reloadMessage}
+              </span>
+            )}
+            <button
               className="file-comment-button"
               type="button"
               disabled={!canCommentOnFile}
@@ -307,6 +332,7 @@ export default function App() {
             onCreateComment={handleCreateComment}
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
+            onDraftStateChange={setHasUnsavedDraft}
             onCopyFilePath={filePathCopyRequest.copy}
             onFocusFileTree={focusFileTree}
             onToggleRelativeLineNumbers={toggleRelativeLineNumbers}

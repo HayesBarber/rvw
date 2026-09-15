@@ -33,32 +33,33 @@ export function createRepositoryFilesHook(fetchPaths) {
     }, [])
 
     const load = useCallback(() => {
-const requestId = requestTracker.current.begin()
-    setRequest((current) => ({
-      status: RequestStatus.LOADING,
-      data: current.data,
-      error: null,
-    }))
-    fetchPaths()
-      .then((paths) => {
-        if (requestTracker.current.isCurrent(requestId)) {
-          setRequest({
-            status: RequestStatus.SUCCESS,
-            data: paths,
-            error: null,
-          })
-        }
-      })
-      .catch((error) => {
-        if (requestTracker.current.isCurrent(requestId)) {
-          setRequest((current) => ({
-            status: RequestStatus.ERROR,
-            data: current.data,
-            error: error.message,
-          }))
-        }
-      })
-  }, [])
+      const requestId = requestTracker.current.begin()
+      setRequest((current) => ({
+        status: RequestStatus.LOADING,
+        data: current.data,
+        error: null,
+      }))
+      return fetchPaths()
+        .then((paths) => {
+          if (requestTracker.current.isCurrent(requestId)) {
+            setRequest({
+              status: RequestStatus.SUCCESS,
+              data: paths,
+              error: null,
+            })
+          }
+        })
+        .catch((error) => {
+          if (requestTracker.current.isCurrent(requestId)) {
+            setRequest((current) => ({
+              status: RequestStatus.ERROR,
+              data: current.data,
+              error: error.message,
+            }))
+          }
+          return null
+        })
+    }, [])
 
     return useMemo(() => ({ ...request, load }), [load, request])
   }

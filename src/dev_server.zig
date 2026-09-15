@@ -28,30 +28,11 @@ pub fn main(init: std.process.Init) !void {
         return error.InvalidHost;
     };
 
-    var git = rvw.provider.diff.git.GitProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
+    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
         std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
         return err;
     };
-    defer git.deinit();
-    var all_files_tree = try rvw.provider.filetree.walk.WalkFileTreeProvider.init(
-        init.gpa,
-        init.io,
-        options.directory.?,
-    );
-    defer all_files_tree.deinit();
-    var visible_files_tree = try rvw.provider.filetree.gitignore.GitignoreFileTreeProvider.init(
-        init.gpa,
-        init.io,
-        options.directory.?,
-    );
-    defer visible_files_tree.deinit();
-    var files = try rvw.provider.file.filesystem.FilesystemFileProvider.init(
-        init.gpa,
-        init.io,
-        options.directory.?,
-        all_files_tree.interface(),
-    );
-    defer files.deinit();
+    defer review.deinit();
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
@@ -70,13 +51,9 @@ pub fn main(init: std.process.Init) !void {
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
-        git.interface(),
-        files.interface(),
-        all_files_tree.interface(),
-        visible_files_tree.interface(),
+        review.interface(),
         comments.interface(),
         clipboard.interface(),
-        git.repository_root,
         logger,
         configuration.snapshot,
     );

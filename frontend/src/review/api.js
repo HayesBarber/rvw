@@ -106,6 +106,16 @@ export async function getDiffOverview() {
   return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
+/** Rebuilds the repository-backed review snapshot without changing comments. */
+export async function reloadReview() {
+  const request = { type: 'reload_review' }
+  return requestJson('/api/review/reload', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
 /**
  * Loads display content for one canonical file path.
  * @param {string} diffId

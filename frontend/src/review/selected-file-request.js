@@ -15,9 +15,9 @@ const initialRequest = Object.freeze({
   key: null,
 })
 
-export function fileRequestKey(diffId, path, changed) {
+export function fileRequestKey(diffId, path, changed, generation = 0) {
   if (!path || (changed && !diffId)) return null
-  return `${changed ? diffId : 'file'}\u0000${path}`
+  return `${generation}\u0000${changed ? diffId : 'file'}\u0000${path}`
 }
 
 export function selectFileRequest(request, key, path) {
@@ -38,9 +38,9 @@ export function selectFileRequest(request, key, path) {
   }
 }
 
-export function useReviewFile({ diffId, path, changed }) {
+export function useReviewFile({ diffId, path, changed, generation }) {
   const [request, setRequest] = useState(initialRequest)
-  const key = fileRequestKey(diffId, path, changed)
+  const key = fileRequestKey(diffId, path, changed, generation)
 
   useEffect(() => {
     if (!key) return undefined
@@ -77,7 +77,7 @@ export function useReviewFile({ diffId, path, changed }) {
     return () => {
       active = false
     }
-  }, [changed, diffId, key, path])
+  }, [changed, diffId, generation, key, path])
 
   return useMemo(
     () => selectFileRequest(request, key, path),

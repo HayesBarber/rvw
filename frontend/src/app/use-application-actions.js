@@ -18,6 +18,7 @@ export function useApplicationActions({
   dispatchWorkspace,
   vimController,
   reviewAvailable,
+  reloadReview,
   changeTreeMode,
   copyComments,
   clearComments,
@@ -92,6 +93,7 @@ export function useApplicationActions({
 
   const globalActions = useMemo(() => ({
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
+    [ApplicationAction.RELOAD_REVIEW]: reloadReview,
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
       dispatchWorkspace({ type: 'file_tree_resized', steps: count })
       return true
@@ -128,6 +130,7 @@ export function useApplicationActions({
     openFileFinderAll,
     openKeymapReference,
     reviewAvailable,
+    reloadReview,
   ])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import CommentComposer from './CommentComposer.jsx'
 import SavedComment from './SavedComment.jsx'
@@ -15,6 +15,7 @@ export default function useDiffComments({
   onCreateComment,
   onDeleteComment,
   onEditComment,
+  onDraftStateChange,
 }) {
   const [draft, setDraft] = useState(null)
   const [selectedLines, setSelectedLines] = useState(null)
@@ -23,6 +24,12 @@ export default function useDiffComments({
   const [deleteError, setDeleteError] = useState(null)
   const commentReturnFocusRef = useRef(null)
   const deletingCommentIdRef = useRef(null)
+
+  const hasUnsavedDraft = Boolean(draft || editingCommentId)
+  useEffect(() => {
+    onDraftStateChange?.(hasUnsavedDraft)
+    return () => onDraftStateChange?.(false)
+  }, [hasUnsavedDraft, onDraftStateChange])
 
   const selectLines = useCallback((range) => {
     setSelectedLines(range)

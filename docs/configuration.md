@@ -7,6 +7,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
 | `application.close` | `q` | Close Rvw through the native application host. In HTTP development mode, this action is a no-op. |
+| `review.reload` | `<leader> r` | Reload repository files and changes while preserving saved comments and session display settings. Reload is blocked while a comment draft or editor is open. |
 | `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |

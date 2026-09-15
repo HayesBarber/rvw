@@ -184,6 +184,7 @@ pub const FileDiff = struct {
 
 pub const Request = union(enum) {
     get_configuration,
+    reload_review,
     get_diff_overview,
     get_files,
     get_files_not_ignored,
@@ -232,8 +233,13 @@ pub const ClearCommentsResult = struct {
     commentCount: usize,
 };
 
+pub const ReloadReviewResult = struct {
+    generation: usize,
+};
+
 pub const Response = union(enum) {
     configuration: config.Snapshot,
+    reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     files: []const []const u8,
     file: FileDiff,
@@ -254,6 +260,7 @@ pub const AppError = error{
     UnknownComment,
     NoComments,
     InvalidFilePath,
+    ReloadUnavailable,
 };
 
 pub const ErrorCode = enum {
@@ -266,6 +273,7 @@ pub const ErrorCode = enum {
     unknown_comment,
     no_comments,
     invalid_file_path,
+    reload_unavailable,
     file_path_clipboard_unavailable,
     clipboard_unavailable,
     internal_error,
@@ -280,6 +288,7 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.UnknownComment => .unknown_comment,
         error.NoComments => .no_comments,
         error.InvalidFilePath => .invalid_file_path,
+        error.ReloadUnavailable => .reload_unavailable,
         error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
         error.ClipboardCommandFailed,
         error.ClipboardToolNotFound,
@@ -301,6 +310,7 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .unknown_comment => "Comment was not found",
         .no_comments => "No review comments to copy",
         .invalid_file_path => "File path is invalid",
+        .reload_unavailable => "Unable to reload the review snapshot",
         .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",
         .internal_error => "Internal error",
