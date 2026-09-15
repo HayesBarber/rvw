@@ -207,23 +207,11 @@ test "file path copy requests require a supported format" {
     try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed_invalid.value));
 }
 
-fn blankMessage(message: []const u8) DecodeError!bool {
-    const view = std.unicode.Utf8View.init(message) catch return error.MalformedRequest;
-    var iterator = view.iterator();
-    while (iterator.nextCodepoint()) |codepoint| {
-        switch (codepoint) {
-            0x09...0x0d, 0x20, 0x85, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000 => {},
-            else => return false,
-        }
-    }
-    return true;
-}
-
 fn decodeLog(value: std.json.Value) DecodeError!model.Request {
     const object = value.object;
     const level = log.Level.parse(jsonString(object.get("level")) orelse return error.MalformedRequest) orelse return error.MalformedRequest;
     const message = jsonString(object.get("message")) orelse return error.MalformedRequest;
-    if (try blankMessage(message)) return error.MalformedRequest;
+    if (std.mem.trim(u8, message, &std.ascii.whitespace).len == 0) return error.MalformedRequest;
     var trace: ?[]const u8 = null;
     if (object.get("traceId")) |field| {
         if (field != .null) {
@@ -268,7 +256,7 @@ test "log relay validates fields and preserves context and trace" {
     }
 }
 
-test "null relay options are omitted and Unicode whitespace is blank" {
+test "null relay options are omitted" {
     var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator,
         \\{"type":"log","level":"err","message":"event","context":null,"traceId":null}
     , .{});
@@ -276,6 +264,4 @@ test "null relay options are omitted and Unicode whitespace is blank" {
     const event = (try decodeRequestValue(parsed.value)).log;
     try std.testing.expect(event.context == null);
     try std.testing.expect(event.traceId == null);
-    try std.testing.expect(try blankMessage(" \t\n\u{a0}\u{3000}"));
-    try std.testing.expect(!try blankMessage("event"));
 }
