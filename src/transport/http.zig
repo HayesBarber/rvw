@@ -275,7 +275,6 @@ test "HTTP comment mutation errors distinguish invalid and stale IDs" {
 
 fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const body = req.body() orelse return handler.failure(res, .bad_request, .malformed_request);
-    json_protocol.validateLogPayload(body) catch return handler.failure(res, .bad_request, .malformed_request);
     var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch return handler.failure(res, .bad_request, .malformed_request);
     defer parsed.deinit();
     const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);

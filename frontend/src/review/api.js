@@ -258,52 +258,14 @@ export async function copyFilePath(path, format) {
   })
 }
 
-export const MAX_PENDING_LOGS = 8
-export const LOG_TIMEOUT_MS = 5000
-const MAX_LOG_BYTES = 16 * 1024
-let pendingLogs = 0
-let stalledNativeLogs = 0
-
-/** Best-effort relay; deliberately bypasses ordinary request instrumentation. */
+/** Fire-and-forget logging; failures must not interrupt application work. */
 export function sendLogEvent(event) {
-  if (stalledNativeLogs > 0 || pendingLogs >= MAX_PENDING_LOGS) return
   try {
     const body = JSON.stringify({ ...event, type: 'log' })
-    if (new TextEncoder().encode(body).length > MAX_LOG_BYTES) return
-    relayLog(body).catch(() => {})
-  } catch { /* Serialization must never interrupt application work. */ }
-}
-
-async function relayLog(body) {
-  pendingLogs += 1
-  let timer
-  let timedOut = false
-  try {
-    const native = window.webkit?.messageHandlers?.native
-    const controller = new AbortController()
-    const request = native
-      ? native.postMessage(JSON.parse(body))
-      : fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body,
-          signal: controller.signal,
-        })
-    const settled = Promise.resolve(request).finally(() => {
-      if (native && timedOut) stalledNativeLogs -= 1
-    })
-    const timeout = new Promise((resolve) => {
-      timer = setTimeout(() => {
-        timedOut = true
-        // Native requests cannot be cancelled: pause until late replies settle.
-        if (native) stalledNativeLogs += 1
-        else controller.abort()
-        resolve()
-      }, LOG_TIMEOUT_MS)
-    })
-    await Promise.race([settled, timeout])
-  } finally {
-    clearTimeout(timer)
-    pendingLogs -= 1
-  }
+    requestJson('/api/log', JSON.parse(body), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).catch(() => {})
+  } catch { /* Ignore serialization failures. */ }
 }

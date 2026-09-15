@@ -13,7 +13,7 @@ diagnostics remain on stderr.
 Frontend code uses `logError(message, context?, traceId?)`; the shared
 `sendLogEvent` API relays through `/api/log` or the native bridge. Use fixed
 messages and selected diagnostic fields, never user content or raw exceptions.
-Delivery is best effort, bounded, and has no retries.
+Delivery is fire-and-forget; failures are ignored and there are no retries.
 
 Application events are errors only. The shared API supports other severities for
 future instrumentation. `--log-level` overrides `LOG_LEVEL`, defaulting to `error`;

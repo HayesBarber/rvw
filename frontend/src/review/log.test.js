@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { setImmediate } from 'node:timers/promises'
-import { sendLogEvent, MAX_PENDING_LOGS, LOG_TIMEOUT_MS } from './api.js'
+import { sendLogEvent } from './api.js'
 import { installGlobalLogging } from './log.js'
 
 const settle = () => setImmediate()
@@ -66,58 +66,4 @@ test('global capture is once per page and never forwards sensitive event propert
     { type: 'log', level: 'error', message: 'frontend unhandled rejection' },
   ])
   assert.equal(prevented, false)
-})
-
-test('native relay pauses on timeout and resumes only after every late reply settles', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
-  const replies = []
-  let count = 0
-  window.webkit.messageHandlers.native.postMessage = () => {
-    count += 1
-    return new Promise((resolve, reject) => replies.push({ resolve, reject }))
-  }
-  const send = () => sendLogEvent({ level: 'error', message: 'test' })
-  for (let index = 0; index < 100; index += 1) send()
-  assert.equal(count, MAX_PENDING_LOGS)
-  t.mock.timers.tick(LOG_TIMEOUT_MS)
-  await settle()
-  send()
-  assert.equal(count, MAX_PENDING_LOGS)
-  replies[0].reject(new Error('late failure'))
-  await settle()
-  send()
-  assert.equal(count, MAX_PENDING_LOGS)
-  for (const reply of replies.slice(1)) reply.resolve()
-  await settle()
-  window.webkit.messageHandlers.native.postMessage = () => { count += 1 }
-  send()
-  await settle()
-  assert.equal(count, MAX_PENDING_LOGS + 1)
-})
-
-test('HTTP relay aborts stalled work and accepts new events after timeout', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
-  globalThis.window = {}
-  const originalFetch = globalThis.fetch
-  let aborted = false
-  let count = 0
-  try {
-    globalThis.fetch = (_url, { signal }) => {
-      count += 1
-      if (count > 1) return Promise.resolve({ ok: true })
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => {
-          aborted = true
-          reject(new Error('aborted'))
-        })
-      })
-    }
-    sendLogEvent({ level: 'error', message: 'test' })
-    t.mock.timers.tick(LOG_TIMEOUT_MS)
-    await settle()
-    assert.equal(aborted, true)
-    sendLogEvent({ level: 'error', message: 'test' })
-    await settle()
-    assert.equal(count, 2)
-  } finally { globalThis.fetch = originalFetch }
 })
