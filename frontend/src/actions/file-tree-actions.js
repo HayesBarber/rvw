@@ -69,12 +69,21 @@ export function createFileTreeActionAdapter(
     focusDiffPane = () => false,
     showChanges = () => false,
     showFiles = () => false,
+    copyFilePath = () => false,
   } = {},
 ) {
   return Object.freeze({
     [ApplicationAction.FOCUS_DIFF_PANE]: focusDiffPane,
     [ApplicationAction.SHOW_CHANGES]: showChanges,
     [ApplicationAction.SHOW_FILES]: showFiles,
+    [ApplicationAction.COPY_FILE_PATH_RELATIVE]: () => {
+      const item = model.getFocusedItem()
+      return Boolean(item && !item.isDirectory() && copyFilePath(item.getPath(), 'relative'))
+    },
+    [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: () => {
+      const item = model.getFocusedItem()
+      return Boolean(item && !item.isDirectory() && copyFilePath(item.getPath(), 'absolute'))
+    },
     [ApplicationAction.CURSOR_UP]: (count) => moveFocus(
       model,
       () => model.focusPreviousItem(),

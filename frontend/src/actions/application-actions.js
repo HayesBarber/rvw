@@ -12,6 +12,7 @@ export const ActionGroup = Object.freeze({
   APPLICATION: 'application',
   NAVIGATION: 'navigation',
   FILE_TREE: 'file_tree',
+  FILE: 'file',
   REVIEW: 'review',
 })
 
@@ -19,6 +20,7 @@ export const applicationActionGroups = Object.freeze([
   Object.freeze({ id: ActionGroup.APPLICATION, label: 'Application' }),
   Object.freeze({ id: ActionGroup.NAVIGATION, label: 'Navigation' }),
   Object.freeze({ id: ActionGroup.FILE_TREE, label: 'File tree' }),
+  Object.freeze({ id: ActionGroup.FILE, label: 'File' }),
   Object.freeze({ id: ActionGroup.REVIEW, label: 'Review comments' }),
 ])
 
@@ -48,6 +50,8 @@ export const ApplicationAction = Object.freeze({
   DIFF_EXPAND_TOGGLE: 'diff.expand.toggle',
   DIFF_RELATIVE_LINE_NUMBERS_TOGGLE: 'diff.relative_line_numbers.toggle',
   DIFF_WRAP_TOGGLE: 'diff.wrap.toggle',
+  COPY_FILE_PATH_RELATIVE: 'file.path.copy_relative',
+  COPY_FILE_PATH_ABSOLUTE: 'file.path.copy_absolute',
   COPY_COMMENTS: 'comments.copy',
   ADD_COMMENT: 'comments.add',
   ADD_FILE_COMMENT: 'comments.add_file',
@@ -82,6 +86,8 @@ const actionDefinitions = [
   [ApplicationAction.DIFF_EXPAND_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle all unchanged diff regions.'],
   [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle relative line numbers in text views.'],
   [ApplicationAction.DIFF_WRAP_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle text wrapping in the diff view.'],
+  [ApplicationAction.COPY_FILE_PATH_RELATIVE, ActionScope.ACTIVE_SURFACE, ActionGroup.FILE, 'Copy the active file repository-relative path.'],
+  [ApplicationAction.COPY_FILE_PATH_ABSOLUTE, ActionScope.ACTIVE_SURFACE, ActionGroup.FILE, 'Copy the active file absolute path.'],
   [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, ActionGroup.REVIEW, 'Copy all review comments as Markdown.'],
   [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment at the active diff cursor.'],
   [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment to the open file.'],
@@ -160,6 +166,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.DIFF_EXPAND_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'e')),
   [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'n')),
   [ApplicationAction.DIFF_WRAP_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'w')),
+  [ApplicationAction.COPY_FILE_PATH_RELATIVE]: actionBindings(keySequence(LEADER_KEY, 'y')),
+  [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),

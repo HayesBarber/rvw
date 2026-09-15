@@ -76,6 +76,7 @@ pub fn main(init: std.process.Init) !void {
         visible_files_tree.interface(),
         comments.interface(),
         clipboard.interface(),
+        git.repository_root,
         logger,
         configuration.snapshot,
     );

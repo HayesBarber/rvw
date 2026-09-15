@@ -14,6 +14,7 @@ export default function FileTreePane({
   isCursorVisible,
   mode,
   onFocusDiffPane,
+  onCopyFilePath,
   selectedPath,
   onSelectFile,
   onShowChanges,
@@ -63,6 +64,7 @@ export default function FileTreePane({
       onSelectFile,
       {
         focusDiffPane: onFocusDiffPane,
+        copyFilePath: onCopyFilePath,
         showChanges: onShowChanges,
         showFiles: onShowFiles,
       },
@@ -70,6 +72,7 @@ export default function FileTreePane({
     [
       model,
       onFocusDiffPane,
+      onCopyFilePath,
       onSelectFile,
       onShowChanges,
       onShowFiles,

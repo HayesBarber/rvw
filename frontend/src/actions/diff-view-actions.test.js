@@ -4,6 +4,7 @@ import test from 'node:test'
 import { ApplicationAction } from './application-actions.js'
 import {
   RenderableFileKind,
+  createDiffFilePathActionAdapter,
   createDiffViewActionAdapter,
 } from './diff-view-actions.js'
 
@@ -48,6 +49,31 @@ test('diff display actions toggle expansion and wrapping in both directions', ()
     ['relative', true],
     ['relative', false],
   ])
+})
+
+test('diff path actions always copy the open file in the requested format', () => {
+  const copies = []
+  const actions = createDiffFilePathActionAdapter({
+    filePath: 'open/renamed ü.txt',
+    copyFilePath: (...args) => (copies.push(args), true),
+  })
+
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), true)
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_ABSOLUTE](), true)
+  assert.deepEqual(copies, [
+    ['open/renamed ü.txt', 'relative'],
+    ['open/renamed ü.txt', 'absolute'],
+  ])
+})
+
+test('diff path actions are unavailable without an open file', () => {
+  const actions = createDiffFilePathActionAdapter({
+    filePath: null,
+    copyFilePath: () => assert.fail('copy should not be attempted'),
+  })
+
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), false)
+  assert.equal(actions[ApplicationAction.COPY_FILE_PATH_ABSOLUTE](), false)
 })
 
 test('full files support wrapping while unavailable views ignore display actions', () => {

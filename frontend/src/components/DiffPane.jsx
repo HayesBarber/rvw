@@ -3,7 +3,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApplicationAction } from '../actions/application-actions.js'
 import { createCommentActionAdapter, openFileCommentTarget } from '../actions/comment-actions.js'
 import { createDiffCursorActionAdapter } from '../actions/diff-cursor-actions.js'
-import { createDiffViewActionAdapter } from '../actions/diff-view-actions.js'
+import {
+  createDiffFilePathActionAdapter,
+  createDiffViewActionAdapter,
+} from '../actions/diff-view-actions.js'
 import DiffSurface from './diff-pane/DiffSurface.jsx'
 import useDiffComments from './diff-pane/useDiffComments.jsx'
 import useDiffCursor from './diff-pane/useDiffCursor.js'
@@ -26,12 +29,14 @@ export default function DiffPane({
   onCreateComment,
   onEditComment,
   onDeleteComment,
+  onCopyFilePath,
   onFocusFileTree,
   onToggleRelativeLineNumbers,
   onToggleWrapLines,
   registerActionAdapter,
   relativeLineNumbers,
   wrapLines,
+  filePath,
 }) {
   const [expandUnchanged, setExpandUnchanged] = useState(false)
   const cursor = useDiffCursor({
@@ -55,6 +60,7 @@ export default function DiffPane({
 
   useEffect(() => registerActionAdapter({
     [ApplicationAction.FOCUS_FILE_TREE]: onFocusFileTree,
+    ...createDiffFilePathActionAdapter({ filePath, copyFilePath: onCopyFilePath }),
     ...createDiffViewActionAdapter({
       contentKind: fileDiff?.content.kind,
       prepareLayoutChange: cursor.guardNextLayoutRender,
@@ -92,6 +98,8 @@ export default function DiffPane({
     cursor.getRows,
     cursor.guardNextLayoutRender,
     fileDiff,
+    filePath,
+    onCopyFilePath,
     onFocusFileTree,
     onToggleRelativeLineNumbers,
     onToggleWrapLines,

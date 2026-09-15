@@ -158,6 +158,7 @@ pub export fn rvw_core_create(
         handle.visible_files_tree.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
+        handle.git.repository_root,
         handle.logger,
         handle.configuration.snapshot,
     );

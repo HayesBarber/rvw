@@ -5,6 +5,17 @@ export const RenderableFileKind = Object.freeze({
   FILE: 'file',
 })
 
+/** Builds path-copy actions for the file opened by the diff surface. */
+export function createDiffFilePathActionAdapter({ filePath, copyFilePath }) {
+  const copy = (format) => Boolean(
+    filePath && copyFilePath(filePath, format),
+  )
+  return {
+    [ApplicationAction.COPY_FILE_PATH_RELATIVE]: () => copy('relative'),
+    [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: () => copy('absolute'),
+  }
+}
+
 /** Builds display actions that are valid only for the currently rendered text view. */
 export function createDiffViewActionAdapter({
   contentKind,

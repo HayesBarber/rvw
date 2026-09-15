@@ -7,6 +7,10 @@ import KeyboardStatus from '../components/KeyboardStatus.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
 import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
+import {
+  filePathCopyRequestMessage,
+  useCopyFilePath,
+} from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { useReviewSession } from '../review/review-session.js'
 import {
@@ -81,6 +85,8 @@ export default function App() {
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace })
   const copyMessage = copyRequestMessage(copyRequest)
+  const filePathCopyRequest = useCopyFilePath()
+  const filePathCopyMessage = filePathCopyRequestMessage(filePathCopyRequest)
   const clearMessage = clearRequestMessage(clearRequest)
   const closeKeymapReference = () => {
     dispatchWorkspace({ type: 'keymap_reference_closed' })
@@ -193,6 +199,7 @@ export default function App() {
             isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
             mode={workspace.treeMode}
             onFocusDiffPane={focusDiffPane}
+            onCopyFilePath={filePathCopyRequest.copy}
             selectedPath={activePath}
             onSelectFile={handleTreeFileSelect}
             onShowChanges={showChanges}
@@ -218,6 +225,34 @@ export default function App() {
         <header className="pane-header">
           <strong>{activePath ?? 'No file selected'}</strong>
           <div className="review-actions">
+            {filePathCopyMessage && (
+              <span
+                className={`file-path-copy-status ${filePathCopyRequest.status}`}
+                role={filePathCopyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
+              >
+                {filePathCopyMessage}
+              </span>
+            )}
+            <div className="file-path-copy-controls" role="group" aria-label="Copy open file path">
+              <button
+                type="button"
+                disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
+                title="Copy repository-relative path"
+                aria-label="Copy repository-relative path"
+                onClick={() => filePathCopyRequest.copy(activePath, 'relative')}
+              >
+                Copy path
+              </button>
+              <button
+                type="button"
+                disabled={!activePath || filePathCopyRequest.status === RequestStatus.LOADING}
+                title="Copy absolute filesystem path"
+                aria-label="Copy absolute filesystem path"
+                onClick={() => filePathCopyRequest.copy(activePath, 'absolute')}
+              >
+                Absolute
+              </button>
+            </div>
             <button
               className="file-comment-button"
               type="button"
@@ -269,6 +304,7 @@ export default function App() {
           <DiffPane
             key={activePath ?? 'no-file'}
             fileDiff={fileDiff}
+            filePath={activePath}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             loading={fileLoading}
             error={fileError}
@@ -276,6 +312,7 @@ export default function App() {
             onCreateComment={handleCreateComment}
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
+            onCopyFilePath={filePathCopyRequest.copy}
             onFocusFileTree={focusFileTree}
             onToggleRelativeLineNumbers={toggleRelativeLineNumbers}
             onToggleWrapLines={toggleWrapLines}

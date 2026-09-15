@@ -4,11 +4,59 @@ import test from 'node:test'
 import {
   clearComments,
   closeApplication,
+  copyFilePath,
   deleteComment,
   editComment,
   getConfiguration,
   getFilesNotIgnored,
 } from './api.js'
+
+test('file path copies use the same request through the native bridge', async () => {
+  const requests = []
+  globalThis.window = {
+    webkit: { messageHandlers: { native: { postMessage(request) {
+      requests.push(request)
+      return Promise.resolve({ path: request.path, format: request.format })
+    } } } },
+  }
+
+  try {
+    assert.deepEqual(await copyFilePath('src/renamed ü.txt', 'absolute'), {
+      path: 'src/renamed ü.txt',
+      format: 'absolute',
+    })
+    assert.deepEqual(requests, [{
+      type: 'copy_file_path',
+      path: 'src/renamed ü.txt',
+      format: 'absolute',
+    }])
+  } finally {
+    delete globalThis.window
+  }
+})
+
+test('file path copies use the dedicated HTTP endpoint', async () => {
+  const requests = []
+  globalThis.window = {}
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options })
+    return { ok: true, status: 200, json: async () => JSON.parse(options.body) }
+  }
+
+  try {
+    await copyFilePath('deleted file.txt', 'relative')
+    assert.equal(requests[0].url, '/api/files/copy-path')
+    assert.equal(requests[0].options.method, 'POST')
+    assert.deepEqual(JSON.parse(requests[0].options.body), {
+      type: 'copy_file_path',
+      path: 'deleted file.txt',
+      format: 'relative',
+    })
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
 
 test('application close is sent only through the native host boundary', async () => {
   const requests = []
