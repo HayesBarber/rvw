@@ -252,6 +252,66 @@ function scrollFileCommentIntoView(node) {
   return false
 }
 
+function viewportState(viewport) {
+  const isDocument = viewport?.nodeType === 9
+  const element = isDocument ? viewport.documentElement : viewport
+  if (!element) return null
+  return {
+    height: element.clientHeight,
+    isDocument,
+    left: isDocument ? (viewport.defaultView?.scrollX ?? 0) : viewport.scrollLeft,
+    top: isDocument ? (viewport.defaultView?.scrollY ?? 0) : viewport.scrollTop,
+    viewportTop: isDocument ? 0 : viewport.getBoundingClientRect().top,
+  }
+}
+
+/** Capture the active logical row's viewport position before a diff layout rebuild. */
+export function captureDiffLayoutAnchor(instance, node, cursor) {
+  const viewport = instance?.getEditorViewport?.()
+  const state = viewportState(viewport)
+  if (!viewport || !state || !node) return null
+
+  const position = cursor?.lineNumber > 0
+    ? instance.getLinePosition?.(cursor.lineNumber, cursor.side)
+    : null
+  const rowOffset = position && position.height > 0 && Number.isFinite(position.top)
+    ? node.getBoundingClientRect().top - state.viewportTop + position.top
+    : null
+
+  return {
+    left: state.left,
+    rowOffset,
+    top: state.top,
+  }
+}
+
+/** Restore a captured row anchor, or the exact scroll offset when no row was anchored. */
+export function restoreDiffLayoutAnchor(anchor, instance, node, cursor) {
+  if (!anchor) return false
+  const viewport = instance?.getEditorViewport?.()
+  const state = viewportState(viewport)
+  if (!viewport || !state || !node) return false
+
+  const position = cursor?.lineNumber > 0
+    ? instance.getLinePosition?.(cursor.lineNumber, cursor.side)
+    : null
+  let top = anchor.top
+  if (
+    anchor.rowOffset !== null &&
+    position &&
+    position.height > 0 &&
+    Number.isFinite(position.top)
+  ) {
+    const nextOffset = node.getBoundingClientRect().top - state.viewportTop + position.top
+    top = Math.max(0, state.top + nextOffset - anchor.rowOffset)
+  }
+
+  const target = { left: anchor.left, top }
+  if (state.isDocument) viewport.defaultView?.scrollTo(target)
+  else viewport.scrollTo(target)
+  return true
+}
+
 export function scrollDiffCursorIntoView(instance, node, cursor) {
   if (cursor?.lineNumber === 0) return scrollFileCommentIntoView(node)
 

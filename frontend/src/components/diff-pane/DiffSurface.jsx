@@ -22,6 +22,7 @@ const baseOptions = {
 }
 
 export default function DiffSurface({
+  expandUnchanged = false,
   fileDiff,
   lineAnnotations,
   selectedLines,
@@ -33,18 +34,20 @@ export default function DiffSurface({
 }) {
   const options = useMemo(() => ({
     ...baseOptions,
+    expandUnchanged,
     overflow: wrapLines ? 'wrap' : 'scroll',
     onGutterUtilityClick: onBeginComment,
     onLineSelected: onSelectLines,
     onLineSelectionChange: onSelectLines,
     onLineSelectionEnd: onSelectLines,
     onPostRender,
-  }), [onBeginComment, onPostRender, onSelectLines, wrapLines])
+  }), [expandUnchanged, onBeginComment, onPostRender, onSelectLines, wrapLines])
 
   return (
     <Virtualizer className="diff-scroll">
       {fileDiff.content.kind === 'diff' ? (
         <MultiFileDiff
+          key={expandUnchanged ? 'expanded' : 'collapsed'}
           oldFile={fileDiff.content.oldFile}
           newFile={fileDiff.content.newFile}
           lineAnnotations={lineAnnotations}

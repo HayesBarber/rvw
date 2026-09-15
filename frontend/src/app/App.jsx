@@ -29,6 +29,9 @@ export default function App() {
   const resizeFileTree = useCallback((width) => {
     dispatchWorkspace({ type: 'file_tree_width_set', width })
   }, [])
+  const toggleWrapLines = useCallback(() => {
+    dispatchWorkspace({ type: 'wrap_lines_toggled' })
+  }, [])
   const vimController = useVimController()
   const vimState = useVimState()
   const keyboardConfiguration = useConfiguration(vimController)
@@ -265,6 +268,7 @@ export default function App() {
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
             onFocusFileTree={focusFileTree}
+            onToggleWrapLines={toggleWrapLines}
             registerActionAdapter={registerDiffPaneActions}
             wrapLines={workspace.wrapLines}
           />
