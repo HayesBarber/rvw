@@ -890,24 +890,3 @@ textarea {
   padding: 0;
   border: 0;
 }
-
-.command-palette-body input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 8px;
-  color: inherit;
-  background: transparent;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-}
-
-.command-palette-body ul {
-  list-style: none;
-  padding: 0;
-}
-
-.command-palette-body li button {
-  width: 100%;
-  padding: 8px;
-  text-align: left;
-}
