@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import CommentComposer from './CommentComposer.jsx'
+import { useVimController, VimMode } from '../../vim/index.js'
 import SavedComment from './SavedComment.jsx'
 import {
   createCommentAnnotations,
@@ -20,6 +21,7 @@ export default function useDiffComments({
   onEditComment,
   onDraftStateChange,
 }) {
+  const vimController = useVimController()
   const [draft, setDraft] = useState(null)
   const [selectedLines, setSelectedLines] = useState(null)
   const [editingCommentId, setEditingCommentId] = useState(null)
@@ -42,7 +44,8 @@ export default function useDiffComments({
   const beginRangeComment = useCallback((range) => {
     if (!fileDiff || !range) return
 
-    commentReturnFocusRef.current = document.activeElement
+    vimController.dispatch({ type: 'set_mode', mode: VimMode.NORMAL })
+    commentReturnFocusRef.current = document.activeElement?.closest('.diff-pane') ?? document.activeElement
     const nextDraft = normalizeCommentRange(
       fileDiff.path,
       range,
@@ -52,16 +55,20 @@ export default function useDiffComments({
     cursor.activateRangeCommentContext(range)
     setSelectedLines(nextDraft.selection)
     setDraft(nextDraft)
-  }, [cursor, fileDiff])
+  }, [cursor, fileDiff, vimController])
 
   const beginCursorComment = useCallback((target) => {
+    if (selectedLines) {
+      beginRangeComment(selectedLines)
+      return
+    }
     commentReturnFocusRef.current = document.activeElement
     cursor.guardNextAnnotationRender()
     setDraft({
       annotationSide: target.side === 'old' ? 'deletions' : 'additions',
       target,
     })
-  }, [cursor])
+  }, [beginRangeComment, cursor, selectedLines])
 
   const beginFileComment = useCallback((target) => {
     commentReturnFocusRef.current = document.activeElement
@@ -197,6 +204,7 @@ export default function useDiffComments({
     lineAnnotations,
     renderAnnotation,
     selectedLines,
+    setSelectedLines,
     selectLines,
   }), [
     beginCursorComment,
@@ -207,6 +215,7 @@ export default function useDiffComments({
     lineAnnotations,
     renderAnnotation,
     selectedLines,
+    setSelectedLines,
     selectLines,
   ])
 }

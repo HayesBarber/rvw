@@ -252,6 +252,11 @@ export default function App() {
       <section
         ref={diffPaneRef}
         className="pane diff-pane"
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            vimController.dispatch({ type: 'set_mode', mode: 'normal' })
+          }
+        }}
         tabIndex={-1}
         onPointerDown={() => activateSurface(ActiveSurface.DIFF_PANE)}
         onFocusCapture={() => activateSurface(ActiveSurface.DIFF_PANE)}
@@ -262,6 +267,8 @@ export default function App() {
             fileDiff={fileDiff}
             filePath={activePath}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
+            visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
+              !workspace.finderOpen && !workspace.keymapReferenceOpen}
             loading={fileLoading}
             error={fileError}
             comments={comments}

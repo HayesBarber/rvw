@@ -15,6 +15,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
+| `diff.visual_line` | `V` | Enter linewise Visual selection at the active code row. |
 | `diff.side.switch` | `<leader> s` | Switch diff side on the same visual row. If the opposite side is empty, keep the cursor in place. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
@@ -55,6 +56,18 @@ from the effective keymap, so valid user replacements and disabled actions are
 shown exactly as installed. While the reference is open, workspace commands
 are blocked. Use `j` and `k` to scroll the reference. Press `<Esc>` to close it
 and restore focus to the prior workspace context.
+
+In the active text/diff pane, `V` anchors an inclusive line selection. In Visual
+mode, `j`/`k`, arrows, counts, `<C-u>`/`<C-d>` (or Page Up/Down), and `gg`/`G`
+extend or reverse the endpoint. Movement stays on the original diff side and
+skips non-code rows; ranges spanning collapsed context include intervening source
+lines. `c` opens one range-comment composer. Saving or cancelling restores normal
+mode and diff focus. `<Esc>` or `V` clears selection. Changing files, leaving the
+diff pane, or opening an overlay also exits Visual mode.
+
+The entry action `diff.visual_line` is configurable in `keybindings.normal`.
+Visual-mode bindings themselves are fixed and independent of normal-mode overrides.
+Mouse range selection remains available; normal-mode `c` uses an active mouse range.
 
 ## User configuration
 

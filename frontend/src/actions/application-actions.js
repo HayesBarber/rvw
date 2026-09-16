@@ -35,6 +35,7 @@ export const ApplicationAction = Object.freeze({
   CURSOR_FIRST: 'cursor.first',
   CURSOR_LAST: 'cursor.last',
   CURSOR_CENTER: 'cursor.center',
+  VISUAL_LINE: 'diff.visual_line',
   DIFF_SWITCH_SIDE: 'diff.side.switch',
   FILE_TREE_ITEM_ACTIVATE: 'file_tree.item.activate',
   TREE_COLLAPSE_OR_PARENT: 'tree.collapse_or_parent',
@@ -73,6 +74,7 @@ const actionDefinitions = [
   [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the first item.'],
   [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the last item.'],
   [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Center the active cursor in its viewport.'],
+  [ApplicationAction.VISUAL_LINE, ActionScope.DIFF_PANE, ActionGroup.NAVIGATION, 'Select lines in Visual mode.'],
   [ApplicationAction.DIFF_SWITCH_SIDE, ActionScope.DIFF_PANE, ActionGroup.NAVIGATION, 'Switch diff side.'],
   [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Activate the focused file-tree item.'],
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
@@ -139,6 +141,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
   [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
   [ApplicationAction.CURSOR_CENTER]: actionBindings(keySequence('z', 'z')),
+  [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
   [ApplicationAction.DIFF_SWITCH_SIDE]: actionBindings(keySequence(LEADER_KEY, 's')),
   [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: actionBindings(
@@ -180,6 +183,17 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'd')),
   [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
+})
+
+export const visualKeymap = Object.freeze({
+  [ApplicationAction.CURSOR_UP]: actionBindings(keySequence('k'), keySequence('<Up>')),
+  [ApplicationAction.CURSOR_DOWN]: actionBindings(keySequence('j'), keySequence('<Down>')),
+  [ApplicationAction.CURSOR_PAGE_UP]: actionBindings(keySequence('<C-u>'), keySequence('<PageUp>')),
+  [ApplicationAction.CURSOR_PAGE_DOWN]: actionBindings(keySequence('<C-d>'), keySequence('<PageDown>')),
+  [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
+  [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
+  [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
+  [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
 })
 
 const workspaceSurfaces = Object.freeze([
@@ -275,6 +289,15 @@ export function compileApplicationKeymap(
     })
   })
 
+  // Visual bindings are fixed and separate from configurable Normal bindings.
+  for (const [action, sequences] of Object.entries(visualKeymap)) {
+    for (const keys of sequences) bindings.push(Object.freeze({
+      mode: VimMode.VISUAL,
+      keys,
+      command: APPLICATION_DISPATCH_COMMAND,
+      args: Object.freeze({ actions: Object.freeze([action]) }),
+    }))
+  }
   compileBindings(bindings)
   return Object.freeze(bindings)
 }

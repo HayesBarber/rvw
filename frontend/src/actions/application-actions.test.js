@@ -31,7 +31,7 @@ test('the action catalog is frozen, enumerable, and documented', () => {
   }
 })
 
-test('every default binding references a known action and compiles for Normal mode', () => {
+test('every default binding references a known action and compiles for its mode', () => {
   assert.deepEqual(
     Object.keys(defaultNormalKeymap),
     Object.values(ApplicationAction),
@@ -40,7 +40,7 @@ test('every default binding references a known action and compiles for Normal mo
   assert(Object.isFrozen(defaultApplicationBindings))
 
   for (const binding of defaultApplicationBindings) {
-    assert.equal(binding.mode, VimMode.NORMAL)
+    assert([VimMode.NORMAL, VimMode.VISUAL].includes(binding.mode))
     assert.equal(binding.command, APPLICATION_DISPATCH_COMMAND)
     assert(binding.args.actions.length > 0)
     for (const action of binding.args.actions) {
@@ -141,7 +141,7 @@ test('user-configured duplicate keys compile for disjoint surface scopes', () =>
   assert.deepEqual(compileApplicationKeymap({
     [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: [['x']],
     [ApplicationAction.ADD_FILE_COMMENT]: [['x']],
-  }), [{
+  }).filter((binding) => binding.mode === VimMode.NORMAL), [{
     mode: VimMode.NORMAL,
     keys: ['x'],
     command: APPLICATION_DISPATCH_COMMAND,
@@ -160,13 +160,13 @@ test('leader placeholders compile to a concrete key without mutating the keymap'
   }
 
   assert.equal(DEFAULT_LEADER_KEY, '<Space>')
-  assert.deepEqual(compileApplicationKeymap(keymap), [{
+  assert.deepEqual(compileApplicationKeymap(keymap).filter((binding) => binding.mode === VimMode.NORMAL), [{
     mode: VimMode.NORMAL,
     keys: ['<Space>', 'y'],
     command: APPLICATION_DISPATCH_COMMAND,
     args: { actions: [ApplicationAction.COPY_COMMENTS] },
   }])
-  assert.deepEqual(compileApplicationKeymap(keymap, { leader: '\\' }), [{
+  assert.deepEqual(compileApplicationKeymap(keymap, { leader: '\\' }).filter((binding) => binding.mode === VimMode.NORMAL), [{
     mode: VimMode.NORMAL,
     keys: ['\\', 'y'],
     command: APPLICATION_DISPATCH_COMMAND,

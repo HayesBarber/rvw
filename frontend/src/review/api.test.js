@@ -331,3 +331,33 @@ test('comment mutations use ID-addressed HTTP endpoints and methods', async () =
     delete globalThis.window
   }
 })
+
+test('range comments preserve normalized old-side coordinates across native and HTTP transports', async () => {
+  const { createComment } = await import('./api.js')
+  const { normalizeCommentRange } = await import('../components/diff-pane/comment-annotations.js')
+  const target = normalizeCommentRange('deleted.txt', {
+    start: 20, end: 3, side: 'deletions', endSide: 'deletions',
+  }, true).target
+  const requests = []
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.window = { webkit: { messageHandlers: { native: {
+      postMessage: async (request) => { requests.push(request); return { id: 'native', target: request.target } },
+    } } } }
+    assert.deepEqual((await createComment('Range', null, target)).target, target)
+    globalThis.window = {}
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, '/api/comments')
+      assert.equal(options.method, 'POST')
+      const request = JSON.parse(options.body)
+      requests.push(request)
+      return { ok: true, json: async () => ({ id: 'http', target: request.target }) }
+    }
+    assert.deepEqual((await createComment('Range', null, target)).target, target)
+    assert.deepEqual(requests[0], requests[1])
+    assert.deepEqual(target, { kind: 'line', path: 'deleted.txt', side: 'old', startLine: 3, endLine: 20 })
+  } finally {
+    globalThis.fetch = previousFetch
+    delete globalThis.window
+  }
+})

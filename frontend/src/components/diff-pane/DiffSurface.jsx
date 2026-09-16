@@ -60,7 +60,9 @@ export default function DiffSurface({
     expandUnchanged,
     overflow: wrapLines ? 'wrap' : 'scroll',
     onGutterUtilityClick: onBeginComment,
-    onLineSelected: onSelectLines,
+    // onLineSelected also fires for controlled prop writes. Only pointer
+    // lifecycle callbacks should replace a keyboard selection.
+    onLineSelectionStart: onSelectLines,
     onLineSelectionChange: onSelectLines,
     onLineSelectionEnd: onSelectLines,
     onPostRender,
