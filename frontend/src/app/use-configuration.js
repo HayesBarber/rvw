@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import {
+  DEFAULT_COMMENT_TYPE,
+  DEFAULT_COMMENT_TYPES,
   DEFAULT_RELATIVE_LINE_NUMBERS,
   DEFAULT_WRAP_LINES,
   loadConfiguration,
@@ -12,6 +14,8 @@ import {
 
 export function useConfiguration(vimController) {
   const [state, setState] = useState({
+    commentTypes: DEFAULT_COMMENT_TYPES,
+    defaultCommentType: DEFAULT_COMMENT_TYPE,
     diagnostic: null,
     keymap: defaultNormalKeymap,
     leader: DEFAULT_LEADER_KEY,
@@ -28,6 +32,8 @@ export function useConfiguration(vimController) {
         vimController.setBindings(configuration.bindings)
       }
       setState((current) => ({
+        commentTypes: configuration.commentTypes ?? current.commentTypes,
+        defaultCommentType: configuration.defaultCommentType ?? null,
         diagnostic: configuration.diagnostic,
         keymap: configuration.keymap ?? current.keymap,
         leader: configuration.leader ?? current.leader,

@@ -107,6 +107,7 @@ pub const CommentTarget = union(enum) {
 pub const Comment = struct {
     id: []const u8,
     body: []const u8,
+    commentType: ?[]const u8 = null,
     target: CommentTarget,
 };
 
@@ -203,11 +204,13 @@ pub const Request = union(enum) {
     },
     create_comment: struct {
         body: []const u8,
+        comment_type: ?[]const u8 = null,
         target: CommentTarget,
     },
     edit_comment: struct {
         comment_id: []const u8,
         body: []const u8,
+        comment_type: ?[]const u8 = null,
     },
     delete_comment: struct { comment_id: []const u8 },
     clear_comments,

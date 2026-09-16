@@ -11,6 +11,8 @@ import { createAndActivateComment } from './create-and-activate-comment.js'
 export default function useDiffComments({
   activeCommentId,
   comments,
+  commentTypes,
+  defaultCommentType,
   cursor,
   fileDiff,
   onCreateComment,
@@ -79,16 +81,17 @@ export default function useDiffComments({
     })
   }, [cursor])
 
-  const createComment = useCallback((body, target) => createAndActivateComment({
+  const createComment = useCallback((body, commentType, target) => createAndActivateComment({
     activate: cursor.setActiveCommentId,
     beforeCommit: cursor.guardNextAnnotationRender,
     body,
+    commentType,
     create: onCreateComment,
     target,
   }), [cursor, onCreateComment])
 
-  const editComment = useCallback((commentId, body) => (
-    onEditComment(commentId, body, cursor.guardNextAnnotationRender)
+  const editComment = useCallback((commentId, body, commentType) => (
+    onEditComment(commentId, body, commentType, cursor.guardNextAnnotationRender)
   ), [cursor, onEditComment])
 
   const deleteComment = useCallback((commentId) => (
@@ -145,6 +148,8 @@ export default function useDiffComments({
             ? `file:${target.path}`
             : `${target.side}:${target.startLine}:${target.endLine}`}
           target={target}
+          commentTypes={commentTypes}
+          defaultCommentType={defaultCommentType}
           onCancel={cancelComment}
           onCreate={createComment}
         />
@@ -159,6 +164,7 @@ export default function useDiffComments({
         deleteError={deleteError?.commentId === comment.id ? deleteError.message : null}
         deleting={deletingCommentId === comment.id}
         editing={editingCommentId === comment.id}
+        commentTypes={commentTypes}
         onActivate={activateComment}
         onBeginEdit={beginEditComment}
         onCancelEdit={cancelEditComment}
@@ -172,7 +178,9 @@ export default function useDiffComments({
     beginEditComment,
     cancelComment,
     cancelEditComment,
+    commentTypes,
     createComment,
+    defaultCommentType,
     deleteCommentImmediately,
     deleteError,
     deletingCommentId,

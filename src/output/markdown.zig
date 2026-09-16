@@ -28,11 +28,23 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment) ![]u8 {
             },
         }
         try writer.writeAll(" - ");
+        if (comment.commentType) |comment_type| {
+            try writer.writeByte('[');
+            try writeCommentType(writer, comment_type);
+            try writer.writeAll("] ");
+        }
         try writeCommentBody(writer, comment.body);
         try writer.writeByte('\n');
     }
 
     return output.toOwnedSlice();
+}
+
+fn writeCommentType(writer: *std.Io.Writer, comment_type: []const u8) !void {
+    for (comment_type) |character| {
+        if (character == '\\' or character == '[' or character == ']') try writer.writeByte('\\');
+        try writer.writeByte(character);
+    }
 }
 
 fn writeCommentBody(writer: *std.Io.Writer, body: []const u8) !void {
@@ -88,4 +100,28 @@ fn compareTargets(lhs: model.CommentTarget, rhs: model.CommentTarget) std.math.O
             },
         },
     };
+}
+
+test "typed and untyped comments retain location and body formatting" {
+    const comments = [_]model.Comment{
+        .{ .id = "1", .body = "Handle expiry", .commentType = "ISSUE", .target = .{ .line = .{
+            .path = "src/auth.zig",
+            .side = .new,
+            .startLine = 42,
+            .endLine = 42,
+        } } },
+        .{ .id = "2", .body = "Plain", .target = .{ .file = .{ .path = "README.md" } } },
+        .{ .id = "3", .body = "Safe", .commentType = "A[B]\\C", .target = .{ .line = .{
+            .path = "src/auth.zig",
+            .side = .new,
+            .startLine = 58,
+            .endLine = 61,
+        } } },
+    };
+    const markdown = try serialize(std.testing.allocator, &comments);
+    defer std.testing.allocator.free(markdown);
+    try std.testing.expectEqualStrings(
+        "- README.md - Plain\n- src/auth.zig:42 - [ISSUE] Handle expiry\n- src/auth.zig:58-61 - [A\\[B\\]\\\\C] Safe\n",
+        markdown,
+    );
 }

@@ -9,6 +9,8 @@ export const USER_CONFIGURATION_PATH = '~/.config/rvw/config.json'
 
 export const DEFAULT_WRAP_LINES = true
 export const DEFAULT_RELATIVE_LINE_NUMBERS = false
+export const DEFAULT_COMMENT_TYPES = Object.freeze(['ISSUE', 'QUESTION', 'NITPICK'])
+export const DEFAULT_COMMENT_TYPE = null
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -36,11 +38,59 @@ function configuredDiffSettings(diff) {
   return { relativeLineNumbers, wrapLines }
 }
 
+function configuredCommentSettings(comments) {
+  if (comments === undefined) {
+    return {
+      commentTypes: DEFAULT_COMMENT_TYPES,
+      defaultCommentType: DEFAULT_COMMENT_TYPE,
+    }
+  }
+  if (!isObject(comments)) {
+    throw new TypeError('User configuration comments must be a JSON object')
+  }
+  if (!onlyFields(comments, ['types', 'defaultType'])) {
+    throw new TypeError('User configuration comments contains an unsupported field')
+  }
+
+  const types = comments.types ?? DEFAULT_COMMENT_TYPES
+  if (!Array.isArray(types)) {
+    throw new TypeError('User configuration comments.types must be an array')
+  }
+  const seen = new Set()
+  for (const type of types) {
+    if (typeof type !== 'string') {
+      throw new TypeError('Each comments.types entry must be a string')
+    }
+    if (type.trim().length === 0) {
+      throw new TypeError('Comments.types entries cannot be blank')
+    }
+    if (/\r|\n/.test(type)) {
+      throw new TypeError('Comments.types entries cannot contain line breaks')
+    }
+    if (seen.has(type)) {
+      throw new TypeError('Comments.types entries must be unique')
+    }
+    seen.add(type)
+  }
+
+  const defaultType = comments.defaultType ?? null
+  if (defaultType !== null && typeof defaultType !== 'string') {
+    throw new TypeError('User configuration comments.defaultType must be a string or null')
+  }
+  if (defaultType !== null && !seen.has(defaultType)) {
+    throw new TypeError('User configuration comments.defaultType must match a configured type')
+  }
+  return {
+    commentTypes: Object.freeze([...types]),
+    defaultCommentType: defaultType,
+  }
+}
+
 function configuredKeyboardConfiguration(configuration) {
   if (!isObject(configuration)) {
     throw new TypeError('User configuration must be a JSON object')
   }
-  if (!onlyFields(configuration, ['keybindings', 'diff'])) {
+  if (!onlyFields(configuration, ['keybindings', 'diff', 'comments'])) {
     throw new TypeError('User configuration contains an unsupported top-level field')
   }
 
@@ -120,11 +170,13 @@ export function resolveConfiguration(snapshot) {
           wrapLines: DEFAULT_WRAP_LINES,
         }
       : configuredDiffSettings(snapshot.configuration.diff)
+    const comments = configuredCommentSettings(snapshot.configuration.comments)
     return {
       bindings: compileApplicationKeymap(keyboard.keymap, { leader: keyboard.leader }),
       keymap: keyboard.keymap,
       leader: keyboard.leader,
       ...diff,
+      ...comments,
       diagnostic: null,
     }
   } catch (error) {

@@ -162,6 +162,7 @@ export async function getFile(path) {
  * @typedef {Object} Comment
  * @property {string} id
  * @property {string} body
+ * @property {string | null} [commentType]
  * @property {{ kind: 'file', path: string } | { kind: 'line', path: string, side: 'old' | 'new', startLine: number, endLine: number }} target
  */
 
@@ -179,8 +180,8 @@ export async function getComments() {
  * @param {Comment['target']} target
  * @returns {Promise<Comment>}
  */
-export async function createComment(body, target) {
-  const request = { type: 'create_comment', body, target }
+export async function createComment(body, commentType, target) {
+  const request = { type: 'create_comment', body, commentType, target }
   return requestJson('/api/comments', request, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -194,8 +195,8 @@ export async function createComment(body, target) {
  * @param {string} body
  * @returns {Promise<Comment>}
  */
-export async function editComment(commentId, body) {
-  const request = { type: 'edit_comment', commentId, body }
+export async function editComment(commentId, body, commentType) {
+  const request = { type: 'edit_comment', commentId, body, commentType }
   return requestJson(`/api/comments/${encodeURIComponent(commentId)}`, request, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

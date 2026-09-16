@@ -6,6 +6,8 @@ import {
 } from '../actions/application-actions.js'
 import {
   DEFAULT_RELATIVE_LINE_NUMBERS,
+  DEFAULT_COMMENT_TYPE,
+  DEFAULT_COMMENT_TYPES,
   DEFAULT_WRAP_LINES,
   USER_CONFIGURATION_PATH,
   loadConfiguration,
@@ -111,6 +113,41 @@ test('wrapLines defaults to wrapping when the diff section is omitted', () => {
   assert.equal(result.wrapLines, true)
   assert.equal(result.relativeLineNumbers, DEFAULT_RELATIVE_LINE_NUMBERS)
   assert.equal(result.relativeLineNumbers, false)
+  assert.deepEqual(result.commentTypes, DEFAULT_COMMENT_TYPES)
+  assert.equal(result.defaultCommentType, DEFAULT_COMMENT_TYPE)
+})
+
+test('configured comment types replace built-ins and preserve order and default', () => {
+  const result = resolveConfiguration({
+    configuration: {
+      comments: { types: ['BUG', 'IDEA'], defaultType: 'IDEA' },
+    },
+    diagnostic: null,
+  })
+  assert.equal(result.diagnostic, null)
+  assert.deepEqual(result.commentTypes, ['BUG', 'IDEA'])
+  assert.equal(result.defaultCommentType, 'IDEA')
+
+  const disabled = resolveConfiguration({
+    configuration: { comments: { types: [] } },
+    diagnostic: null,
+  })
+  assert.deepEqual(disabled.commentTypes, [])
+  assert.equal(disabled.defaultCommentType, null)
+})
+
+test('invalid comment type settings produce configuration diagnostics', () => {
+  for (const configuration of [
+    { comments: [] },
+    { comments: { types: 'ISSUE' } },
+    { comments: { types: [''] } },
+    { comments: { types: ['BUG', 'BUG'] } },
+    { comments: { types: ['BUG'], defaultType: 'IDEA' } },
+  ]) {
+    const result = resolveConfiguration({ configuration, diagnostic: null })
+    assert.equal(result.bindings, null)
+    assert.equal(result.diagnostic.code, 'invalid_configuration')
+  }
 })
 
 test('configured diff.wrapLines controls the startup default', () => {

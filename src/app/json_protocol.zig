@@ -76,13 +76,15 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     }
     if (std.mem.eql(u8, operation, "create_comment")) {
         const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
+        const comment_type = try optionalJsonString(object.get("commentType"));
         const target = parseCommentTarget(object.get("target")) orelse return error.MalformedRequest;
-        return .{ .create_comment = .{ .body = body, .target = target } };
+        return .{ .create_comment = .{ .body = body, .comment_type = comment_type, .target = target } };
     }
     if (std.mem.eql(u8, operation, "edit_comment")) {
         const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
         const body = jsonString(object.get("body")) orelse return error.MalformedRequest;
-        return .{ .edit_comment = .{ .comment_id = comment_id, .body = body } };
+        const comment_type = try optionalJsonString(object.get("commentType"));
+        return .{ .edit_comment = .{ .comment_id = comment_id, .body = body, .comment_type = comment_type } };
     }
     if (std.mem.eql(u8, operation, "delete_comment")) {
         const comment_id = jsonString(object.get("commentId")) orelse return error.MalformedRequest;
@@ -96,6 +98,14 @@ fn jsonString(value: ?std.json.Value) ?[]const u8 {
     return switch (value orelse return null) {
         .string => |string| string,
         else => null,
+    };
+}
+
+fn optionalJsonString(value: ?std.json.Value) DecodeError!?[]const u8 {
+    return switch (value orelse return null) {
+        .null => null,
+        .string => |string| string,
+        else => error.MalformedRequest,
     };
 }
 
@@ -141,17 +151,18 @@ fn encodeEnvelopeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
     }, .{});
 }
 
-test "comment mutation requests decode IDs and edited bodies" {
+test "comment mutation requests decode optional types" {
     var parsed_edit = try std.json.parseFromSlice(
         std.json.Value,
         std.testing.allocator,
-        "{\"type\":\"edit_comment\",\"commentId\":\"comment-7\",\"body\":\"revised\"}",
+        "{\"type\":\"edit_comment\",\"commentId\":\"comment-7\",\"body\":\"revised\",\"commentType\":\"QUESTION\"}",
         .{},
     );
     defer parsed_edit.deinit();
     const edit = try decodeRequestValue(parsed_edit.value);
     try std.testing.expectEqualStrings("comment-7", edit.edit_comment.comment_id);
     try std.testing.expectEqualStrings("revised", edit.edit_comment.body);
+    try std.testing.expectEqualStrings("QUESTION", edit.edit_comment.comment_type.?);
 
     var parsed_delete = try std.json.parseFromSlice(
         std.json.Value,

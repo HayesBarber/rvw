@@ -265,6 +265,8 @@ export default function App() {
             loading={fileLoading}
             error={fileError}
             comments={comments}
+            commentTypes={keyboardConfiguration.commentTypes}
+            defaultCommentType={keyboardConfiguration.defaultCommentType}
             onCreateComment={handleCreateComment}
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}

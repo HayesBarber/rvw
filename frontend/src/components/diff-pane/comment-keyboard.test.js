@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   CommentKeyboardAction,
   commentKeyboardAction,
+  cycleCommentType,
 } from './comment-keyboard.js'
 
 function keyboardEvent(overrides = {}) {
@@ -43,4 +44,24 @@ test('Escape cancels when no save is in flight', () => {
     commentKeyboardAction(keyboardEvent({ key: 'Escape' }), false),
     CommentKeyboardAction.CANCEL,
   )
+})
+
+test('Tab cycles configured types in both directions with wrapping', () => {
+  const types = ['ISSUE', 'QUESTION', 'NITPICK']
+  assert.equal(cycleCommentType(null, types, 1), 'ISSUE')
+  assert.equal(cycleCommentType('NITPICK', types, 1), null)
+  assert.equal(cycleCommentType(null, types, -1), 'NITPICK')
+  assert.equal(cycleCommentType('ISSUE', types, -1), null)
+  assert.equal(
+    commentKeyboardAction(keyboardEvent({ key: 'Tab' }), false, true),
+    CommentKeyboardAction.CYCLE_NEXT_TYPE,
+  )
+  assert.equal(
+    commentKeyboardAction(keyboardEvent({ key: 'Tab', shiftKey: true }), false, true),
+    CommentKeyboardAction.CYCLE_PREVIOUS_TYPE,
+  )
+})
+
+test('disabled types retain native Tab behavior', () => {
+  assert.equal(commentKeyboardAction(keyboardEvent({ key: 'Tab' }), false, false), null)
 })

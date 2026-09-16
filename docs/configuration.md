@@ -59,9 +59,11 @@ and restore focus to the prior workspace context.
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts one optional `keybindings` object and one optional `diff` object. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
+The JSON root accepts optional `keybindings`, `diff`, and `comments` objects. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
 
 `diff` accepts optional `wrapLines` and `relativeLineNumbers` boolean keys. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. Line numbers are absolute by default; set `"relativeLineNumbers": true` to show the cursor row's source line and each other code row's vertical movement distance. The `diff.wrap.toggle` and `diff.relative_line_numbers.toggle` actions change their settings for the current session only, apply to subsequently opened files, and are active while the diff pane has focus. `diff.expand.toggle` affects only the open diff and each newly opened file starts with collapsed context.
+
+`comments.types` is an ordered list of comment type names. Without it, Rvw offers `ISSUE`, `QUESTION`, and `NITPICK`. A configured list replaces those built-ins; an empty list disables typed comments. `comments.defaultType` may be `null` or one of the configured names and defaults to `null`. Names must be unique, non-blank, single-line strings. In a comment text editor, `Tab` and `Shift+Tab` cycle through no type and the configured types. The dropdown supports mouse selection and clearing.
 
 This complete example replaces four actions, disables one action, starts with wrapping disabled and relative line numbers enabled, selects `\` as the leader key, and leaves every other action at its default binding:
 
@@ -80,6 +82,10 @@ This complete example replaces four actions, disables one action, starts with wr
   "diff": {
     "relativeLineNumbers": true,
     "wrapLines": false
+  },
+  "comments": {
+    "types": ["ISSUE", "QUESTION", "NITPICK"],
+    "defaultType": null
   }
 }
 ```
