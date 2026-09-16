@@ -17,7 +17,7 @@ import { VimController } from '../vim/machine.js'
 
 function bindingKeys(bindings, action) {
   return bindings
-    .filter((binding) => binding.args.actions.includes(action))
+    .filter((binding) => binding.mode === 'normal' && binding.args.actions.includes(action))
     .map((binding) => binding.keys)
 }
 
@@ -298,4 +298,18 @@ test('Vim binding replacement is atomic when a later map is invalid', () => {
     controller.dispatch({ type: 'key', key: 'w' }).command.args.actions[0],
     ApplicationAction.CURSOR_UP,
   )
+})
+
+test('visual entry is configurable while visual movement remains independent', () => {
+  const result = resolveConfiguration({ configuration: { keybindings: { normal: {
+    [ApplicationAction.VISUAL_LINE]: [['s']],
+    [ApplicationAction.CURSOR_DOWN]: [['n']],
+  } } }, diagnostic: null })
+  assert.equal(result.diagnostic, null)
+  assert.deepEqual(bindingKeys(result.bindings, ApplicationAction.VISUAL_LINE), [['s']])
+  const controller = new VimController({ bindings: result.bindings })
+  assert.deepEqual(controller.dispatch({ type: 'key', key: 's' }).command.args.actions, [ApplicationAction.VISUAL_LINE])
+  controller.dispatch({ type: 'set_mode', mode: 'visual' })
+  assert.deepEqual(controller.dispatch({ type: 'key', key: 'j' }).command.args.actions, [ApplicationAction.CURSOR_DOWN])
+  assert.equal(controller.dispatch({ type: 'key', key: 'n' }).command, null)
 })

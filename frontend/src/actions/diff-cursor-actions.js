@@ -479,6 +479,7 @@ export function createDiffCursorActionAdapter({
   getInstance,
   activateCursor,
   centerCursor,
+  getPreferredSide = () => undefined,
 }) {
   const activate = (cursor) => cursor !== null && activateCursor(cursor) === true
   const move = (offset, count) => activate(moveDiffCursor(
@@ -501,10 +502,10 @@ export function createDiffCursorActionAdapter({
     [ApplicationAction.CURSOR_DOWN]: (count) => move(1, count),
     [ApplicationAction.CURSOR_PAGE_UP]: (count) => movePage(-1, count),
     [ApplicationAction.CURSOR_PAGE_DOWN]: (count) => movePage(1, count),
-    [ApplicationAction.CURSOR_FIRST]: () => activate(cursorForRow(getRows()[0])),
+    [ApplicationAction.CURSOR_FIRST]: () => activate(cursorForRow(getRows()[0], getPreferredSide())),
     [ApplicationAction.CURSOR_LAST]: () => {
       const rows = getRows()
-      return activate(cursorForRow(rows.at(-1)))
+      return activate(cursorForRow(rows.at(-1), getPreferredSide()))
     },
     [ApplicationAction.CURSOR_CENTER]: () => {
       const cursor = getCursor()

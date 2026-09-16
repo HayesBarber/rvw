@@ -75,6 +75,13 @@ export default function KeymapReference({ keymap, leader, onClose }) {
           </button>
         </header>
         <div ref={bodyRef} className="keymap-reference-body">
+          <section className="keymap-reference-group">
+            <h3>Visual line selection</h3>
+            <p>After entering Visual mode: j/k or arrows extend the range; counts
+              repeat movement. Ctrl-u/Ctrl-d or Page Up/Down move by half a viewport;
+              gg/G select to the first/last line on the same side. Press c to comment,
+              or Esc/V to clear. These Visual bindings are fixed.</p>
+          </section>
           {groups.map((group) => (
             <section className="keymap-reference-group" key={group.id}>
               <h3>{group.label}</h3>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import useVisualSelection from './diff-pane/useVisualSelection.js'
 import { ApplicationAction } from '../actions/application-actions.js'
 import { createCommentActionAdapter, openFileCommentTarget } from '../actions/comment-actions.js'
 import { createDiffCursorActionAdapter } from '../actions/diff-cursor-actions.js'
@@ -23,6 +24,7 @@ const unavailableDescriptions = {
 export default function DiffPane({
   fileDiff,
   isCursorVisible,
+  visualSelectionEnabled,
   loading,
   error,
   comments,
@@ -62,11 +64,19 @@ export default function DiffPane({
     onEditComment,
     onDraftStateChange,
   })
+  const visual = useVisualSelection({
+    cursor,
+    selectLines: commentReview.setSelectedLines,
+    onMouseSelect: commentReview.selectLines,
+    enabled: visualSelectionEnabled && !loading && !error &&
+      Boolean(fileDiff && fileDiff.content.kind !== 'unavailable'),
+  })
   const toggleExpandUnchanged = useCallback(() => {
     setExpandUnchanged((expanded) => !expanded)
   }, [])
 
   useEffect(() => registerActionAdapter({
+    [ApplicationAction.VISUAL_LINE]: visual.toggle,
     [ApplicationAction.FOCUS_FILE_TREE]: onFocusFileTree,
     ...createDiffFilePathActionAdapter({ filePath, copyFilePath: onCopyFilePath }),
     ...createDiffViewActionAdapter({
@@ -77,10 +87,11 @@ export default function DiffPane({
       toggleWrapLines: onToggleWrapLines,
     }),
     ...createDiffCursorActionAdapter({
-      getRows: cursor.getRows,
+      getRows: visual.getRows,
+      getPreferredSide: visual.getPreferredSide,
       getCursor: cursor.getCursor,
       getInstance: cursor.getInstance,
-      activateCursor: cursor.activateCursor,
+      activateCursor: visual.activateCursor,
       centerCursor: cursor.centerCursor,
     }),
     ...createCommentActionAdapter({
@@ -97,13 +108,15 @@ export default function DiffPane({
     commentReview.beginEditComment,
     commentReview.beginFileComment,
     commentReview.deleteCommentImmediately,
-    cursor.activateCursor,
+    visual.toggle,
+    visual.getRows,
+    visual.getPreferredSide,
+    visual.activateCursor,
     cursor.centerCursor,
     cursor.getActiveComment,
     cursor.getAddTarget,
     cursor.getCursor,
     cursor.getInstance,
-    cursor.getRows,
     cursor.guardNextLayoutRender,
     fileDiff,
     filePath,
@@ -134,7 +147,7 @@ export default function DiffPane({
       renderHeaderMetadata={renderHeaderMetadata}
       onBeginComment={commentReview.beginRangeComment}
       onPostRender={cursor.handlePostRender}
-      onSelectLines={commentReview.selectLines}
+      onSelectLines={visual.selectMouseLines}
       wrapLines={wrapLines}
     />
   )
