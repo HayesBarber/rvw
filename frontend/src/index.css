@@ -842,7 +842,7 @@ textarea {
 .comment-type-badge {
   padding: 2px 6px;
   border: 1px solid #5d79b8;
-  border-radius: 999px;
+  border-radius: 4px;
   color: #b8ceff;
   font-size: 0.68rem;
   letter-spacing: 0.03em;

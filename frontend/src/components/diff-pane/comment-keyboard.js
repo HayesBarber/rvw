@@ -2,7 +2,6 @@ export const CommentKeyboardAction = Object.freeze({
   CANCEL: 'cancel',
   CYCLE_NEXT_TYPE: 'cycle_next_type',
   CYCLE_PREVIOUS_TYPE: 'cycle_previous_type',
-  FOCUS_CONTROLS: 'focus_controls',
   SUBMIT: 'submit',
 })
 
@@ -16,17 +15,6 @@ export function cycleCommentType(currentType, types, direction) {
 export function commentKeyboardAction(event, saving, typesEnabled = false) {
   if (event.key === 'Escape' && !saving) {
     return CommentKeyboardAction.CANCEL
-  }
-
-  if (
-    event.key === 'ArrowDown' &&
-    event.altKey &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    typesEnabled &&
-    !saving
-  ) {
-    return CommentKeyboardAction.FOCUS_CONTROLS
   }
 
   if (event.key === 'Tab' && typesEnabled && !saving) {

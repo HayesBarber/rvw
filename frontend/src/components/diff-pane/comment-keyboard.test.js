@@ -62,10 +62,6 @@ test('Tab cycles configured types in both directions with wrapping', () => {
   )
 })
 
-test('Alt+Down reaches controls and disabled types retain native Tab behavior', () => {
-  assert.equal(
-    commentKeyboardAction(keyboardEvent({ key: 'ArrowDown', altKey: true }), false, true),
-    CommentKeyboardAction.FOCUS_CONTROLS,
-  )
+test('disabled types retain native Tab behavior', () => {
   assert.equal(commentKeyboardAction(keyboardEvent({ key: 'Tab' }), false, false), null)
 })

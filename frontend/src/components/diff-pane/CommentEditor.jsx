@@ -15,7 +15,6 @@ export default function CommentEditor({ comment, commentTypes, onCancel, onSave 
   const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
   const textareaRef = useRef(null)
-  const typeSelectRef = useRef(null)
   const inputId = `edit-comment-${comment.id}`
 
   useLayoutEffect(() => {
@@ -59,9 +58,6 @@ export default function CommentEditor({ comment, commentTypes, onCancel, onSave 
     } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
-    } else if (action === CommentKeyboardAction.FOCUS_CONTROLS) {
-      event.preventDefault()
-      typeSelectRef.current?.focus()
     } else if (
       action === CommentKeyboardAction.CYCLE_NEXT_TYPE ||
       action === CommentKeyboardAction.CYCLE_PREVIOUS_TYPE
@@ -87,14 +83,13 @@ export default function CommentEditor({ comment, commentTypes, onCancel, onSave 
         ref={textareaRef}
         id={inputId}
         rows="4"
-        aria-keyshortcuts="Tab Shift+Tab Alt+ArrowDown"
+        aria-keyshortcuts="Tab Shift+Tab"
         value={body}
         disabled={saving}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={handleKeyDown}
       />
       <CommentTypeSelect
-        ref={typeSelectRef}
         id={`${inputId}-type`}
         types={commentTypes}
         value={commentType}

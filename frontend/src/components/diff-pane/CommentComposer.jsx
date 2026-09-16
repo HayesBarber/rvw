@@ -22,7 +22,6 @@ export default function CommentComposer({
   const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
   const textareaRef = useRef(null)
-  const typeSelectRef = useRef(null)
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -75,9 +74,6 @@ export default function CommentComposer({
     } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
-    } else if (action === CommentKeyboardAction.FOCUS_CONTROLS) {
-      event.preventDefault()
-      typeSelectRef.current?.focus()
     } else if (
       action === CommentKeyboardAction.CYCLE_NEXT_TYPE ||
       action === CommentKeyboardAction.CYCLE_PREVIOUS_TYPE
@@ -105,7 +101,7 @@ export default function CommentComposer({
         ref={textareaRef}
         id="comment-body"
         rows="4"
-        aria-keyshortcuts="Tab Shift+Tab Alt+ArrowDown"
+        aria-keyshortcuts="Tab Shift+Tab"
         value={body}
         placeholder="Leave a comment"
         disabled={saving}
@@ -113,7 +109,6 @@ export default function CommentComposer({
         onKeyDown={handleKeyDown}
       />
       <CommentTypeSelect
-        ref={typeSelectRef}
         id="comment-type"
         types={commentTypes}
         value={commentType}
