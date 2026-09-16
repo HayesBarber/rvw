@@ -8,6 +8,7 @@ import {
 } from '../components/FileHeaderControls.jsx'
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
+import CommandPalette from '../components/CommandPalette.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
 import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
@@ -32,6 +33,7 @@ export default function App() {
     initialWorkspaceState,
   )
   const reviewShellRef = useRef(null)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false)
   const resizeFileTree = useCallback((width) => {
     dispatchWorkspace({ type: 'file_tree_width_set', width })
@@ -103,6 +105,7 @@ export default function App() {
   }
   const {
     activateSurface,
+    executeAction,
     addFileComment: handleAddFileComment,
     diffPaneRef,
     fileTreePaneRef,
@@ -115,6 +118,7 @@ export default function App() {
     showChanges,
     showFiles,
   } = useApplicationActions({
+    commandPaletteOpen,
     workspace,
     dispatchWorkspace,
     vimController,
@@ -306,6 +310,13 @@ export default function App() {
           registerActionAdapter={registerFinderActions}
         />
       )}
+      {commandPaletteOpen && (
+        <CommandPalette
+          activeSurface={workspace.activeSurface}
+          onClose={() => setCommandPaletteOpen(false)}
+          onExecute={executeAction}
+        />
+      )}
       {workspace.keymapReferenceOpen && (
         <KeymapReference
           keymap={keyboardConfiguration.keymap}
@@ -320,6 +331,8 @@ export default function App() {
         copyMessage={copyMessage}
         copyRequest={copyRequest}
         diagnostic={configurationDiagnostic}
+        onOpenCommands={() => setCommandPaletteOpen(true)}
+        commandsDisabled={hasUnsavedDraft || workspace.finderOpen || workspace.keymapReferenceOpen}
         onCopyComments={handleCopyComments}
         onReload={reloadRequest.reload}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}

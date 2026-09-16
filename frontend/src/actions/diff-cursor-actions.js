@@ -197,6 +197,17 @@ function rowIndexForCursor(rows, cursor) {
   return rows.findIndex((row) => row[cursor.side] === cursor.lineNumber)
 }
 
+/** Switch to the corresponding line on this visual row, without falling back. */
+export function switchDiffCursorSide(rows, cursor) {
+  const row = rows[rowIndexForCursor(rows, cursor)]
+  if (!row || cursor.lineNumber === 0) return null
+  const side = cursor.side === DiffCursorSide.ADDITIONS
+    ? DiffCursorSide.DELETIONS
+    : DiffCursorSide.ADDITIONS
+  const lineNumber = row[side]
+  return lineNumber === undefined ? null : { lineNumber, side }
+}
+
 /** Preserve a cursor across rerenders, falling back to the nearest same-side line. */
 export function reconcileDiffCursor(rows, cursor) {
   if (rows.length === 0) return null
@@ -485,6 +496,7 @@ export function createDiffCursorActionAdapter({
   ))
 
   return Object.freeze({
+    [ApplicationAction.DIFF_SWITCH_SIDE]: () => activate(switchDiffCursorSide(getRows(), getCursor())),
     [ApplicationAction.CURSOR_UP]: (count) => move(-1, count),
     [ApplicationAction.CURSOR_DOWN]: (count) => move(1, count),
     [ApplicationAction.CURSOR_PAGE_UP]: (count) => movePage(-1, count),

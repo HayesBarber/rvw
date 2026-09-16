@@ -15,6 +15,7 @@ const blockingOverlayActions = Object.freeze({})
 
 export function useApplicationActions({
   workspace,
+  commandPaletteOpen,
   dispatchWorkspace,
   vimController,
   reviewAvailable,
@@ -138,7 +139,7 @@ export function useApplicationActions({
       getActiveSurface: () => workspace.activeSurface,
       getSurfaceActions: surfaceActions.get,
       getOverlayActions: () => {
-        if (workspace.keymapReferenceOpen) return blockingOverlayActions
+        if (workspace.keymapReferenceOpen || commandPaletteOpen) return blockingOverlayActions
         return workspace.finderOpen ? finderActionsRef.current : null
       },
       globalActions,
@@ -148,6 +149,7 @@ export function useApplicationActions({
       return dispatchApplicationAction(command.args.actions, command.count)
     })
   }, [
+    commandPaletteOpen,
     globalActions,
     surfaceActions,
     vimController,
@@ -156,7 +158,14 @@ export function useApplicationActions({
     workspace.keymapReferenceOpen,
   ])
 
+  const executeAction = createApplicationDispatcher({
+    getActiveSurface: () => workspace.activeSurface,
+    getSurfaceActions: surfaceActions.get,
+    globalActions,
+  })
+
   return {
+    executeAction,
     activateSurface,
     addFileComment,
     diffPaneRef,

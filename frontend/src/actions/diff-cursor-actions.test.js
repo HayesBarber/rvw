@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { parseDiffFromFile } from '@pierre/diffs'
+import { commentAtCursor, commentTargetAtCursor } from './comment-actions.js'
 import { ApplicationAction } from './application-actions.js'
 import {
   DiffCursorSide,
@@ -14,6 +15,7 @@ import {
   reconcileDiffCursor,
   restoreDiffLayoutAnchor,
   scrollDiffCursorIntoView,
+  switchDiffCursorSide,
   syncDiffCursorPresentation,
   syncRelativeLineNumbers,
 } from './diff-cursor-actions.js'
@@ -738,4 +740,59 @@ test('cursor reconciliation preserves the file comment row cursor', () => {
 
   assert.equal(reconcileDiffCursor(rows, existing), existing)
   assert.deepEqual(reconcileDiffCursor(rows, null), existing)
+})
+
+
+test('switching sides maps paired visual rows in both directions and preserves subsequent movement', () => {
+  const rows = createDiffCursorRows(diffInstance(
+    'context\nold one\nold two\ntail\nnext\n',
+    'context\nnew one\ntail\nnext\n',
+  ))
+  const original = { lineNumber: 3, side: DiffCursorSide.ADDITIONS }
+  const switched = switchDiffCursorSide(rows, original)
+  assert.deepEqual(switched, { lineNumber: 4, side: DiffCursorSide.DELETIONS })
+  assert.deepEqual(switchDiffCursorSide(rows, switched), original)
+  assert.deepEqual(moveDiffCursor(rows, switched, 1), {
+    lineNumber: 5, side: DiffCursorSide.DELETIONS,
+  })
+  assert.deepEqual(switchDiffCursorSide(rows, { lineNumber: 1, side: 'additions' }), {
+    lineNumber: 1, side: 'deletions',
+  })
+})
+
+test('side switching does nothing for one-sided, file-comment, missing, and stale cursors', () => {
+  for (const [rows, cursor] of [
+    [[{ additions: 2 }], { lineNumber: 2, side: 'additions' }],
+    [[{ deletions: 2 }], { lineNumber: 2, side: 'deletions' }],
+    [[{ additions: 0, fileCommentRow: true }], { lineNumber: 0, side: 'additions' }],
+    [[{ additions: 2, deletions: 3 }], { lineNumber: 1, side: 'additions' }],
+    [[], null],
+  ]) {
+    let activations = 0
+    const actions = createDiffCursorActionAdapter({
+      getRows: () => rows, getCursor: () => cursor,
+      activateCursor: () => { activations++; return true },
+    })
+    assert.equal(switchDiffCursorSide(rows, cursor), null)
+    assert.equal(actions[ApplicationAction.DIFF_SWITCH_SIDE](), false)
+    assert.equal(activations, 0)
+  }
+})
+
+test('switch action activates the mapped cursor for comment creation and existing comments', () => {
+  const rows = [{ additions: 8, deletions: 7 }]
+  let cursor = { lineNumber: 8, side: 'additions' }
+  const comments = ['old', 'new'].map((side) => ({
+    id: side, target: { kind: 'line', path: 'example.txt', side,
+      startLine: side === 'old' ? 7 : 8, endLine: side === 'old' ? 7 : 8 },
+  }))
+  const actions = createDiffCursorActionAdapter({
+    getRows: () => rows, getCursor: () => cursor,
+    activateCursor: (next) => { cursor = next; return true },
+  })
+  for (const side of ['old', 'new']) {
+    assert.equal(actions[ApplicationAction.DIFF_SWITCH_SIDE](), true)
+    assert.equal(commentTargetAtCursor('example.txt', cursor, rows).side, side)
+    assert.equal(commentAtCursor(comments, 'example.txt', cursor).id, side)
+  }
 })

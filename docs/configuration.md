@@ -15,6 +15,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
+| `diff.side.switch` | `<leader> s` | Switch diff side on the same visual row. If the opposite side is empty, keep the cursor in place. Available in Commands and the keyboard reference. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
@@ -48,6 +49,11 @@ focus to the result list and enable its Vim bindings without changing the
 query, then press `<Esc>` again to close the finder. Outside that transition,
 `<Esc>` clears a pending count or multi-key sequence. An unmatched key after a
 pending sequence also clears that pending input without running an action.
+
+Open **Commands** in the footer to search actions for the active pane. Press
+`Enter` in the search field to run the first match, or use `Tab` to choose a
+command button. Press `<Esc>` to close the dialog. Commands are unavailable
+while a comment draft or another dialog is open.
 
 Press `?` to open the keyboard reference. It is grouped by purpose and reads
 from the effective keymap, so valid user replacements and disabled actions are

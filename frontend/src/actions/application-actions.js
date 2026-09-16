@@ -35,6 +35,7 @@ export const ApplicationAction = Object.freeze({
   CURSOR_FIRST: 'cursor.first',
   CURSOR_LAST: 'cursor.last',
   CURSOR_CENTER: 'cursor.center',
+  DIFF_SWITCH_SIDE: 'diff.side.switch',
   FILE_TREE_ITEM_ACTIVATE: 'file_tree.item.activate',
   TREE_COLLAPSE_OR_PARENT: 'tree.collapse_or_parent',
   TREE_EXPAND: 'tree.expand',
@@ -72,6 +73,7 @@ const actionDefinitions = [
   [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the first item.'],
   [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the last item.'],
   [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Center the active cursor in its viewport.'],
+  [ApplicationAction.DIFF_SWITCH_SIDE, ActionScope.DIFF_PANE, ActionGroup.NAVIGATION, 'Switch diff side.'],
   [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Activate the focused file-tree item.'],
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
   [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Expand the focused tree item.'],
@@ -137,6 +139,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
   [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
   [ApplicationAction.CURSOR_CENTER]: actionBindings(keySequence('z', 'z')),
+  [ApplicationAction.DIFF_SWITCH_SIDE]: actionBindings(keySequence(LEADER_KEY, 's')),
   [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: actionBindings(
     keySequence('h'),

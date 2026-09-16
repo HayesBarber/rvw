@@ -13,6 +13,8 @@ export default function ApplicationFooter({
   copyMessage,
   copyRequest,
   diagnostic,
+  onOpenCommands,
+  commandsDisabled = false,
   onCopyComments,
   onReload,
   reloadDisabled = false,
@@ -59,6 +61,9 @@ export default function ApplicationFooter({
       </span>
       {repositoryName && (
         <>
+          <button className="reload-button" type="button" disabled={commandsDisabled} onClick={onOpenCommands}>
+            Commands
+          </button>
           <span className="footer-reload-action">
             <button
               className="reload-button"
