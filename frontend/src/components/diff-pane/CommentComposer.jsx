@@ -1,18 +1,28 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { commentTargetLabel } from './comment-annotations.js'
+import CommentTypeSelect from './CommentTypeSelect.jsx'
 import {
   CommentKeyboardAction,
   commentKeyboardAction,
+  cycleCommentType,
 } from './comment-keyboard.js'
 import { scrollCommentIntoView } from './scroll-comment-into-view.js'
 
-export default function CommentComposer({ target, onCancel, onCreate }) {
+export default function CommentComposer({
+  commentTypes,
+  defaultCommentType,
+  target,
+  onCancel,
+  onCreate,
+}) {
   const [body, setBody] = useState('')
+  const [commentType, setCommentType] = useState(defaultCommentType)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
   const textareaRef = useRef(null)
+  const typeSelectRef = useRef(null)
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current
@@ -49,7 +59,7 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
     setSaving(true)
     setError(null)
     try {
-      await onCreate(nextBody, target)
+      await onCreate(nextBody, commentType, target)
       onCancel()
     } catch (nextError) {
       setError(nextError.message)
@@ -58,13 +68,26 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
   }
 
   function handleKeyDown(event) {
-    const action = commentKeyboardAction(event, saving)
+    const action = commentKeyboardAction(event, saving, commentTypes.length > 0)
     if (action === CommentKeyboardAction.CANCEL) {
       event.preventDefault()
       onCancel()
     } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
+    } else if (action === CommentKeyboardAction.FOCUS_CONTROLS) {
+      event.preventDefault()
+      typeSelectRef.current?.focus()
+    } else if (
+      action === CommentKeyboardAction.CYCLE_NEXT_TYPE ||
+      action === CommentKeyboardAction.CYCLE_PREVIOUS_TYPE
+    ) {
+      event.preventDefault()
+      setCommentType((current) => cycleCommentType(
+        current,
+        commentTypes,
+        action === CommentKeyboardAction.CYCLE_NEXT_TYPE ? 1 : -1,
+      ))
     }
   }
 
@@ -82,11 +105,20 @@ export default function CommentComposer({ target, onCancel, onCreate }) {
         ref={textareaRef}
         id="comment-body"
         rows="4"
+        aria-keyshortcuts="Tab Shift+Tab Alt+ArrowDown"
         value={body}
         placeholder="Leave a comment"
         disabled={saving}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={handleKeyDown}
+      />
+      <CommentTypeSelect
+        ref={typeSelectRef}
+        id="comment-type"
+        types={commentTypes}
+        value={commentType}
+        disabled={saving}
+        onChange={setCommentType}
       />
       {error && <p className="comment-error" role="alert">{error}</p>}
       <div className="comment-actions">

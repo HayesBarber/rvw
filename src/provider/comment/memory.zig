@@ -22,6 +22,7 @@ pub const MemoryProvider = struct {
         for (self.comments[0..self.comment_count]) |comment| {
             self.allocator.free(comment.id);
             self.allocator.free(comment.body);
+            if (comment.commentType) |comment_type| self.allocator.free(comment_type);
             freeTarget(self.allocator, comment.target);
         }
         self.* = undefined;
@@ -35,6 +36,7 @@ pub const MemoryProvider = struct {
         context: *anyopaque,
         io: Io,
         body: []const u8,
+        comment_type: ?[]const u8,
         target: model.CommentTarget,
     ) !model.Comment {
         const self: *MemoryProvider = @ptrCast(@alignCast(context));
@@ -48,12 +50,15 @@ pub const MemoryProvider = struct {
         errdefer self.allocator.free(owned_id);
         const owned_body = try self.allocator.dupe(u8, body);
         errdefer self.allocator.free(owned_body);
+        const owned_type = if (comment_type) |value| try self.allocator.dupe(u8, value) else null;
+        errdefer if (owned_type) |value| self.allocator.free(value);
         const owned_target = try duplicateTarget(self.allocator, target);
         errdefer freeTarget(self.allocator, owned_target);
 
         const comment: model.Comment = .{
             .id = owned_id,
             .body = owned_body,
+            .commentType = owned_type,
             .target = owned_target,
         };
         self.comments[self.comment_count] = comment;
@@ -74,6 +79,7 @@ pub const MemoryProvider = struct {
         io: Io,
         comment_id: []const u8,
         body: []const u8,
+        comment_type: ?[]const u8,
     ) !model.Comment {
         const self: *MemoryProvider = @ptrCast(@alignCast(context));
         self.mutex.lockUncancelable(io);
@@ -82,8 +88,12 @@ pub const MemoryProvider = struct {
         for (self.comments[0..self.comment_count]) |*comment| {
             if (!std.mem.eql(u8, comment.id, comment_id)) continue;
             const owned_body = try self.allocator.dupe(u8, body);
+            errdefer self.allocator.free(owned_body);
+            const owned_type = if (comment_type) |value| try self.allocator.dupe(u8, value) else null;
             self.allocator.free(comment.body);
+            if (comment.commentType) |value| self.allocator.free(value);
             comment.body = owned_body;
+            comment.commentType = owned_type;
             return comment.*;
         }
         return error.UnknownComment;
@@ -98,6 +108,7 @@ pub const MemoryProvider = struct {
             if (!std.mem.eql(u8, comment.id, comment_id)) continue;
             self.allocator.free(comment.id);
             self.allocator.free(comment.body);
+            if (comment.commentType) |comment_type| self.allocator.free(comment_type);
             freeTarget(self.allocator, comment.target);
             if (index + 1 < self.comment_count) {
                 std.mem.copyForwards(
@@ -121,6 +132,7 @@ pub const MemoryProvider = struct {
         for (self.comments[0..cleared]) |comment| {
             self.allocator.free(comment.id);
             self.allocator.free(comment.body);
+            if (comment.commentType) |comment_type| self.allocator.free(comment_type);
             freeTarget(self.allocator, comment.target);
         }
         self.comment_count = 0;
@@ -164,28 +176,29 @@ test "editing and deleting comments preserve identity and isolate stale IDs" {
     defer provider.deinit();
     const comments = provider.interface();
 
-    const first = try comments.createComment(threaded.io(), "first", .{ .line = .{
+    const first = try comments.createComment(threaded.io(), "first", "ISSUE", .{ .line = .{
         .path = "src/main.zig",
         .side = .new,
         .startLine = 3,
         .endLine = 4,
     } });
-    const second = try comments.createComment(threaded.io(), "second", .{ .file = .{
+    const second = try comments.createComment(threaded.io(), "second", null, .{ .file = .{
         .path = "README.md",
     } });
     const first_id = try std.testing.allocator.dupe(u8, first.id);
     defer std.testing.allocator.free(first_id);
 
-    const edited = try comments.editComment(threaded.io(), first.id, "updated");
+    const edited = try comments.editComment(threaded.io(), first.id, "updated", "QUESTION");
     try std.testing.expectEqualStrings(first_id, edited.id);
     try std.testing.expectEqualStrings("updated", edited.body);
+    try std.testing.expectEqualStrings("QUESTION", edited.commentType.?);
     try std.testing.expectEqualStrings("src/main.zig", edited.target.line.path);
     try std.testing.expectEqual(@as(usize, 3), edited.target.line.startLine);
     try std.testing.expectEqual(@as(usize, 4), edited.target.line.endLine);
 
     try std.testing.expectError(
         error.UnknownComment,
-        comments.editComment(threaded.io(), "missing", "unchanged"),
+        comments.editComment(threaded.io(), "missing", "unchanged", null),
     );
     try comments.deleteComment(threaded.io(), first_id);
     try std.testing.expectError(
@@ -205,13 +218,13 @@ test "clearing comments frees storage and reports the removed count" {
     defer provider.deinit();
     const comments = provider.interface();
 
-    _ = try comments.createComment(threaded.io(), "first", .{ .line = .{
+    _ = try comments.createComment(threaded.io(), "first", null, .{ .line = .{
         .path = "src/main.zig",
         .side = .old,
         .startLine = 1,
         .endLine = 2,
     } });
-    _ = try comments.createComment(threaded.io(), "second", .{ .file = .{
+    _ = try comments.createComment(threaded.io(), "second", null, .{ .file = .{
         .path = "README.md",
     } });
 

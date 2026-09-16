@@ -92,8 +92,8 @@ export function useReviewComments() {
     }
   }, [])
 
-  const create = useCallback(async (body, target, beforeCommit) => {
-    const comment = await createComment(body, target)
+  const create = useCallback(async (body, commentType, target, beforeCommit) => {
+    const comment = await createComment(body, commentType, target)
     beforeCommit?.()
     mutationTracker.current.recordMutation()
     setRequest((current) => ({
@@ -105,8 +105,8 @@ export function useReviewComments() {
     return comment
   }, [])
 
-  const edit = useCallback(async (commentId, body, beforeCommit) => {
-    const comment = await editComment(commentId, body)
+  const edit = useCallback(async (commentId, body, commentType, beforeCommit) => {
+    const comment = await editComment(commentId, body, commentType)
     beforeCommit?.()
     mutationTracker.current.recordMutation()
     setRequest((current) => ({

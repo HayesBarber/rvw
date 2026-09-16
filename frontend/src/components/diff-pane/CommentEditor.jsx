@@ -3,15 +3,19 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import {
   CommentKeyboardAction,
   commentKeyboardAction,
+  cycleCommentType,
 } from './comment-keyboard.js'
+import CommentTypeSelect from './CommentTypeSelect.jsx'
 import { scrollCommentIntoView } from './scroll-comment-into-view.js'
 
-export default function CommentEditor({ comment, onCancel, onSave }) {
+export default function CommentEditor({ comment, commentTypes, onCancel, onSave }) {
   const [body, setBody] = useState(comment.body)
+  const [commentType, setCommentType] = useState(comment.commentType ?? null)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
   const textareaRef = useRef(null)
+  const typeSelectRef = useRef(null)
   const inputId = `edit-comment-${comment.id}`
 
   useLayoutEffect(() => {
@@ -39,7 +43,7 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
     setSaving(true)
     setError(null)
     try {
-      await onSave(comment.id, nextBody)
+      await onSave(comment.id, nextBody, commentType)
       onCancel()
     } catch (nextError) {
       setError(nextError.message)
@@ -48,13 +52,26 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
   }
 
   function handleKeyDown(event) {
-    const action = commentKeyboardAction(event, saving)
+    const action = commentKeyboardAction(event, saving, commentTypes.length > 0)
     if (action === CommentKeyboardAction.CANCEL) {
       event.preventDefault()
       onCancel()
     } else if (action === CommentKeyboardAction.SUBMIT) {
       event.preventDefault()
       formRef.current?.requestSubmit()
+    } else if (action === CommentKeyboardAction.FOCUS_CONTROLS) {
+      event.preventDefault()
+      typeSelectRef.current?.focus()
+    } else if (
+      action === CommentKeyboardAction.CYCLE_NEXT_TYPE ||
+      action === CommentKeyboardAction.CYCLE_PREVIOUS_TYPE
+    ) {
+      event.preventDefault()
+      setCommentType((current) => cycleCommentType(
+        current,
+        commentTypes,
+        action === CommentKeyboardAction.CYCLE_NEXT_TYPE ? 1 : -1,
+      ))
     }
   }
 
@@ -70,10 +87,19 @@ export default function CommentEditor({ comment, onCancel, onSave }) {
         ref={textareaRef}
         id={inputId}
         rows="4"
+        aria-keyshortcuts="Tab Shift+Tab Alt+ArrowDown"
         value={body}
         disabled={saving}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={handleKeyDown}
+      />
+      <CommentTypeSelect
+        ref={typeSelectRef}
+        id={`${inputId}-type`}
+        types={commentTypes}
+        value={commentType}
+        disabled={saving}
+        onChange={setCommentType}
       />
       {error && <p className="comment-error" role="alert">{error}</p>}
       <div className="comment-actions">

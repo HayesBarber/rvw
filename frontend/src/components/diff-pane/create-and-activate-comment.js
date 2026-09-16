@@ -3,10 +3,11 @@ export async function createAndActivateComment({
   activate,
   beforeCommit,
   body,
+  commentType,
   create,
   target,
 }) {
-  const comment = await create(body, target, beforeCommit)
+  const comment = await create(body, commentType, target, beforeCommit)
   activate(comment.id)
   return comment
 }

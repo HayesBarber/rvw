@@ -26,6 +26,8 @@ export default function DiffPane({
   loading,
   error,
   comments,
+  commentTypes,
+  defaultCommentType,
   onCreateComment,
   onEditComment,
   onDeleteComment,
@@ -50,6 +52,8 @@ export default function DiffPane({
   })
   const commentReview = useDiffComments({
     comments,
+    commentTypes,
+    defaultCommentType,
     cursor,
     activeCommentId: cursor.activeCommentId,
     fileDiff,

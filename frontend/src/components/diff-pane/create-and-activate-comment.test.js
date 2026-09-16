@@ -13,6 +13,7 @@ test('a newly created comment becomes the active keyboard context', async () => 
     activate: (commentId) => calls.push(['activate', commentId]),
     beforeCommit,
     body: 'Check this',
+    commentType: 'ISSUE',
     create: async (...args) => {
       calls.push(['create', ...args])
       return comment
@@ -22,7 +23,7 @@ test('a newly created comment becomes the active keyboard context', async () => 
 
   assert.equal(result, comment)
   assert.deepEqual(calls, [
-    ['create', 'Check this', target, beforeCommit],
+    ['create', 'Check this', 'ISSUE', target, beforeCommit],
     ['activate', 'comment-1'],
   ])
 })

@@ -110,20 +110,22 @@ pub const Core = struct {
                 } };
             },
             .create_comment => |details| blk: {
-                if (!validComment(details.body, details.target)) return error.InvalidComment;
+                if (!validComment(details.body, details.comment_type, details.target)) return error.InvalidComment;
                 break :blk .{ .comment = try self.comment_provider.createComment(
                     self.io,
                     details.body,
+                    details.comment_type,
                     details.target,
                 ) };
             },
             .edit_comment => |details| blk: {
                 if (!validCommentId(details.comment_id)) return error.InvalidCommentId;
-                if (!validCommentBody(details.body)) return error.InvalidComment;
+                if (!validCommentBody(details.body) or !validCommentType(details.comment_type)) return error.InvalidComment;
                 break :blk .{ .comment = try self.comment_provider.editComment(
                     self.io,
                     details.comment_id,
                     details.body,
+                    details.comment_type,
                 ) };
             },
             .delete_comment => |details| blk: {
@@ -196,14 +198,22 @@ fn logRequestFailureWithoutContext(logger: log.Logger, io: Io) void {
     });
 }
 
-fn validComment(body: []const u8, target: model.CommentTarget) bool {
-    if (!validCommentBody(body)) return false;
+fn validComment(body: []const u8, comment_type: ?[]const u8, target: model.CommentTarget) bool {
+    if (!validCommentBody(body) or !validCommentType(comment_type)) return false;
     return switch (target) {
         .file => |details| details.path.len > 0,
         .line => |details| details.path.len > 0 and
             details.startLine > 0 and
             details.endLine >= details.startLine,
     };
+}
+
+fn validCommentType(comment_type: ?[]const u8) bool {
+    const value = comment_type orelse return true;
+    return value.len > 0 and
+        std.mem.trim(u8, value, &std.ascii.whitespace).len > 0 and
+        std.mem.indexOfAny(u8, value, "\r\n") == null and
+        std.unicode.utf8ValidateSlice(value);
 }
 
 fn validCommentBody(body: []const u8) bool {
@@ -236,6 +246,10 @@ fn validRepositoryRelativePath(path: []const u8) bool {
 test "comment mutation validation rejects blank bodies and malformed IDs" {
     try std.testing.expect(validCommentBody("updated"));
     try std.testing.expect(!validCommentBody(" \n\t"));
+    try std.testing.expect(validCommentType(null));
+    try std.testing.expect(validCommentType("ISSUE"));
+    try std.testing.expect(!validCommentType(""));
+    try std.testing.expect(!validCommentType("MULTI\nLINE"));
     try std.testing.expect(validCommentId("comment-12"));
     try std.testing.expect(!validCommentId(""));
     try std.testing.expect(!validCommentId(" comment-12"));
@@ -533,6 +547,7 @@ test "core edits and deletes only the requested comment with useful errors" {
 
     const first = (try core.dispatch(.{ .create_comment = .{
         .body = "first",
+        .comment_type = "ISSUE",
         .target = .{ .file = .{ .path = "README.md" } },
     } })).comment;
     const second = (try core.dispatch(.{ .create_comment = .{
@@ -545,13 +560,20 @@ test "core edits and deletes only the requested comment with useful errors" {
     const edited = (try core.dispatch(.{ .edit_comment = .{
         .comment_id = first_id,
         .body = "updated",
+        .comment_type = "QUESTION",
     } })).comment;
     try std.testing.expectEqualStrings(first_id, edited.id);
     try std.testing.expectEqualStrings("updated", edited.body);
+    try std.testing.expectEqualStrings("QUESTION", edited.commentType.?);
     try std.testing.expectEqualStrings("README.md", edited.target.file.path);
     try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
         .comment_id = first_id,
         .body = "  \n",
+    } }));
+    try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
+        .comment_id = first_id,
+        .body = "valid",
+        .comment_type = "MULTI\nLINE",
     } }));
     try std.testing.expectError(error.InvalidCommentId, core.dispatch(.{ .delete_comment = .{
         .comment_id = " invalid",

@@ -6,6 +6,7 @@ const Io = std.Io;
 
 const maximum_configuration_size = 1024 * 1024;
 const relative_configuration_path = ".config/rvw/config.json";
+const default_comment_types = [_][]const u8{ "ISSUE", "QUESTION", "NITPICK" };
 
 pub const Environment = struct {
     home: ?[]const u8 = null,
@@ -119,6 +120,15 @@ const SchemaError = error{
     unknown_diff_field,
     wrap_lines_not_boolean,
     relative_line_numbers_not_boolean,
+    comments_not_object,
+    unknown_comments_field,
+    comment_types_not_array,
+    comment_type_not_string,
+    blank_comment_type,
+    multiline_comment_type,
+    duplicate_comment_type,
+    default_comment_type_not_string_or_null,
+    default_comment_type_not_configured,
 };
 
 fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!ParseResult {
@@ -138,7 +148,52 @@ fn validateConfiguration(value: std.json.Value) SchemaError!void {
         .object => |object| object,
         else => return error.root_not_object,
     };
-    if (!onlyFields(root, &.{ "keybindings", "diff" })) return error.unknown_root_field;
+    if (!onlyFields(root, &.{ "keybindings", "diff", "comments" })) return error.unknown_root_field;
+
+    if (root.get("comments")) |comments_value| {
+        const comments = switch (comments_value) {
+            .object => |object| object,
+            else => return error.comments_not_object,
+        };
+        if (!onlyFields(comments, &.{ "types", "defaultType" })) return error.unknown_comments_field;
+
+        const types = if (comments.get("types")) |types_value| switch (types_value) {
+            .array => |array| array.items,
+            else => return error.comment_types_not_array,
+        } else null;
+        if (types) |configured_types| {
+            for (configured_types, 0..) |type_value, index| {
+                const comment_type = switch (type_value) {
+                    .string => |string| string,
+                    else => return error.comment_type_not_string,
+                };
+                if (std.mem.trim(u8, comment_type, &std.ascii.whitespace).len == 0) return error.blank_comment_type;
+                if (std.mem.indexOfAny(u8, comment_type, "\r\n") != null) return error.multiline_comment_type;
+                for (configured_types[0..index]) |previous| {
+                    if (std.mem.eql(u8, previous.string, comment_type)) return error.duplicate_comment_type;
+                }
+            }
+        }
+
+        if (comments.get("defaultType")) |default_value| {
+            const default_type = switch (default_value) {
+                .null => null,
+                .string => |string| string,
+                else => return error.default_comment_type_not_string_or_null,
+            };
+            if (default_type) |name| {
+                if (types) |configured_types| {
+                    for (configured_types) |type_value| {
+                        if (std.mem.eql(u8, type_value.string, name)) break;
+                    } else return error.default_comment_type_not_configured;
+                } else {
+                    for (default_comment_types) |comment_type| {
+                        if (std.mem.eql(u8, comment_type, name)) break;
+                    } else return error.default_comment_type_not_configured;
+                }
+            }
+        }
+    }
 
     if (root.get("diff")) |diff_value| {
         const diff = switch (diff_value) {
@@ -236,6 +291,15 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.unknown_diff_field => "user configuration diff contains an unsupported field",
         error.wrap_lines_not_boolean => "user configuration diff.wrapLines must be a boolean",
         error.relative_line_numbers_not_boolean => "user configuration diff.relativeLineNumbers must be a boolean",
+        error.comments_not_object => "user configuration comments must be a JSON object",
+        error.unknown_comments_field => "user configuration comments contains an unsupported field",
+        error.comment_types_not_array => "user configuration comments.types must be an array",
+        error.comment_type_not_string => "each comments.types entry must be a string",
+        error.blank_comment_type => "comments.types entries cannot be blank",
+        error.multiline_comment_type => "comments.types entries cannot contain line breaks",
+        error.duplicate_comment_type => "comments.types entries must be unique",
+        error.default_comment_type_not_string_or_null => "user configuration comments.defaultType must be a string or null",
+        error.default_comment_type_not_configured => "user configuration comments.defaultType must match a configured type",
     };
 }
 
@@ -408,6 +472,42 @@ test "diff diagnostics describe the invalid diff field" {
         "user configuration diff.relativeLineNumbers must be a boolean",
         schemaErrorMessage(error.relative_line_numbers_not_boolean),
     );
+}
+
+test "comment types preserve order and validate defaults" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const valid = try parseConfiguration(arena.allocator(),
+        \\{"comments":{"types":["BUG","IDEA"],"defaultType":"IDEA"}}
+    );
+    const configuration = switch (valid) {
+        .configuration => |value| value,
+        else => return error.TestUnexpectedResult,
+    };
+    const comments = configuration.object.get("comments").?.object;
+    try std.testing.expectEqualStrings("BUG", comments.get("types").?.array.items[0].string);
+    try std.testing.expectEqualStrings("IDEA", comments.get("defaultType").?.string);
+
+    const built_in_default = try parseConfiguration(arena.allocator(),
+        \\{"comments":{"defaultType":"ISSUE"}}
+    );
+    try std.testing.expect(built_in_default == .configuration);
+
+    for ([_]struct { input: []const u8, expected: SchemaError }{
+        .{ .input = "{\"comments\":[]}", .expected = error.comments_not_object },
+        .{ .input = "{\"comments\":{\"types\":\"ISSUE\"}}", .expected = error.comment_types_not_array },
+        .{ .input = "{\"comments\":{\"types\":[\"\"]}}", .expected = error.blank_comment_type },
+        .{ .input = "{\"comments\":{\"types\":[\" \"]}}", .expected = error.blank_comment_type },
+        .{ .input = "{\"comments\":{\"types\":[\"A\\nB\"]}}", .expected = error.multiline_comment_type },
+        .{ .input = "{\"comments\":{\"types\":[\"BUG\",\"BUG\"]}}", .expected = error.duplicate_comment_type },
+        .{ .input = "{\"comments\":{\"types\":[\"BUG\"],\"defaultType\":\"IDEA\"}}", .expected = error.default_comment_type_not_configured },
+        .{ .input = "{\"comments\":{\"defaultType\":\"OTHER\"}}", .expected = error.default_comment_type_not_configured },
+    }) |case| {
+        const parsed = try parseConfiguration(arena.allocator(), case.input);
+        try std.testing.expect(parsed == .invalid_schema);
+        try std.testing.expectEqual(case.expected, parsed.invalid_schema);
+    }
 }
 
 test "loader reads and serializes the user configuration file" {

@@ -273,11 +273,11 @@ test('comment mutations use equivalent native bridge requests', async () => {
   }
 
   try {
-    assert.equal((await editComment('comment-1', 'updated')).body, 'updated')
+    assert.equal((await editComment('comment-1', 'updated', 'QUESTION')).body, 'updated')
     assert.deepEqual(await deleteComment('comment-1'), { commentId: 'comment-1' })
     assert.deepEqual(await clearComments(), { commentCount: 2 })
     assert.deepEqual(requests, [
-      { type: 'edit_comment', commentId: 'comment-1', body: 'updated' },
+      { type: 'edit_comment', commentId: 'comment-1', body: 'updated', commentType: 'QUESTION' },
       { type: 'delete_comment', commentId: 'comment-1' },
       { type: 'clear_comments' },
     ])
@@ -309,7 +309,7 @@ test('comment mutations use ID-addressed HTTP endpoints and methods', async () =
   }
 
   try {
-    await editComment('comment/1', 'updated')
+    await editComment('comment/1', 'updated', null)
     await deleteComment('comment/1')
     await clearComments()
     assert.deepEqual(requests.map(({ url, options }) => [url, options.method]), [
@@ -321,6 +321,7 @@ test('comment mutations use ID-addressed HTTP endpoints and methods', async () =
       type: 'edit_comment',
       commentId: 'comment/1',
       body: 'updated',
+      commentType: null,
     })
     assert.deepEqual(JSON.parse(requests[2].options.body), {
       type: 'clear_comments',

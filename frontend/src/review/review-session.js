@@ -223,15 +223,15 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     dispatchWorkspace({ type: 'finder_closed' })
   }, [dispatchWorkspace])
 
-  const createReviewComment = useCallback(async (body, target, beforeCommit) => {
-    const comment = await commentsRequest.create(body, target, beforeCommit)
+  const createReviewComment = useCallback(async (body, commentType, target, beforeCommit) => {
+    const comment = await commentsRequest.create(body, commentType, target, beforeCommit)
     copyRequest.reset()
     clearRequest.reset()
     return comment
   }, [clearRequest, commentsRequest, copyRequest])
 
-  const editReviewComment = useCallback(async (commentId, body, beforeCommit) => {
-    const comment = await commentsRequest.edit(commentId, body, beforeCommit)
+  const editReviewComment = useCallback(async (commentId, body, commentType, beforeCommit) => {
+    const comment = await commentsRequest.edit(commentId, body, commentType, beforeCommit)
     copyRequest.reset()
     clearRequest.reset()
     return comment

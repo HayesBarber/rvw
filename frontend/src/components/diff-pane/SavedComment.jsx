@@ -5,6 +5,7 @@ import CommentEditor from './CommentEditor.jsx'
 export default function SavedComment({
   active,
   comment,
+  commentTypes,
   deleteError,
   deleting,
   editing,
@@ -39,7 +40,12 @@ export default function SavedComment({
       onPointerDown={() => onActivate(comment.id)}
     >
       <header>
-        <span>{lineLabel}</span>
+        <span className="saved-comment-labels">
+          <span>{lineLabel}</span>
+          {comment.commentType && (
+            <span className="comment-type-badge">{comment.commentType}</span>
+          )}
+        </span>
         {!editing && (
           <span className="saved-comment-actions">
             <button
@@ -62,7 +68,12 @@ export default function SavedComment({
         )}
       </header>
       {editing ? (
-        <CommentEditor comment={comment} onCancel={onCancelEdit} onSave={onEdit} />
+        <CommentEditor
+          comment={comment}
+          commentTypes={commentTypes}
+          onCancel={onCancelEdit}
+          onSave={onEdit}
+        />
       ) : (
         <p>{comment.body}</p>
       )}
