@@ -15,6 +15,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `cursor.page.down` | `<C-d>` | Move the active cursor down by half of its visible viewport. |
 | `cursor.first` | `g g` | Move the active cursor to the first item. |
 | `cursor.last` | `G` | Move the active cursor to the last item. |
+| `diff.side.switch` | `<leader> s` | Switch diff side on the same visual row. If the opposite side is empty, keep the cursor in place. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
 | `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
