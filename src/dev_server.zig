@@ -38,11 +38,13 @@ pub fn main(init: std.process.Init) !void {
     defer default_logger.deinit();
     default_logger.minimum_level = rvw.log.Level.resolve(init.io, options.log_level orelse init.environ_map.get("LOG_LEVEL"));
     const logger = default_logger.interface();
+    const snapshot_timing = rvw.log.interface.Timing.begin(logger, init.io);
     var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
         rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
         std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
         return err;
     };
+    if (snapshot_timing) |timing| timing.finish("git_snapshot_build", null);
     defer review.deinit();
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();

@@ -361,3 +361,35 @@ test('range comments preserve normalized old-side coordinates across native and 
     delete globalThis.window
   }
 })
+
+test('file timing propagates the same trace through HTTP and native transports', async () => {
+  const { getFile, getFileDiff } = await import('./api.js')
+  const trace = { id: 'load-1', start: performance.now() }
+  const requests = []
+  globalThis.window = { webkit: { messageHandlers: { native: { postMessage(request) {
+    requests.push(request)
+    return Promise.resolve({ content: { kind: 'unavailable' } })
+  } } } } }
+  const originalFetch = globalThis.fetch
+  try {
+    await getFile('secret-name.js', trace)
+    await getFileDiff('diff-1', 'secret-name.js', trace)
+    assert.equal(requests[0].traceId, 'load-1')
+    assert.equal(requests.find((r) => r.type === 'get_file_diff').traceId, 'load-1')
+    assert(requests.filter((r) => r.type === 'log').every((r) => !JSON.stringify(r).includes('secret-name')))
+    requests.length = 0
+    globalThis.window = {}
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url, options })
+      return { ok: true, status: 200, text: async () => '{"path":"file.js"}', json: async () => ({ accepted: true }) }
+    }
+    assert.deepEqual(await getFile('file.js', trace), { path: 'file.js' })
+    assert.equal(requests[0].url, '/api/files/content?path=file.js&traceId=load-1')
+    const events = requests.filter((r) => r.url === '/api/log').map((r) => JSON.parse(r.options.body))
+    assert.deepEqual(events.map((r) => r.context.stage), ['http_transport', 'response_parse'])
+    assert(events.every((r) => r.traceId === 'load-1' && r.level === 'debug'))
+  } finally {
+    globalThis.fetch = originalFetch
+    delete globalThis.window
+  }
+})

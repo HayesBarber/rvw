@@ -1,3 +1,5 @@
+import { prepareFile } from './prepare-file.js'
+import { activateFileLoad, attachFileLoad, beginFileLoad, cancelFileLoad, fileLoadStage, receivedFileLoad } from './file-load-performance.js'
 import { useEffect, useMemo, useState } from 'react'
 
 import { getFile, getFileDiff } from './api.js'
@@ -42,17 +44,24 @@ export function useReviewFile({ diffId, path, changed, generation }) {
   const [request, setRequest] = useState(initialRequest)
   const key = fileRequestKey(diffId, path, changed, generation)
 
+  const trace = useMemo(() => beginFileLoad(key, path), [key, path])
+
   useEffect(() => {
     if (!key) return undefined
 
     let active = true
+    activateFileLoad(trace)
+    fileLoadStage(trace, 'request_schedule', trace?.start)
     const pendingRequest = changed
-      ? getFileDiff(diffId, path)
-      : getFile(path)
+      ? getFileDiff(diffId, path, trace)
+      : getFile(path, trace)
 
     pendingRequest
       .then((file) => {
         if (active) {
+          receivedFileLoad(trace)
+          file = prepareFile(file, trace)
+          attachFileLoad(file, trace)
           setRequest({
             status: RequestStatus.SUCCESS,
             key,
@@ -64,6 +73,7 @@ export function useReviewFile({ diffId, path, changed, generation }) {
       })
       .catch((error) => {
         if (active) {
+          fileLoadStage(trace, 'request_failed', trace?.start)
           setRequest({
             status: RequestStatus.ERROR,
             key,
@@ -76,8 +86,9 @@ export function useReviewFile({ diffId, path, changed, generation }) {
 
     return () => {
       active = false
+      cancelFileLoad(trace)
     }
-  }, [changed, diffId, generation, key, path])
+  }, [changed, diffId, generation, key, path, trace])
 
   return useMemo(
     () => selectFileRequest(request, key, path),

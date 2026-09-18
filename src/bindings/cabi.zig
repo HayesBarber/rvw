@@ -40,6 +40,7 @@ pub export fn rvw_core_create(
     });
     handle.default_logger.minimum_level = rvw.log.Level.resolve(handle.threaded.io(), if (log_level_ptr) |value| std.mem.span(value) else null);
     handle.logger = handle.default_logger.interface();
+    const snapshot_timing = rvw.log.interface.Timing.begin(handle.logger, handle.threaded.io());
     handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
         rvw.startup.logApplicationStartFailed(
             handle.logger,
@@ -56,6 +57,7 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    if (snapshot_timing) |timing| timing.finish("git_snapshot_build", null);
     handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
         .home = environmentVariable("HOME"),
     }) catch |err| {

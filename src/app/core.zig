@@ -40,7 +40,7 @@ pub const Core = struct {
     }
 
     pub fn dispatcher(self: *Core) dispatcher_module.Dispatcher {
-        return .{ .context = self, .dispatchFn = dispatchOpaque };
+        return .{ .context = self, .dispatchFn = dispatchOpaque, .io = self.io, .logger = self.logger };
     }
 
     fn dispatchOpaque(context: *anyopaque, request: model.Request) !model.Response {
@@ -65,8 +65,14 @@ pub const Core = struct {
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .log => unreachable,
-            .get_configuration => .{ .configuration = self.configuration },
+            .get_configuration => blk: {
+                var configuration = self.configuration;
+                configuration.performanceLogging = self.logger.minimum_level == .debug;
+                break :blk .{ .configuration = configuration };
+            },
             .reload_review => blk: {
+                const snapshot_timing = log.interface.Timing.begin(self.logger, self.io);
+                defer if (snapshot_timing) |timing| timing.finish("git_snapshot_build", null);
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
                 self.review_generation +%= 1;
                 break :blk .{ .reload_review_result = .{ .generation = self.review_generation } };

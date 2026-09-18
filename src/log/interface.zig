@@ -125,3 +125,24 @@ test "severity aliases and authoritative threshold cover every event level" {
         try std.testing.expectEqual(4 - @as(usize, @intFromEnum(threshold)), counter.count);
     }
 }
+
+/// Optional monotonic timing. No clock reads or allocations below debug level.
+pub const Timing = struct {
+    logger: Logger,
+    io: Io,
+    start: Io.Timestamp,
+
+    pub fn begin(logger: Logger, io: Io) ?Timing {
+        if (logger.minimum_level != .debug) return null;
+        return .{ .logger = logger, .io = io, .start = Io.Timestamp.now(io, .awake) };
+    }
+
+    pub fn finish(self: Timing, stage: []const u8, trace_id: ?[]const u8) void {
+        const duration = Io.Timestamp.now(self.io, .awake).nanoseconds - self.start.nanoseconds;
+        var context: std.json.ObjectMap = .empty;
+        defer context.deinit(self.logger.allocator);
+        context.put(self.logger.allocator, "stage", .{ .string = stage }) catch return;
+        context.put(self.logger.allocator, "durationMs", .{ .float = @as(f64, @floatFromInt(duration)) / 1_000_000 }) catch return;
+        self.logger.log(self.io, .{ .level = .debug, .source = .backend, .message = "file load timing", .traceId = trace_id, .context = .{ .object = context } });
+    }
+};

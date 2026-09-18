@@ -17,4 +17,5 @@ pub const Diagnostic = struct {
 pub const Snapshot = struct {
     configuration: std.json.Value,
     diagnostic: ?Diagnostic,
+    performanceLogging: bool = false,
 };

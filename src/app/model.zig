@@ -191,8 +191,9 @@ pub const Request = union(enum) {
     get_diff_overview,
     get_files,
     get_files_not_ignored,
-    get_file: struct { path: []const u8 },
+    get_file: struct { path: []const u8, trace_id: ?[]const u8 = null },
     get_file_diff: struct {
+        trace_id: ?[]const u8 = null,
         diff_id: []const u8,
         path: []const u8,
     },

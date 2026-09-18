@@ -1,3 +1,5 @@
+import { configureFileLoadPerformance, fileLoadStage } from './file-load-performance.js'
+
 /** Shared review transport for native and development environments. */
 
 /**
@@ -37,9 +39,20 @@
  * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents } | { kind: 'unavailable', reason: 'binary' | 'invalid-utf8' | 'too-large' | 'symlink' | 'submodule' }} content
  */
 
-async function requestJson(url, nativeRequest, options = {}) {
+async function requestJson(url, nativeRequest, options = {}, trace = null) {
+  const start = trace ? performance.now() : 0
+  if (trace) {
+    nativeRequest = { ...nativeRequest, traceId: trace.id }
+    url += `${url.includes('?') ? '&' : '?'}traceId=${encodeURIComponent(trace.id)}`
+  }
   const native = window.webkit?.messageHandlers?.native
-  if (native) return native.postMessage(nativeRequest)
+  if (native) {
+    try {
+      return await native.postMessage(nativeRequest)
+    } finally {
+      fileLoadStage(trace, 'native_round_trip', start)
+    }
+  }
 
   const response = await fetch(url, {
     ...options,
@@ -51,7 +64,15 @@ async function requestJson(url, nativeRequest, options = {}) {
 
   let body
   try {
-    body = await response.json()
+    if (trace) {
+      const text = await response.text()
+      fileLoadStage(trace, 'http_transport', start, { characters: text.length })
+      const parseStart = performance.now()
+      body = JSON.parse(text)
+      fileLoadStage(trace, 'response_parse', parseStart)
+    } else {
+      body = await response.json()
+    }
   } catch {
     throw new Error(`The rvw service returned an invalid response (${response.status})`)
   }
@@ -95,7 +116,9 @@ export function closeApplication() {
  * @returns {Promise<{ configuration: Object, diagnostic: ConfigurationDiagnostic | null }>}
  */
 export async function getConfiguration() {
-  return requestJson('/api/configuration', { type: 'get_configuration' })
+  const result = await requestJson('/api/configuration', { type: 'get_configuration' })
+  configureFileLoadPerformance(result.performanceLogging)
+  return result
 }
 
 /**
@@ -122,10 +145,11 @@ export async function reloadReview() {
  * @param {string} path
  * @returns {Promise<FileDiff>}
  */
-export async function getFileDiff(diffId, path) {
+export async function getFileDiff(diffId, path, trace = null) {
   return requestJson(
     `/api/diffs/${encodeURIComponent(diffId)}/files?path=${encodeURIComponent(path)}`,
     { type: 'get_file_diff', diffId, path },
+    {}, trace,
   )
 }
 
@@ -151,10 +175,11 @@ export async function getFilesNotIgnored() {
  * @param {string} path
  * @returns {Promise<FileDiff>}
  */
-export async function getFile(path) {
+export async function getFile(path, trace = null) {
   return requestJson(
     `/api/files/content?path=${encodeURIComponent(path)}`,
     { type: 'get_file', path },
+    {}, trace,
   )
 }
 

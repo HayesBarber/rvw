@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { fileRendered } from '../../review/file-load-performance.js'
+import { useCallback, useMemo } from 'react'
 import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
-import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
+import { File, FileDiff, Virtualizer, useWorkerPool } from '@pierre/diffs/react'
 
 const diffCursorCSS = `
   [data-line][data-editor-active-line],
@@ -55,6 +56,14 @@ export default function DiffSurface({
   onSelectLines,
   wrapLines = true,
 }) {
+  const pool = useWorkerPool()
+  const handlePostRender = useCallback((node, instance, phase) => {
+    onPostRender?.(node, instance, phase)
+    const highlighted = fileDiff.content.kind === 'diff'
+      ? pool?.getDiffResultCache(fileDiff.parsedDiff) != null
+      : pool?.getFileResultCache(fileDiff.content.file) != null
+    fileRendered(fileDiff, node, phase, highlighted)
+  }, [fileDiff, onPostRender, pool])
   const options = useMemo(() => ({
     ...baseOptions,
     expandUnchanged,
@@ -65,16 +74,15 @@ export default function DiffSurface({
     onLineSelectionStart: onSelectLines,
     onLineSelectionChange: onSelectLines,
     onLineSelectionEnd: onSelectLines,
-    onPostRender,
-  }), [expandUnchanged, onBeginComment, onPostRender, onSelectLines, wrapLines])
+    onPostRender: handlePostRender,
+  }), [expandUnchanged, onBeginComment, handlePostRender, onSelectLines, wrapLines])
 
   return (
     <Virtualizer className="diff-scroll">
       {fileDiff.content.kind === 'diff' ? (
-        <MultiFileDiff
+        <FileDiff
           key={expandUnchanged ? 'expanded' : 'collapsed'}
-          oldFile={fileDiff.content.oldFile}
-          newFile={fileDiff.content.newFile}
+          fileDiff={fileDiff.parsedDiff}
           lineAnnotations={lineAnnotations}
           metrics={metrics}
           selectedLines={selectedLines}

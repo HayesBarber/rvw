@@ -35,6 +35,8 @@ const Handler = struct {
             return self.failure(res, status, code);
         };
         setJsonHeaders(res);
+        const serialization = self.dispatcher.startTiming(request);
+        defer self.dispatcher.finishTiming(request, "response_serialize", serialization);
         res.body = try json_protocol.encodeResponse(res.arena, response);
     }
 
@@ -99,7 +101,9 @@ fn getFile(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const path = query.get("path") orelse
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
-    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path } });
+    const trace = query.get("traceId");
+    if (trace) |id| if (!json_protocol.validTraceId(id)) return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path, .trace_id = trace } });
 }
 
 fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -113,9 +117,12 @@ fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !vo
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
 
+    const trace = query.get("traceId");
+    if (trace) |id| if (!json_protocol.validTraceId(id)) return handler.failure(res, .bad_request, .malformed_request);
     return handler.dispatchRequest(res, .{ .get_file_diff = .{
         .diff_id = diff_id,
         .path = path,
+        .trace_id = trace,
     } });
 }
 

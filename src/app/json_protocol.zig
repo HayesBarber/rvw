@@ -18,6 +18,10 @@ pub fn encodeError(allocator: Allocator, code: model.ErrorCode) ![]u8 {
 }
 
 pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatcher, input: []const u8) ![]u8 {
+    const decode_start = if (dispatcher.io != null and dispatcher.logger != null and dispatcher.logger.?.minimum_level == .debug)
+        log.Timing.begin(dispatcher.logger.?, dispatcher.io.?)
+    else
+        null;
     var parsed = std.json.parseFromSlice(std.json.Value, allocator, input, .{}) catch {
         return encodeEnvelopeError(allocator, .malformed_request);
     };
@@ -28,9 +32,12 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         if (err == error.UnknownOperation) .unknown_operation else .malformed_request,
     );
 
+    if (dispatcher.startTiming(request) != null) dispatcher.finishTiming(request, "request_decode", decode_start);
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
+    const serialization = dispatcher.startTiming(request);
+    defer dispatcher.finishTiming(request, "response_serialize", serialization);
     return switch (response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
@@ -54,12 +61,12 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "get_file")) {
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
         if (path.len == 0) return error.MalformedRequest;
-        return .{ .get_file = .{ .path = path } };
+        return .{ .get_file = .{ .path = path, .trace_id = try optionalTraceId(object.get("traceId")) } };
     }
     if (std.mem.eql(u8, operation, "get_file_diff")) {
         const diff_id = jsonString(object.get("diffId")) orelse return error.MalformedRequest;
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
-        return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
+        return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path, .trace_id = try optionalTraceId(object.get("traceId")) } };
     }
     if (std.mem.eql(u8, operation, "get_comments")) return .get_comments;
     if (std.mem.eql(u8, operation, "copy_comments_as_markdown")) return .copy_comments_as_markdown;
@@ -275,4 +282,33 @@ test "null relay options are omitted" {
     const event = (try decodeRequestValue(parsed.value)).log;
     try std.testing.expect(event.context == null);
     try std.testing.expect(event.traceId == null);
+}
+
+fn optionalTraceId(value: ?std.json.Value) DecodeError!?[]const u8 {
+    const id = try optionalJsonString(value) orelse return null;
+    if (!validTraceId(id)) return error.MalformedRequest;
+    return id;
+}
+
+pub fn validTraceId(id: []const u8) bool {
+    if (id.len == 0 or id.len > 64) return false;
+    for (id) |byte| if (!std.ascii.isAlphanumeric(byte) and byte != '-') return false;
+    return true;
+}
+
+test "file load trace IDs decode for both operations and reject malformed IDs" {
+    for ([_][]const u8{ "get_file", "get_file_diff" }) |operation| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "{{\"type\":\"{s}\",\"path\":\"secret.js\",\"diffId\":\"d\",\"traceId\":\"load-123\"}}", .{operation});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        const request = try decodeRequestValue(parsed.value);
+        const id = switch (request) {
+            .get_file => |details| details.trace_id,
+            .get_file_diff => |details| details.trace_id,
+            else => unreachable,
+        };
+        try std.testing.expectEqualStrings("load-123", id.?);
+    }
+    for ([_][]const u8{ "", "path/secret", "line\nbreak" }) |id| try std.testing.expect(!validTraceId(id));
 }

@@ -532,7 +532,7 @@ test "loader reads and serializes the user configuration file" {
     );
     defer std.testing.allocator.free(encoded);
     try std.testing.expectEqualStrings(
-        "{\"configuration\":{\"keybindings\":{\"normal\":{\"focus.file_tree\":[[\"g\",\"t\"]]}},\"diff\":{\"relativeLineNumbers\":true}},\"diagnostic\":null}",
+        "{\"configuration\":{\"keybindings\":{\"normal\":{\"focus.file_tree\":[[\"g\",\"t\"]]}},\"diff\":{\"relativeLineNumbers\":true}},\"diagnostic\":null,\"performanceLogging\":false}",
         encoded,
     );
 }

@@ -62,7 +62,13 @@ final class NativeCore {
         guard let pointer else {
             throw NativeCoreError.requestFailed("rvw is no longer available")
         }
+        let message = messageBody as? [String: Any]
+        let operation = message?["type"] as? String
+        let trace = (operation == "get_file" || operation == "get_file_diff")
+            ? message?["traceId"] as? String : nil
+        let encodeStart = trace == nil ? 0 : ProcessInfo.processInfo.systemUptime
         let request = try JSONSerialization.data(withJSONObject: messageBody)
+        let encodeDuration = trace == nil ? 0 : ProcessInfo.processInfo.systemUptime - encodeStart
         let response = request.withUnsafeBytes { bytes in
             rvw_core_dispatch(pointer, bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
         }
@@ -71,10 +77,20 @@ final class NativeCore {
         }
         defer { rvw_buffer_free(pointer, response) }
 
+        let parseStart = trace == nil ? 0 : ProcessInfo.processInfo.systemUptime
         guard let envelope = try JSONSerialization.jsonObject(
             with: Data(bytes: responsePointer, count: response.len)
         ) as? [String: Any] else {
             throw NativeCoreError.invalidResponse
+        }
+        if let trace {
+            let parseDuration = ProcessInfo.processInfo.systemUptime - parseStart
+            for (stage, duration) in [("native_request_encode", encodeDuration), ("native_response_parse", parseDuration)] {
+                // Reuse the shared relay; diagnostic failures cannot fail a load.
+                _ = try? dispatch(["type": "log", "level": "debug",
+                    "message": "file load timing", "traceId": trace,
+                    "context": ["stage": stage, "durationMs": duration * 1000]])
+            }
         }
         if envelope["ok"] as? Bool == true {
             return envelope["data"]
