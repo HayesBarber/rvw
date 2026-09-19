@@ -22,16 +22,25 @@ export function reloadRequestMessage(request) {
 export function useReloadReview({ hasUnsavedDraft, onReloaded }) {
   const [request, setRequest] = useState(idleRequest)
   const pending = useRef(false)
+  const blocked = useRef(false)
 
   useEffect(() => {
+    if (blocked.current) {
+      const timeout = setTimeout(() => {
+        blocked.current = false
+        setRequest(idleRequest)
+      }, MESSAGE_TIMEOUT_MS)
+      return () => clearTimeout(timeout)
+    }
     if (request.status !== RequestStatus.SUCCESS) return undefined
     const timeout = setTimeout(() => setRequest(idleRequest), MESSAGE_TIMEOUT_MS)
     return () => clearTimeout(timeout)
-  }, [request.status])
+  }, [request])
 
   const reload = useCallback(() => {
     if (pending.current) return true
     if (hasUnsavedDraft) {
+      blocked.current = true
       setRequest({
         status: RequestStatus.ERROR,
         data: null,
@@ -40,6 +49,7 @@ export function useReloadReview({ hasUnsavedDraft, onReloaded }) {
       return true
     }
 
+    blocked.current = false
     pending.current = true
     setRequest({ status: RequestStatus.LOADING, data: null, error: null })
     reloadReview().then(async (result) => {
