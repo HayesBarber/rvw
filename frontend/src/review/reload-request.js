@@ -4,6 +4,8 @@ import { reloadReview } from './api.js'
 import { RequestStatus } from './request-state.js'
 import { MESSAGE_TIMEOUT_MS } from './transient-request.js'
 
+export const BLOCKED_DURING_DRAFT_MESSAGE = 'Cancel the comment draft, then reload.'
+
 const idleRequest = Object.freeze({
   status: RequestStatus.IDLE,
   data: null,
@@ -33,7 +35,7 @@ export function useReloadReview({ hasUnsavedDraft, onReloaded }) {
       setRequest({
         status: RequestStatus.ERROR,
         data: null,
-        error: 'Finish or cancel the comment draft before reloading.',
+        error: BLOCKED_DURING_DRAFT_MESSAGE,
       })
       return true
     }

@@ -1,4 +1,5 @@
 import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
+import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
 import { RequestStatus } from '../review/request-state.js'
 
 function diagnosticText(diagnostic) {
@@ -72,7 +73,7 @@ export default function ApplicationFooter({
                 className="reload-button"
                 type="button"
                 disabled={reloadDisabled}
-                title={reloadDisabled ? 'Finish or cancel the comment draft before reloading' : 'Reload review'}
+                title={reloadDisabled ? BLOCKED_DURING_DRAFT_MESSAGE : 'Reload review'}
                 onClick={onReload}
               >
                 Reload
