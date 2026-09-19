@@ -46,7 +46,7 @@ textarea {
 
 .application-footer {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, auto);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   min-width: 0;
   min-height: 36px;
   align-items: center;
@@ -57,6 +57,22 @@ textarea {
   color: #adadb1;
   font-size: 0.72rem;
   white-space: nowrap;
+}
+
+.footer-left,
+.footer-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.footer-left {
+  gap: 10px;
+}
+
+.footer-right {
+  gap: 7px;
+  justify-content: flex-end;
 }
 
 .keyboard-diagnostic {
@@ -93,6 +109,7 @@ textarea {
 .repository-name {
   max-width: 220px;
   overflow: hidden;
+  justify-self: center;
   color: #fafafa;
   font-size: 0.74rem;
   text-overflow: ellipsis;
