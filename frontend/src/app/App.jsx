@@ -91,10 +91,8 @@ export default function App() {
   const copyMessage = copyRequestMessage(copyRequest)
   const filePathCopyRequest = useCopyFilePath()
   const clearMessage = clearRequestMessage(clearRequest)
-  const reloadMessage = hasUnsavedDraft
-    ? 'Finish or cancel the comment draft before reloading.'
-    : reloadRequestMessage(reloadRequest)
-  const reloadMessageIsError = hasUnsavedDraft || reloadRequest.status === RequestStatus.ERROR
+  const reloadMessage = reloadRequestMessage(reloadRequest)
+  const reloadMessageIsError = reloadRequest.status === RequestStatus.ERROR
   const closeKeymapReference = () => {
     dispatchWorkspace({ type: 'keymap_reference_closed' })
   }
