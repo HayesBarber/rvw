@@ -63,10 +63,14 @@ export default function ApplicationFooter({
         </span>
       </span>
       {repositoryName && (
-        <strong className="repository-context" title={`${repositoryName} · ${reviewSourceLabel(source)}`}>
-          <span className="repository-name">{repositoryName}</span>
-          {source && <span className="review-source"> · {reviewSourceLabel(source, true)}</span>}
-        </strong>
+        <span className="repository-context">
+          <strong className="repository-name" title={repositoryName}>{repositoryName}</strong>
+          {source && (
+            <span className="review-source" title={reviewSourceLabel(source)}>
+              {reviewSourceLabel(source, true)}
+            </span>
+          )}
+        </span>
       )}
       <span className="footer-right">
         {repositoryName && (

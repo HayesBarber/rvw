@@ -42,12 +42,6 @@ usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
        rvw -v | --version
 ```
 
-Review a GitHub pull request with `rvw --pr 100 [DIR]`. The repository must have
-an `origin` remote and GitHub head and merge refs for the PR. Rvw reuses cached
-PR refs when present, or fetches them before launch. The review uses the merge
-base and PR head without changing your checkout. The footer identifies the
-working tree, commit range, or PR being reviewed.
-
 ## Usage
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.

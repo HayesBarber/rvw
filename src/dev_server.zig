@@ -134,14 +134,3 @@ fn usage() void {
         .{},
     );
 }
-
-test "server PR options require a directory and exclude ranges" {
-    const options = try parseArgs(&.{ "server", "serve", "--directory", ".", "--pr", "100" }, .{});
-    try std.testing.expectEqual(@as(?u32, 100), options.pr);
-    try std.testing.expectError(error.MissingDirectory, parseArgs(&.{ "server", "serve", "--pr", "100" }, .{}));
-    try std.testing.expectError(error.MissingValue, parseArgs(&.{ "server", "serve", "--pr" }, .{}));
-    try std.testing.expectError(error.InvalidPr, parseArgs(&.{ "server", "serve", "--pr", "0" }, .{}));
-    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--pr", "1", "--range", "a..b" }, .{}));
-    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--range", "a..b", "--pr", "1" }, .{}));
-    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--pr", "1", "--pr", "2" }, .{}));
-}

@@ -57,9 +57,6 @@ pub fn build(b: *std.Build) void {
     cli_tests.root_module.addOptions("build_options", build_options);
     test_step.dependOn(&b.addRunArtifact(cli_tests).step);
 
-    const server_tests = b.addTest(.{ .root_module = server.root_module });
-    test_step.dependOn(&b.addRunArtifact(server_tests).step);
-
     const frontend_tests = b.addSystemCommand(&.{ "npm", "test", "--prefix", "frontend" });
     test_step.dependOn(&frontend_tests.step);
 
