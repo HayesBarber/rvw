@@ -15,7 +15,7 @@ pub const GitProvider = struct {
     overview: model.DiffOverview,
     file_contents: []const model.FileContent,
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8) !GitProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !GitProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
         const allocator = arena.allocator();
@@ -42,7 +42,7 @@ pub const GitProvider = struct {
             try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change));
         }
 
-        const source: model.DiffSource = if (snapshot.head) |head|
+        const source: model.DiffSource = if (pr) |number| .{ .pull_request = .{ .number = number } } else if (snapshot.head) |head|
             .{ .commit_range = .{ .base = snapshot.base, .head = head } }
         else
             .{ .working_tree = .{ .base = snapshot.base } };
@@ -135,6 +135,7 @@ test "Git provider builds a deterministic working-tree review from a temporary r
         std.testing.io,
         fixture.root,
         null,
+        null,
     );
     defer provider.deinit();
     const diffs = provider.interface();
@@ -193,6 +194,7 @@ test "Git provider resolves explicit commit ranges independently of the working 
         std.testing.io,
         fixture.root,
         range,
+        null,
     );
     defer provider.deinit();
     const diffs = provider.interface();

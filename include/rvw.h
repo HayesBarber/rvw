@@ -17,13 +17,14 @@ typedef struct rvw_buffer {
 
 /*
  * Creates an independent, thread-safe Git diff snapshot. `directory` must
- * identify a Git worktree root. `range` is either NULL for a working-tree
+ * identify a Git worktree root. `pr` is NULL or a positive PR number with a
+ * resolved range. `range` is either NULL for a working-tree
  * diff or a two-commit expression such as "main..feature". On failure,
  * `error_out` receives UTF-8 text that may be freed with rvw_buffer_free(NULL,
  * ...).
  */
 /* log_level is an optional raw LOG_LEVEL value; NULL defaults to error. */
-rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, rvw_buffer *error_out);
+rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, const uint32_t *pr, rvw_buffer *error_out);
 
 /*
  * Dispatches a length-delimited UTF-8 JSON request. Supported request types are

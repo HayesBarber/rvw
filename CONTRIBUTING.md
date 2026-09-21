@@ -25,7 +25,7 @@ Run these commands from the repository root.
 | --- | --- |
 | `zig build` | Build the macOS application bundle at `zig-out/Rvw.app`. |
 | `zig build test` | Run Zig tests, frontend Node tests, and platform specific tests. |
-| `zig build dev -- --directory /path/to/repository` | Start the Zig HTTP server and Vite development server against a repository. Add `--range A..B` to review a commit range. |
+| `zig build dev -- --directory /path/to/repository` | Start the Zig HTTP server and Vite development server against a repository. Add `--range A..B` to review a commit range or `--pr 100` to review a GitHub PR. |
 | `zig build serve -- serve --directory /path/to/repository` | Run only the Zig HTTP service. Add `--host` or `--port` as needed. |
 | `npm run lint --prefix frontend` | Lint the React frontend. |
 | `npm test --prefix frontend` | Run frontend unit tests. |

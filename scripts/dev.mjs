@@ -32,6 +32,7 @@ function takeOption(args, index, name) {
 function parseDevArguments(args) {
   let directory
   let range
+  let pr
   let logLevel
   const fixtureArguments = []
 
@@ -45,6 +46,11 @@ function parseDevArguments(args) {
       if (range !== undefined) throw new Error('--range may only be provided once')
       range = takeOption(args, index, argument)
       index += 1
+    } else if (argument === '--pr') {
+      if (pr !== undefined) throw new Error('--pr may only be provided once')
+      pr = takeOption(args, index, argument)
+      if (!/^[0-9]+$/.test(pr) || Number(pr) < 1 || Number(pr) > 4294967295) throw new Error('PR number must be a positive integer')
+      index += 1
     } else if (argument === '--log-level') {
       if (logLevel !== undefined) throw new Error('--log-level may only be provided once')
       logLevel = takeOption(args, index, argument)
@@ -54,13 +60,14 @@ function parseDevArguments(args) {
     }
   }
 
-  if (range !== undefined && directory === undefined) {
-    throw new Error('--range requires --directory DIR')
+  if (range !== undefined && pr !== undefined) throw new Error('provide only one of --range or --pr')
+  if ((range !== undefined || pr !== undefined) && directory === undefined) {
+    throw new Error('--range and --pr require --directory DIR')
   }
   if (directory !== undefined && fixtureArguments.length > 0) {
     throw new Error('--directory cannot be combined with fixture options')
   }
-  return { directory, range, logLevel, fixtureArguments }
+  return { directory, range, pr, logLevel, fixtureArguments }
 }
 
 let options
@@ -69,7 +76,7 @@ try {
 } catch (error) {
   console.error(`[dev] ${error.message}`)
   console.error(
-    '[dev] usage: zig build dev -- [-d DIR [-r A..B] | --repo NAME|random [--seed INTEGER]]',
+    '[dev] usage: zig build dev -- [-d DIR [-r A..B | --pr NUMBER] | --repo NAME|random [--seed INTEGER]]',
   )
   process.exit(1)
 }
@@ -102,6 +109,7 @@ if (options.directory !== undefined) {
   review = {
     path: resolve(projectRoot, options.directory),
     range: options.range,
+    pr: options.pr,
   }
   console.log(`[dev] directory=${review.path}${review.range ? ` range=${review.range}` : ''}`)
 } else {
@@ -150,6 +158,7 @@ function cancelCleanupGuardian() {
 
 const environment = { ...process.env, RVW_PORT: port }
 const serverArguments = ['serve', '--directory', review.path]
+if (review.pr !== undefined) serverArguments.push('--pr', review.pr)
 if (review.range !== undefined) serverArguments.push('--range', review.range)
 if (options.logLevel !== undefined) serverArguments.push('--log-level', options.logLevel)
 const children = [

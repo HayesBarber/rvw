@@ -6,6 +6,7 @@ const Options = struct {
     port: u16 = 7331,
     directory: ?[]const u8 = null,
     range: ?[]const u8 = null,
+    pr: ?u32 = null,
     log_level: ?[]const u8 = null,
 };
 
@@ -20,6 +21,8 @@ pub fn main(init: std.process.Init) !void {
             error.MissingDirectory => "missing required --directory DIR",
             error.DuplicateDirectory => "--directory may only be provided once",
             error.DuplicateLogLevel => "--log-level may only be provided once",
+            error.InvalidPr => "PR number must be a positive integer",
+            error.DuplicateTarget => "provide only one of --range or --pr",
             error.DuplicateRange => "--range may only be provided once",
         }});
         usage();
@@ -38,7 +41,12 @@ pub fn main(init: std.process.Init) !void {
     defer default_logger.deinit();
     default_logger.minimum_level = rvw.log.Level.resolve(init.io, options.log_level orelse init.environ_map.get("LOG_LEVEL"));
     const logger = default_logger.interface();
-    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, options.range) catch |err| {
+    const range = if (options.pr) |number| rvw.util.pull_request.resolveRange(init.io, init.arena.allocator(), options.directory.?, number) catch |err| {
+        std.log.err("{s}", .{rvw.util.pull_request.errorMessage(err)});
+        usage();
+        return err;
+    } else options.range;
+    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, range, options.pr) catch |err| {
         rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
         std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
         return err;
@@ -97,8 +105,14 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
             index += 1;
         } else if (std.mem.eql(u8, argument, "--range")) {
             if (index == args.len) return error.MissingValue;
+            if (options.pr != null) return error.DuplicateTarget;
             if (options.range != null) return error.DuplicateRange;
             options.range = args[index];
+            index += 1;
+        } else if (std.mem.eql(u8, argument, "--pr")) {
+            if (index == args.len) return error.MissingValue;
+            if (options.pr != null or options.range != null) return error.DuplicateTarget;
+            options.pr = try rvw.util.pull_request.parseNumber(args[index]);
             index += 1;
         } else if (std.mem.eql(u8, argument, "--log-level")) {
             if (index == args.len) return error.MissingValue;
@@ -115,8 +129,19 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
 
 fn usage() void {
     std.debug.print(
-        "usage: rvw-server serve --directory DIR [--range A..B] [--host HOST] [--port PORT] [--log-level LEVEL]\n" ++
+        "usage: rvw-server serve --directory DIR [--range A..B | --pr NUMBER] [--host HOST] [--port PORT] [--log-level LEVEL]\n" ++
             "       defaults may also be set with RVW_HOST and RVW_PORT\n",
         .{},
     );
+}
+
+test "server PR options require a directory and exclude ranges" {
+    const options = try parseArgs(&.{ "server", "serve", "--directory", ".", "--pr", "100" }, .{});
+    try std.testing.expectEqual(@as(?u32, 100), options.pr);
+    try std.testing.expectError(error.MissingDirectory, parseArgs(&.{ "server", "serve", "--pr", "100" }, .{}));
+    try std.testing.expectError(error.MissingValue, parseArgs(&.{ "server", "serve", "--pr" }, .{}));
+    try std.testing.expectError(error.InvalidPr, parseArgs(&.{ "server", "serve", "--pr", "0" }, .{}));
+    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--pr", "1", "--range", "a..b" }, .{}));
+    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--range", "a..b", "--pr", "1" }, .{}));
+    try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "server", "serve", "--pr", "1", "--pr", "2" }, .{}));
 }

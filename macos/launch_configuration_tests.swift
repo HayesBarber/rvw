@@ -37,7 +37,24 @@ func testLaunchConfiguration() {
         }
     }
 
+    for level in [[], ["--log-level", "debug"]] {
+        let args = ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--range", "base..head", "--pr", "100"] + level
+        switch LaunchConfiguration.parse(arguments: args) {
+        case let .configuration(configuration):
+            expect(configuration.pr == 100, "PR number should survive launch")
+            expect(configuration.range == "base..head", "resolved range should survive launch")
+        default: fatalError("PR launch should be accepted")
+        }
+    }
+    for number in ["", "0", "-1", "+1", "abc", "4294967296"] {
+        switch LaunchConfiguration.parse(arguments: ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--range", "a..b", "--pr", number]) {
+        case .invalid: break
+        default: fatalError("invalid PR should be rejected")
+        }
+    }
     let invalidArguments = [
+        ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--pr", "100"],
+        ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository", "--range", "a..b", "--pr"],
         ["Rvw", "--rvw-cli-launch"],
         ["Rvw", "--rvw-cli-launch", "--directory"],
         ["Rvw", "--rvw-cli-launch", "--directory", ""],

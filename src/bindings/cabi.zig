@@ -23,6 +23,7 @@ pub export fn rvw_core_create(
     directory_ptr: ?[*:0]const u8,
     range_ptr: ?[*:0]const u8,
     log_level_ptr: ?[*:0]const u8,
+    pr_ptr: ?*const u32,
     error_out: ?*RvwBuffer,
 ) callconv(.c) ?*RvwCore {
     if (error_out) |output| output.* = emptyBuffer();
@@ -31,6 +32,12 @@ pub export fn rvw_core_create(
         return null;
     });
     const range: ?[]const u8 = if (range_ptr) |value| std.mem.span(value) else null;
+    if (pr_ptr) |pr| {
+        if (pr.* == 0 or range == null) {
+            setCreationError(error_out, "PR review requires a positive number and resolved range");
+            return null;
+        }
+    }
     const handle = allocator.create(RvwCore) catch return null;
     handle.threaded = .init(allocator, .{});
     handle.default_logger = rvw.log.DefaultLogger.init(allocator, handle.threaded.io(), .{
@@ -40,7 +47,7 @@ pub export fn rvw_core_create(
     });
     handle.default_logger.minimum_level = rvw.log.Level.resolve(handle.threaded.io(), if (log_level_ptr) |value| std.mem.span(value) else null);
     handle.logger = handle.default_logger.interface();
-    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range) catch |err| {
+    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range, if (pr_ptr) |pr| pr.* else null) catch |err| {
         rvw.startup.logApplicationStartFailed(
             handle.logger,
             handle.threaded.io(),

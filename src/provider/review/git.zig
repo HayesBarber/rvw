@@ -16,6 +16,7 @@ pub const GitReviewProvider = struct {
     backing_allocator: Allocator,
     repository_path: []const u8,
     range: ?[]const u8,
+    pr: ?u32,
     active: *Snapshot,
 
     const Snapshot = struct {
@@ -24,11 +25,11 @@ pub const GitReviewProvider = struct {
         visible_files: gitignore.GitignoreFileTreeProvider,
         files: file.FilesystemFileProvider,
 
-        fn init(allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8) !*Snapshot {
+        fn init(allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !*Snapshot {
             const snapshot = try allocator.create(Snapshot);
             errdefer allocator.destroy(snapshot);
 
-            snapshot.git = try diff.GitProvider.init(allocator, io, path, range);
+            snapshot.git = try diff.GitProvider.init(allocator, io, path, range, pr);
             errdefer snapshot.git.deinit();
             snapshot.all_files = try walk.WalkFileTreeProvider.init(allocator, io, path);
             errdefer snapshot.all_files.deinit();
@@ -52,10 +53,10 @@ pub const GitReviewProvider = struct {
         }
     };
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8) !GitReviewProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !GitReviewProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
-        const active = try Snapshot.init(backing_allocator, io, path, range);
+        const active = try Snapshot.init(backing_allocator, io, path, range, pr);
         errdefer active.deinit(backing_allocator);
         const repository_path = try arena.allocator().dupe(u8, active.git.repository_root);
         const owned_range = if (range) |value| try arena.allocator().dupe(u8, value) else null;
@@ -64,6 +65,7 @@ pub const GitReviewProvider = struct {
             .backing_allocator = backing_allocator,
             .repository_path = repository_path,
             .range = owned_range,
+            .pr = pr,
             .active = active,
         };
     }
@@ -110,6 +112,7 @@ pub const GitReviewProvider = struct {
             io,
             self.repository_path,
             self.range,
+            self.pr,
         );
         const previous = self.active;
         self.active = replacement;
@@ -146,6 +149,7 @@ test "reload swaps in new working-tree contents" {
         std.testing.io,
         repository.root,
         null,
+        null,
     );
     defer provider.deinit();
     const reviews = provider.interface();
@@ -173,6 +177,7 @@ test "failed reload leaves the prior snapshot usable" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        null,
         null,
     );
     defer provider.deinit();
@@ -206,6 +211,7 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         std.testing.io,
         repository.root,
         "HEAD~1..HEAD",
+        null,
     );
     defer symbolic.deinit();
     const explicit_range = try std.fmt.allocPrint(
@@ -219,6 +225,7 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         std.testing.io,
         repository.root,
         explicit_range,
+        null,
     );
     defer explicit.deinit();
     const explicit_id = (try explicit.interface().getDiffOverview(std.testing.io)).id;
@@ -237,4 +244,28 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         explicit_id,
         (try explicit.interface().getDiffOverview(std.testing.io)).id,
     );
+}
+
+test "PR source survives snapshot reload and serializes for transports" {
+    const Repository = @import("../../testing/repository.zig").Repository;
+    var repository = try Repository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    try repository.write("file.txt", "head\n");
+    try repository.commit("head");
+    var provider = try GitReviewProvider.init(std.testing.allocator, std.testing.io, repository.root, "HEAD~1..HEAD", 100);
+    defer provider.deinit();
+    for (0..2) |_| {
+        const overview = try provider.interface().getDiffOverview(std.testing.io);
+        try std.testing.expectEqual(@as(u32, 100), overview.source.pull_request.number);
+        try std.testing.expectEqual(@as(usize, 1), overview.files.len);
+        const json = try std.json.Stringify.valueAlloc(std.testing.allocator, overview.source, .{});
+        defer std.testing.allocator.free(json);
+        const parsed = try std.json.parseFromSlice(struct { kind: []const u8, number: u32 }, std.testing.allocator, json, .{});
+        defer parsed.deinit();
+        try std.testing.expectEqualStrings("pull-request", parsed.value.kind);
+        try std.testing.expectEqual(@as(u32, 100), parsed.value.number);
+        try provider.interface().reload(std.testing.io);
+    }
 }

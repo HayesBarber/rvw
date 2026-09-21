@@ -1,8 +1,9 @@
 const std = @import("std");
+const pull_request = @import("util/pull_request.zig");
 const build_options = @import("build_options");
 
 const usage =
-    \\usage: rvw [DIR] [-r RANGE | --range RANGE] [--log-level LEVEL]
+    \\usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
     \\       rvw -h | --help
     \\       rvw -v | --version
     \\
@@ -12,6 +13,7 @@ const Options = struct {
     directory: []const u8 = ".",
     range: ?[]const u8 = null,
     log_level: ?[]const u8 = null,
+    pr: ?u32 = null,
 };
 
 const Command = union(enum) {
@@ -21,6 +23,9 @@ const Command = union(enum) {
 };
 
 const ParseError = error{
+    DuplicateTarget,
+    MissingPr,
+    InvalidPr,
     DuplicateDirectory,
     DuplicateRange,
     DuplicateLogLevel,
@@ -69,7 +74,12 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("invalid directory '{s}': {t}", .{ options.directory, err });
         return 2;
     };
-    launch(init.io, allocator, directory, options.range, options.log_level orelse init.environ_map.get("LOG_LEVEL")) catch |err| {
+    const range = if (options.pr) |number| pull_request.resolveRange(init.io, allocator, directory, number) catch |err| {
+        std.log.err("{s}", .{pull_request.errorMessage(err)});
+        std.Io.File.stderr().writeStreamingAll(init.io, usage) catch {};
+        return 2;
+    } else options.range;
+    launch(init.io, allocator, directory, range, options.pr, options.log_level orelse init.environ_map.get("LOG_LEVEL")) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -102,12 +112,20 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
         if (!positional_only and
             (std.mem.eql(u8, argument, "-r") or std.mem.eql(u8, argument, "--range")))
         {
+            if (options.pr != null) return error.DuplicateTarget;
             if (has_range) return error.DuplicateRange;
             index += 1;
             if (index == args.len) return error.MissingRange;
             if (args[index].len == 0) return error.EmptyRange;
             options.range = args[index];
             has_range = true;
+            continue;
+        }
+        if (!positional_only and std.mem.eql(u8, argument, "--pr")) {
+            if (has_range or options.pr != null) return error.DuplicateTarget;
+            index += 1;
+            if (index == args.len) return error.MissingPr;
+            options.pr = try pull_request.parseNumber(args[index]);
             continue;
         }
         if (!positional_only and std.mem.eql(u8, argument, "--log-level")) {
@@ -130,6 +148,9 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
 
 fn parseErrorMessage(err: ParseError) []const u8 {
     return switch (err) {
+        error.DuplicateTarget => "provide only one of --range or --pr",
+        error.MissingPr => "missing value for --pr",
+        error.InvalidPr => pull_request.errorMessage(error.InvalidPr),
         error.DuplicateDirectory => "only one directory may be provided",
         error.DuplicateRange => "the commit range may only be provided once",
         error.EmptyRange => "the commit range cannot be empty",
@@ -156,14 +177,16 @@ fn launch(
     allocator: std.mem.Allocator,
     directory: []const u8,
     range: ?[]const u8,
+    pr: ?u32,
     log_level: ?[]const u8,
 ) !void {
     // Zig resolves the running executable through symlinks here. A CLI invoked
     // as /usr/local/bin/rvw therefore finds rvw-cli inside the installed app.
     const executable_dir = try std.process.executableDirPathAlloc(io, allocator);
     const bundle_path = try appBundlePath(executable_dir);
-    var buffer: [11][]const u8 = undefined;
-    const argv = launchArguments(&buffer, bundle_path, directory, range, log_level);
+    var buffer: [13][]const u8 = undefined;
+    const pr_text = if (pr) |number| try std.fmt.allocPrint(allocator, "{d}", .{number}) else null;
+    const argv = launchArguments(&buffer, bundle_path, directory, range, pr_text, log_level);
 
     var child = try std.process.spawn(io, .{ .argv = argv });
     const result = try child.wait(io);
@@ -181,10 +204,11 @@ fn appBundlePath(executable_dir: []const u8) ![]const u8 {
 }
 
 fn launchArguments(
-    buffer: *[11][]const u8,
+    buffer: *[13][]const u8,
     bundle_path: []const u8,
     directory: []const u8,
     range: ?[]const u8,
+    pr: ?[]const u8,
     log_level: ?[]const u8,
 ) []const []const u8 {
     buffer[0..7].* = .{
@@ -201,6 +225,11 @@ fn launchArguments(
         buffer[7] = "--range";
         buffer[8] = value;
         count = 9;
+    }
+    if (pr) |value| {
+        buffer[count] = "--pr";
+        buffer[count + 1] = value;
+        count += 2;
     }
     if (log_level) |value| {
         buffer[count] = "--log-level";
@@ -288,11 +317,12 @@ test "CLI launch arguments target the containing app and forward the optional ra
     );
     try std.testing.expectError(error.InvalidBundleLayout, appBundlePath("Rvw"));
 
-    var without_range_buffer: [11][]const u8 = undefined;
+    var without_range_buffer: [13][]const u8 = undefined;
     const without_range = launchArguments(
         &without_range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
+        null,
         null,
         null,
     );
@@ -306,12 +336,13 @@ test "CLI launch arguments target the containing app and forward the optional ra
         "/tmp/repository",
     }, without_range);
 
-    var range_buffer: [11][]const u8 = undefined;
+    var range_buffer: [13][]const u8 = undefined;
     const with_range = launchArguments(
         &range_buffer,
         "/Applications/Rvw.app",
         "/tmp/repository",
         "main..feature",
+        null,
         null,
     );
     try expectArguments(&.{
@@ -337,8 +368,8 @@ fn expectArguments(expected: []const []const u8, actual: []const []const u8) !vo
 test "CLI forwards raw logging configuration with and without range" {
     for ([_]?[]const u8{ null, "main..HEAD" }) |range| {
         for ([_][]const u8{ "debug", "", "invalid-secret" }) |level| {
-            var buffer: [11][]const u8 = undefined;
-            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, level);
+            var buffer: [13][]const u8 = undefined;
+            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, null, level);
             try std.testing.expectEqualStrings("--log-level", args[args.len - 2]);
             try std.testing.expectEqualStrings(level, args[args.len - 1]);
             if (range) |value| try std.testing.expectEqualStrings(value, args[8]);
@@ -357,4 +388,28 @@ test "public log-level option preserves raw values and rejects missing or duplic
     try std.testing.expectError(error.DuplicateLogLevel, parseArgs(&.{ "rvw", "--log-level", "info", "--log-level", "debug" }));
     const positional = (try parseArgs(&.{ "rvw", "--", "--log-level" })).launch;
     try std.testing.expect(positional.log_level == null);
+}
+
+test "CLI accepts PR targets and rejects ambiguous or invalid targets" {
+    const options = (try parseArgs(&.{ "rvw", "--pr", "100", "repository" })).launch;
+    try std.testing.expectEqual(@as(?u32, 100), options.pr);
+    try std.testing.expectEqualStrings("repository", options.directory);
+    try std.testing.expectError(error.MissingPr, parseArgs(&.{ "rvw", "--pr" }));
+    for ([_][]const u8{ "", "0", "-1", "abc", "4294967296" }) |value| {
+        try std.testing.expectError(error.InvalidPr, parseArgs(&.{ "rvw", "--pr", value }));
+    }
+    for ([_][]const []const u8{
+        &.{ "rvw", "--pr", "1", "--range", "a..b" },
+        &.{ "rvw", "--range", "a..b", "--pr", "1" },
+        &.{ "rvw", "--pr", "1", "--pr", "2" },
+    }) |args| try std.testing.expectError(error.DuplicateTarget, parseArgs(args));
+    for ([_]?[]const u8{ null, "debug" }) |level| {
+        var buffer: [13][]const u8 = undefined;
+        const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", "base..head", "100", level);
+        try std.testing.expectEqualStrings("--range", args[7]);
+        try std.testing.expectEqualStrings("base..head", args[8]);
+        try std.testing.expectEqualStrings("--pr", args[9]);
+        try std.testing.expectEqualStrings("100", args[10]);
+        try std.testing.expectEqual(@as(usize, if (level != null) 13 else 11), args.len);
+    }
 }

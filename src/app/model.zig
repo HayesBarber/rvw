@@ -13,6 +13,7 @@ pub const FileStatus = enum {
 pub const Repository = struct { name: []const u8 };
 
 pub const DiffSource = union(enum) {
+    pull_request: struct { number: u32 },
     working_tree: struct { base: []const u8 },
     commit_range: struct {
         base: []const u8,
@@ -22,6 +23,12 @@ pub const DiffSource = union(enum) {
     pub fn jsonStringify(self: DiffSource, writer: *std.json.Stringify) !void {
         try writer.beginObject();
         switch (self) {
+            .pull_request => |source| {
+                try writer.objectField("kind");
+                try writer.write("pull-request");
+                try writer.objectField("number");
+                try writer.write(source.number);
+            },
             .working_tree => |source| {
                 try writer.objectField("kind");
                 try writer.write("working-tree");
