@@ -20,7 +20,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
     };
 }
 
-/// Uses cached mirror refs when available, otherwise fetches both GitHub refs.
+/// Fetches both GitHub refs on every resolution, including force-pushed updates.
 /// The returned range is owned by the caller; the worktree is never checked out.
 pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32) ![]u8 {
     if (number == 0) return error.InvalidPr;
@@ -34,17 +34,12 @@ pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, 
     const head_ref = try std.fmt.allocPrint(scratch, "refs/rvw/pr/{d}/head", .{number});
     const merge_ref = try std.fmt.allocPrint(scratch, "refs/rvw/pr/{d}/merge", .{number});
     const head_revision = try std.fmt.allocPrint(scratch, "{s}^{{commit}}", .{head_ref});
-    const merge_revision = try std.fmt.allocPrint(scratch, "{s}^{{commit}}", .{merge_ref});
-    const cached_head = try revision(io, scratch, root, head_revision);
-    const cached_merge = try revision(io, scratch, root, merge_revision);
-    if (cached_head == null or cached_merge == null) {
-        const head_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/head:{s}", .{ number, head_ref });
-        const merge_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/merge:{s}", .{ number, merge_ref });
-        _ = command(io, scratch, root, &.{ "fetch", "--atomic", "origin", head_spec, merge_spec }) catch |err| switch (err) {
-            error.GitCommandFailed => return error.PullRequestUnavailable,
-            else => return err,
-        };
-    }
+    const head_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/head:{s}", .{ number, head_ref });
+    const merge_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/merge:{s}", .{ number, merge_ref });
+    _ = command(io, scratch, root, &.{ "fetch", "--atomic", "origin", head_spec, merge_spec }) catch |err| switch (err) {
+        error.GitCommandFailed => return error.PullRequestUnavailable,
+        else => return err,
+    };
     const head = (try revision(io, scratch, root, head_revision)) orelse return error.InvalidPullRequestRefs;
     const parent = try std.fmt.allocPrint(scratch, "{s}^1", .{merge_ref});
     const base = command(io, scratch, root, &.{ "merge-base", parent, head }) catch |err| switch (err) {
@@ -78,7 +73,7 @@ test "PR numbers are positive decimal integers" {
     }
 }
 
-test "PR resolution fetches mirror refs and uses the merge base, then works offline" {
+test "PR resolution refreshes refs after force pushes and never falls back to stale refs" {
     const Repository = @import("../testing/repository.zig").Repository;
     var remote = try Repository.init(std.testing.allocator);
     defer remote.deinit();
@@ -108,10 +103,34 @@ test "PR resolution fetches mirror refs and uses the merge base, then works offl
     defer std.testing.allocator.free(fetched);
     try std.testing.expectEqualStrings(expected, fetched);
     try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 101));
+    // Rewrite the PR branch so refreshing requires a non-fast-forward ref update.
+    const upstream = try remote.revision("HEAD^1");
+    defer std.testing.allocator.free(upstream);
+    try remote.git(&.{ "checkout", "--detach", base });
+    try remote.write("feature.txt", "rewritten feature\n");
+    try remote.commit("rewritten feature");
+    const updated_head = try remote.revision("HEAD");
+    defer std.testing.allocator.free(updated_head);
+    try remote.git(&.{ "update-ref", "refs/pull/100/head", updated_head });
+    try remote.git(&.{ "checkout", "--detach", upstream });
+    try remote.git(&.{ "-c", "user.name=tests", "-c", "user.email=tests@example.invalid", "-c", "commit.gpgSign=false", "merge", "--no-ff", updated_head, "-m", "updated merge" });
+    try remote.git(&.{ "update-ref", "refs/pull/100/merge", "HEAD" });
+    const updated_expected = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, updated_head });
+    defer std.testing.allocator.free(updated_expected);
+    const refreshed = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100);
+    defer std.testing.allocator.free(refreshed);
+    try std.testing.expectEqualStrings(updated_expected, refreshed);
+    const remote_merge = try remote.revision("refs/pull/100/merge");
+    defer std.testing.allocator.free(remote_merge);
+    const local_merge = try local.revision("refs/rvw/pr/100/merge");
+    defer std.testing.allocator.free(local_merge);
+    try std.testing.expectEqualStrings(remote_merge, local_merge);
+
     try local.git(&.{ "remote", "set-url", "origin", "/nonexistent/rvw-test-remote" });
-    const cached = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100);
-    defer std.testing.allocator.free(cached);
-    try std.testing.expectEqualStrings(expected, cached);
-    try local.git(&.{ "update-ref", "refs/rvw/pr/100/merge", base });
+    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try local.git(&.{ "remote", "set-url", "origin", remote.root });
+    try remote.git(&.{ "update-ref", "refs/pull/100/merge", base });
     try std.testing.expectError(error.InvalidPullRequestRefs, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try remote.git(&.{ "update-ref", "-d", "refs/pull/100/merge" });
+    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
 }
