@@ -332,6 +332,7 @@ export default function App() {
         reloadMessageIsError={reloadMessageIsError}
         reloadStatus={reloadRequest.status}
         repositoryName={overview.repository.name}
+        source={overview.source}
         vimState={vimState}
       />
     </div>

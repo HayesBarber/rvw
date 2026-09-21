@@ -17,7 +17,7 @@
  * @typedef {Object} DiffOverview
  * @property {string} id
  * @property {{ name: string }} repository
- * @property {{ kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string }} source
+ * @property {{ kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string } | { kind: 'pull-request', number: number }} source
  * @property {string | null} initialPath
  * @property {FileSummary[]} files
  */

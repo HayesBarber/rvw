@@ -10,6 +10,9 @@ pub const unix_socket = @import("transport/unix_socket.zig");
 pub const repository = @import("util/repository.zig");
 pub const output = @import("output/output.zig");
 pub const log = @import("log/log.zig");
+pub const util = struct {
+    pub const pull_request = @import("util/pull_request.zig");
+};
 
 test {
     _ = @import("config/config.zig");
@@ -22,4 +25,5 @@ test {
     _ = @import("provider/filetree/walk.zig");
     _ = @import("provider/filetree/gitignore.zig");
     _ = @import("util/git_process.zig");
+    _ = util.pull_request;
 }

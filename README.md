@@ -37,7 +37,7 @@ Rvw uses a CLI to launch the GUI. After building the app, the CLI binary is loca
 CLI usage is as follows:
 
 ```bash
-usage: rvw [DIR] [-r RANGE | --range RANGE]
+usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
        rvw -h | --help
        rvw -v | --version
 ```

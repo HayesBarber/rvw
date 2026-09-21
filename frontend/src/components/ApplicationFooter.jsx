@@ -1,3 +1,4 @@
+import { reviewSourceLabel } from '../review/source-label.js'
 import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
 import { RequestStatus } from '../review/request-state.js'
@@ -21,6 +22,7 @@ export default function ApplicationFooter({
   reloadMessageIsError = false,
   reloadStatus,
   repositoryName,
+  source,
   vimState,
 }) {
   const pending = vimState.pendingKeys.join(' ')
@@ -61,9 +63,14 @@ export default function ApplicationFooter({
         </span>
       </span>
       {repositoryName && (
-        <strong className="repository-name" title={repositoryName}>
-          {repositoryName}
-        </strong>
+        <span className="repository-context">
+          <strong className="repository-name" title={repositoryName}>{repositoryName}</strong>
+          {source && (
+            <span className="review-source" title={reviewSourceLabel(source)}>
+              {reviewSourceLabel(source, true)}
+            </span>
+          )}
+        </span>
       )}
       <span className="footer-right">
         {repositoryName && (

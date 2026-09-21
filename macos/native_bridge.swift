@@ -25,10 +25,16 @@ final class NativeCore {
         var creationError = rvw_buffer(ptr: nil, len: 0)
         let createdCore = launchConfiguration.directory.path.withCString { directory in
             func create(_ level: UnsafePointer<CChar>?) -> OpaquePointer? {
-                if let range = launchConfiguration.range {
-                    return range.withCString { rvw_core_create(directory, $0, level, &creationError) }
+                func createWithPR(_ pr: UnsafePointer<UInt32>?) -> OpaquePointer? {
+                    if let range = launchConfiguration.range {
+                        return range.withCString { rvw_core_create(directory, $0, level, pr, &creationError) }
+                    }
+                    return rvw_core_create(directory, nil, level, pr, &creationError)
                 }
-                return rvw_core_create(directory, nil, level, &creationError)
+                if var pr = launchConfiguration.pr {
+                    return withUnsafePointer(to: &pr) { createWithPR($0) }
+                }
+                return createWithPR(nil)
             }
             if let level = launchConfiguration.logLevel {
                 return level.withCString { create($0) }

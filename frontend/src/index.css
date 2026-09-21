@@ -106,7 +106,28 @@ textarea {
   gap: 7px;
 }
 
+.repository-context {
+  display: flex;
+  min-width: 0;
+  max-width: 40vw;
+  gap: 8px;
+  justify-self: center;
+  align-items: center;
+}
+
+.review-source {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid #303033;
+  border-radius: 4px;
+  background: #1c1c1e;
+  line-height: 1.2;
+  color: #adadb1;
+  font-weight: normal;
+}
+
 .repository-name {
+  min-width: 0;
   max-width: 220px;
   overflow: hidden;
   justify-self: center;
