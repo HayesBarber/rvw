@@ -1,5 +1,6 @@
 export const VimMode = Object.freeze({
   NORMAL: 'normal',
+  COMMAND: 'command',
   INSERT: 'insert',
   VISUAL: 'visual',
   OPERATOR_PENDING: 'operator_pending',

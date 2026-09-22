@@ -1,3 +1,4 @@
+import actionDefinitions from '../../../src/app/application-actions.json' with { type: 'json' }
 import { compileBindings, VimMode } from '../vim/machine.js'
 import { isNormalizedVimKey } from '../vim/keyboard.js'
 
@@ -24,94 +25,14 @@ export const applicationActionGroups = Object.freeze([
   Object.freeze({ id: ActionGroup.REVIEW, label: 'Review comments' }),
 ])
 
-export const ApplicationAction = Object.freeze({
-  CLOSE_APPLICATION: 'application.close',
-  RELOAD_REVIEW: 'review.reload',
-  OPEN_KEYMAP_REFERENCE: 'keymap_reference.open',
-  CURSOR_UP: 'cursor.up',
-  CURSOR_DOWN: 'cursor.down',
-  CURSOR_PAGE_UP: 'cursor.page.up',
-  CURSOR_PAGE_DOWN: 'cursor.page.down',
-  CURSOR_FIRST: 'cursor.first',
-  CURSOR_LAST: 'cursor.last',
-  CURSOR_CENTER: 'cursor.center',
-  VISUAL_LINE: 'diff.visual_line',
-  DIFF_SWITCH_SIDE: 'diff.side.switch',
-  FILE_TREE_ITEM_ACTIVATE: 'file_tree.item.activate',
-  TREE_COLLAPSE_OR_PARENT: 'tree.collapse_or_parent',
-  TREE_EXPAND: 'tree.expand',
-  TREE_SIZE_INCREASE: 'tree.size.increase',
-  TREE_SIZE_DECREASE: 'tree.size.decrease',
-  FOCUS_FILE_TREE: 'focus.file_tree',
-  FOCUS_DIFF_PANE: 'focus.diff_pane',
-  SHOW_CHANGES: 'tree_mode.changes',
-  SHOW_FILES: 'tree_mode.files',
-  OPEN_NEXT_FILE: 'file.open.next',
-  OPEN_PREVIOUS_FILE: 'file.open.previous',
-  OPEN_FILE_FINDER: 'file_finder.open',
-  OPEN_FILE_FINDER_ALL: 'file_finder.open.all',
-  DIFF_EXPAND_TOGGLE: 'diff.expand.toggle',
-  DIFF_RELATIVE_LINE_NUMBERS_TOGGLE: 'diff.relative_line_numbers.toggle',
-  DIFF_WRAP_TOGGLE: 'diff.wrap.toggle',
-  COPY_FILE_PATH_RELATIVE: 'file.path.copy_relative',
-  COPY_FILE_PATH_ABSOLUTE: 'file.path.copy_absolute',
-  COPY_COMMENTS: 'comments.copy',
-  ADD_COMMENT: 'comments.add',
-  ADD_FILE_COMMENT: 'comments.add_file',
-  EDIT_COMMENT: 'comments.edit',
-  DELETE_COMMENT: 'comments.delete',
-  CLEAR_COMMENTS: 'comments.clear',
-})
+export const ApplicationAction = Object.freeze(Object.fromEntries(
+  actionDefinitions.map(({ name, id }) => [name, id]),
+))
 
-const actionDefinitions = [
-  [ApplicationAction.CLOSE_APPLICATION, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Close the application.'],
-  [ApplicationAction.RELOAD_REVIEW, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Reload repository files and changes.'],
-  [ApplicationAction.OPEN_KEYMAP_REFERENCE, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Show the effective keyboard bindings.'],
-  [ApplicationAction.CURSOR_UP, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor up.'],
-  [ApplicationAction.CURSOR_DOWN, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor down.'],
-  [ApplicationAction.CURSOR_PAGE_UP, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor up by half a viewport.'],
-  [ApplicationAction.CURSOR_PAGE_DOWN, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor down by half a viewport.'],
-  [ApplicationAction.CURSOR_FIRST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the first item.'],
-  [ApplicationAction.CURSOR_LAST, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Move the active cursor to the last item.'],
-  [ApplicationAction.CURSOR_CENTER, ActionScope.ACTIVE_SURFACE, ActionGroup.NAVIGATION, 'Center the active cursor in its viewport.'],
-  [ApplicationAction.VISUAL_LINE, ActionScope.DIFF_PANE, ActionGroup.NAVIGATION, 'Select lines in Visual mode.'],
-  [ApplicationAction.DIFF_SWITCH_SIDE, ActionScope.DIFF_PANE, ActionGroup.NAVIGATION, 'Switch diff side.'],
-  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Activate the focused file-tree item.'],
-  [ApplicationAction.TREE_COLLAPSE_OR_PARENT, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Collapse the focused tree item or focus its parent.'],
-  [ApplicationAction.TREE_EXPAND, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Expand the focused tree item.'],
-  [ApplicationAction.TREE_SIZE_INCREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Widen the file-tree pane.'],
-  [ApplicationAction.TREE_SIZE_DECREASE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Narrow the file-tree pane.'],
-  [ApplicationAction.FOCUS_FILE_TREE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Focus the file tree.'],
-  [ApplicationAction.FOCUS_DIFF_PANE, ActionScope.FILE_TREE, ActionGroup.APPLICATION, 'Focus the diff pane.'],
-  [ApplicationAction.SHOW_CHANGES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show changed files in the file tree.'],
-  [ApplicationAction.SHOW_FILES, ActionScope.FILE_TREE, ActionGroup.FILE_TREE, 'Show all repository files in the file tree.'],
-  [ApplicationAction.OPEN_NEXT_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the next file in the active file-tree mode.'],
-  [ApplicationAction.OPEN_PREVIOUS_FILE, ActionScope.GLOBAL, ActionGroup.FILE_TREE, 'Open the previous file in the active file-tree mode.'],
-  [ApplicationAction.OPEN_FILE_FINDER, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Open the file finder.'],
-  [ApplicationAction.OPEN_FILE_FINDER_ALL, ActionScope.GLOBAL, ActionGroup.APPLICATION, 'Open the file finder including git-ignored files.'],
-  [ApplicationAction.DIFF_EXPAND_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle all unchanged diff regions.'],
-  [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle relative line numbers in text views.'],
-  [ApplicationAction.DIFF_WRAP_TOGGLE, ActionScope.DIFF_PANE, ActionGroup.APPLICATION, 'Toggle text wrapping in the diff view.'],
-  [ApplicationAction.COPY_FILE_PATH_RELATIVE, ActionScope.ACTIVE_SURFACE, ActionGroup.FILE, 'Copy the active file repository-relative path.'],
-  [ApplicationAction.COPY_FILE_PATH_ABSOLUTE, ActionScope.ACTIVE_SURFACE, ActionGroup.FILE, 'Copy the active file absolute path.'],
-  [ApplicationAction.COPY_COMMENTS, ActionScope.GLOBAL, ActionGroup.REVIEW, 'Copy all review comments as Markdown.'],
-  [ApplicationAction.ADD_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment at the active diff cursor.'],
-  [ApplicationAction.ADD_FILE_COMMENT, ActionScope.DIFF_PANE, ActionGroup.REVIEW, 'Add a comment to the open file.'],
-  [ApplicationAction.EDIT_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Edit the comment in the active context.'],
-  [ApplicationAction.DELETE_COMMENT, ActionScope.ACTIVE_SURFACE, ActionGroup.REVIEW, 'Delete the comment in the active context.'],
-  [ApplicationAction.CLEAR_COMMENTS, ActionScope.GLOBAL, ActionGroup.REVIEW, 'Clear all review comments.'],
-]
-
-/** Stable application actions indexed by their user-configurable identifier. */
+/** Shared with backend configuration validation; behaviors live in the dispatcher. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
-  actionDefinitions.map(([id, scope, group, description]) => [
-    id,
-    Object.freeze({
-      id,
-      scope,
-      group,
-      description,
-    }),
+  actionDefinitions.map(({ id, scope, group, description }) => [
+    id, Object.freeze({ id, scope, group, description }),
   ]),
 ))
 
@@ -128,6 +49,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLOSE_APPLICATION]: actionBindings(keySequence('q')),
   [ApplicationAction.RELOAD_REVIEW]: actionBindings(keySequence(LEADER_KEY, 'r')),
   [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
+  [ApplicationAction.OPEN_COMMAND_LINE]: actionBindings(keySequence(':')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
     keySequence('<Up>'),

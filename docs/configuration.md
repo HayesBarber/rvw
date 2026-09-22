@@ -8,6 +8,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | --- | --- | --- |
 | `application.close` | `q` | Close Rvw through the native application host. In HTTP development mode, this action is a no-op. |
 | `review.reload` | `<leader> r` | Reload repository files and changes while preserving saved comments and session display settings. Reload is blocked while a comment draft or editor is open. |
+| `command_line.open` | `:` | Open the footer command input. |
 | `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |
@@ -73,7 +74,7 @@ Mouse range selection remains available; normal-mode `c` uses an active mouse ra
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts optional `keybindings`, `diff`, and `comments` objects. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
+The JSON root accepts optional `keybindings`, `diff`, `comments`, and `commandLine` objects. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
 
 `diff` accepts optional `wrapLines` and `relativeLineNumbers` boolean keys. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. Line numbers are absolute by default; set `"relativeLineNumbers": true` to show the cursor row's source line and each other code row's vertical movement distance. The `diff.wrap.toggle` and `diff.relative_line_numbers.toggle` actions change their settings for the current session only, apply to subsequently opened files, and are active while the diff pane has focus. `diff.expand.toggle` affects only the open diff and each newly opened file starts with collapsed context.
 
@@ -104,7 +105,7 @@ This complete example replaces four actions, disables one action, starts with wr
 }
 ```
 
-An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the action. An action absent from the file retains all of its defaults. `<leader>` expands to the `keybindings.leader` value, or `<Space>` when `leader` is omitted.
+An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the keyboard binding; the canonical command name remains available. An action absent from the file retains all of its defaults. `<leader>` expands to the `keybindings.leader` value, or `<Space>` when `leader` is omitted.
 
 ## Key notation
 
@@ -121,3 +122,32 @@ Rvw validates the JSON schema, action identifiers, normalized key notation, dupl
 Malformed JSON, invalid fields or actions, unsupported key notation, duplicate bindings, ambiguous prefixes, and file read failures leave the built-in or last valid keymap active. The application footer reports the problem and configuration path while review loading continues. Fix the reported file and restart Rvw to try the configuration again.
 
 Both the native macOS application and the HTTP development server load the same startup snapshot and apply the same frontend validation.
+
+## Command line
+
+Press `:` in Normal mode, enter an action such as `comments.clear`, and press
+Enter. Names are case-sensitive; surrounding whitespace is trimmed. Commands
+use the keyboard dispatcher and active surface.
+
+Aliases can be created for commands:
+
+```json
+{
+  "commandLine": {
+    "aliases": {
+      "clear": "comments.clear",
+      "reload": "review.reload"
+    }
+  }
+}
+```
+
+Alias names must be non-empty, contain no whitespace, and cannot shadow
+canonical actions. Targets must be canonical actions.
+
+Escape, empty Enter, or clicking away cancels. Accepted commands close the
+input; unknown or unavailable commands stay open. Closing restores focus unless
+the action moves it. Configure the opening key with `command_line.open`.
+
+Only one alias name is currently supported. No arguments, ranges, counts, chaining, history,
+completion, JavaScript, or shell execution.

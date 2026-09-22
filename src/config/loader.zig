@@ -100,6 +100,10 @@ const ParseResult = union(enum) {
 };
 
 const SchemaError = error{
+    invalid_command_line,
+    invalid_alias_name,
+    alias_shadows_action,
+    unknown_alias_target,
     duplicate_field,
     root_not_object,
     unknown_root_field,
@@ -139,16 +143,35 @@ fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!P
         error.DuplicateField => return .{ .invalid_schema = error.duplicate_field },
         else => return .malformed_json,
     };
-    validateConfiguration(value) catch |err| return .{ .invalid_schema = err };
+    const catalog = std.json.parseFromSliceLeaky(std.json.Value, allocator, @embedFile("../app/application-actions.json"), .{}) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => unreachable,
+    };
+    validateConfiguration(value, catalog) catch |err| return .{ .invalid_schema = err };
     return .{ .configuration = value };
 }
 
-fn validateConfiguration(value: std.json.Value) SchemaError!void {
+fn validateConfiguration(value: std.json.Value, catalog: std.json.Value) SchemaError!void {
     const root = switch (value) {
         .object => |object| object,
         else => return error.root_not_object,
     };
-    if (!onlyFields(root, &.{ "keybindings", "diff", "comments" })) return error.unknown_root_field;
+    if (!onlyFields(root, &.{ "keybindings", "diff", "comments", "commandLine" })) return error.unknown_root_field;
+
+    if (root.get("commandLine")) |command_line| {
+        if (command_line != .object or !onlyFields(command_line.object, &.{"aliases"})) return error.invalid_command_line;
+        if (command_line.object.get("aliases")) |aliases| {
+            if (aliases != .object) return error.invalid_command_line;
+            var entries = aliases.object.iterator();
+            while (entries.next()) |entry| {
+                const name = entry.key_ptr.*;
+                if (name.len == 0 or containsWhitespace(name)) return error.invalid_alias_name;
+                if (isApplicationAction(catalog, name)) return error.alias_shadows_action;
+                const target = entry.value_ptr.*;
+                if (target != .string or !isApplicationAction(catalog, target.string)) return error.unknown_alias_target;
+            }
+        }
+    }
 
     if (root.get("comments")) |comments_value| {
         const comments = switch (comments_value) {
@@ -237,6 +260,36 @@ fn validateConfiguration(value: std.json.Value) SchemaError!void {
     }
 }
 
+fn isApplicationAction(catalog: std.json.Value, name: []const u8) bool {
+    for (catalog.array.items) |action| {
+        if (std.mem.eql(u8, action.object.get("id").?.string, name)) return true;
+    }
+    return false;
+}
+
+// Match JavaScript's whitespace set, including Unicode spaces and BOM.
+fn containsWhitespace(name: []const u8) bool {
+    const view = std.unicode.Utf8View.init(name) catch return true;
+    var iterator = view.iterator();
+    while (iterator.nextCodepoint()) |point| {
+        if (point <= std.math.maxInt(u8) and std.ascii.isWhitespace(@intCast(point))) return true;
+        // std.ascii covers ASCII only; retain JavaScript's additional Unicode
+        // whitespace so frontend and backend alias validation agree.
+        switch (point) {
+            '\u{00a0}' => return true, // No-break space
+            '\u{1680}' => return true, // Ogham space mark
+            '\u{2000}'...'\u{200a}' => return true, // En quad through hair space
+            '\u{2028}', '\u{2029}' => return true, // Line and paragraph separators
+            '\u{202f}' => return true, // Narrow no-break space
+            '\u{205f}' => return true, // Medium mathematical space
+            '\u{3000}' => return true, // Ideographic space
+            '\u{feff}' => return true, // Byte-order mark
+            else => {},
+        }
+    }
+    return false;
+}
+
 fn validateSequences(value: std.json.Value) SchemaError!void {
     const sequences = switch (value) {
         .array => |array| array.items,
@@ -271,6 +324,10 @@ fn onlyFields(object: std.json.ObjectMap, allowed: []const []const u8) bool {
 
 fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
     return switch (schema_error) {
+        error.invalid_command_line => "user configuration commandLine must be an object with an optional aliases object",
+        error.invalid_alias_name => "commandLine alias names must be non-empty and contain no whitespace",
+        error.alias_shadows_action => "commandLine aliases cannot shadow canonical application actions",
+        error.unknown_alias_target => "commandLine alias targets must be canonical application action identifiers",
         error.duplicate_field => "user configuration contains a duplicate JSON field",
         error.root_not_object => "user configuration root must be a JSON object",
         error.unknown_root_field => "user configuration contains an unsupported top-level field",
@@ -608,4 +665,63 @@ test "missing configuration is empty while read failures are diagnosed" {
     var unreadable = try load(std.testing.allocator, std.testing.io, .{ .home = home });
     defer unreadable.deinit();
     try std.testing.expectEqual(config.DiagnosticCode.file_read_failure, unreadable.snapshot.diagnostic.?.code);
+}
+
+test "command aliases share the application catalog and diagnose invalid configuration" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const valid = try parseConfiguration(arena.allocator(),
+        \\{"commandLine":{"aliases":{"clear":"comments.clear","wipe":"comments.clear","cmd":"command_line.open"}}}
+    );
+    try std.testing.expect(valid == .configuration);
+    try std.testing.expectEqualStrings("comments.clear", valid.configuration.object.get("commandLine").?.object.get("aliases").?.object.get("clear").?.string);
+    for ([_][]const u8{
+        \\{"commandLine":null}
+        ,
+        \\{"commandLine":{"other":{}}}
+        ,
+        \\{"commandLine":{"aliases":[]}}
+        ,
+        \\{"commandLine":{"aliases":null}}
+        ,
+        \\{"commandLine":{"aliases":{"":"comments.clear"}}}
+        ,
+        \\{"commandLine":{"aliases":{"two words":"comments.clear"}}}
+        ,
+        \\{"commandLine":{"aliases":{"a\u00a0b":"comments.clear"}}}
+        ,
+        \\{"commandLine":{"aliases":{"a\ufeffb":"comments.clear"}}}
+        ,
+        \\{"commandLine":{"aliases":{"comments.clear":"review.reload"}}}
+        ,
+        \\{"commandLine":{"aliases":{"clear":"missing"}}}
+        ,
+        \\{"commandLine":{"aliases":{"clear":5}}}
+        ,
+        \\{"commandLine":{"aliases":{"clear":"wipe","wipe":"comments.clear"}}}
+        ,
+    }) |input| {
+        const parsed = try parseConfiguration(arena.allocator(), input);
+        try std.testing.expect(parsed == .invalid_schema);
+        try std.testing.expect(std.mem.indexOf(u8, schemaErrorMessage(parsed.invalid_schema), "commandLine") != null);
+    }
+}
+
+test "invalid aliases load defaults with a diagnostic" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const home = try temporary.dir.realPathFileAlloc(std.testing.io, ".", std.testing.allocator);
+    defer std.testing.allocator.free(home);
+    try temporary.dir.createDirPath(std.testing.io, ".config/rvw");
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = relative_configuration_path,
+        .data =
+        \\{"commandLine":{"aliases":{"clear":"unknown"}}}
+        ,
+    });
+    var loaded = try load(std.testing.allocator, std.testing.io, .{ .home = home });
+    defer loaded.deinit();
+    try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, loaded.snapshot.diagnostic.?.code);
+    try std.testing.expectEqual(@as(usize, 0), loaded.snapshot.configuration.object.count());
+    try std.testing.expect(std.mem.endsWith(u8, loaded.snapshot.diagnostic.?.path, relative_configuration_path));
 }

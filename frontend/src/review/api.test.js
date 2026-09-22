@@ -150,6 +150,7 @@ test('application close does not throw when the native host is exiting', async (
 
 const configurationSnapshot = {
   configuration: {
+    commandLine: { aliases: { clear: 'comments.clear' } },
     diff: { relativeLineNumbers: true },
     keybindings: {
       normal: {

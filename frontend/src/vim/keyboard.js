@@ -138,9 +138,19 @@ export function attachVimKeyboardCapture({
     throw new TypeError('Vim keyboard capture requires an event target')
   }
 
+  let uncapturedKey = null
   const onKeyDown = (event) => {
+    if (!event.repeat) uncapturedKey = null
     if (!shouldCapture(event)) {
+      uncapturedKey = event.key
       if (isClipboardShortcut(event)) dispatch({ type: 'reset' })
+      return
+    }
+    // A held key that closed an input must not start repeating workspace
+    // actions against the newly restored focus (notably Enter submissions).
+    if (event.repeat && event.key === uncapturedKey) {
+      event.preventDefault()
+      event.stopPropagation()
       return
     }
     const key = keyboardEventToKey(event)

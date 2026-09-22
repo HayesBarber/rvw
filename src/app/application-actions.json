@@ -1,0 +1,261 @@
+[
+  {
+    "name": "CLOSE_APPLICATION",
+    "id": "application.close",
+    "scope": "global",
+    "group": "application",
+    "description": "Close the application."
+  },
+  {
+    "name": "RELOAD_REVIEW",
+    "id": "review.reload",
+    "scope": "global",
+    "group": "application",
+    "description": "Reload repository files and changes."
+  },
+  {
+    "name": "OPEN_KEYMAP_REFERENCE",
+    "id": "keymap_reference.open",
+    "scope": "global",
+    "group": "application",
+    "description": "Show the effective keyboard bindings."
+  },
+  {
+    "name": "OPEN_COMMAND_LINE",
+    "id": "command_line.open",
+    "scope": "global",
+    "group": "application",
+    "description": "Open the command line to run an application action."
+  },
+  {
+    "name": "CURSOR_UP",
+    "id": "cursor.up",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor up."
+  },
+  {
+    "name": "CURSOR_DOWN",
+    "id": "cursor.down",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor down."
+  },
+  {
+    "name": "CURSOR_PAGE_UP",
+    "id": "cursor.page.up",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor up by half a viewport."
+  },
+  {
+    "name": "CURSOR_PAGE_DOWN",
+    "id": "cursor.page.down",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor down by half a viewport."
+  },
+  {
+    "name": "CURSOR_FIRST",
+    "id": "cursor.first",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor to the first item."
+  },
+  {
+    "name": "CURSOR_LAST",
+    "id": "cursor.last",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Move the active cursor to the last item."
+  },
+  {
+    "name": "CURSOR_CENTER",
+    "id": "cursor.center",
+    "scope": "active_surface",
+    "group": "navigation",
+    "description": "Center the active cursor in its viewport."
+  },
+  {
+    "name": "VISUAL_LINE",
+    "id": "diff.visual_line",
+    "scope": "diff_pane",
+    "group": "navigation",
+    "description": "Select lines in Visual mode."
+  },
+  {
+    "name": "DIFF_SWITCH_SIDE",
+    "id": "diff.side.switch",
+    "scope": "diff_pane",
+    "group": "navigation",
+    "description": "Switch diff side."
+  },
+  {
+    "name": "FILE_TREE_ITEM_ACTIVATE",
+    "id": "file_tree.item.activate",
+    "scope": "file_tree",
+    "group": "file_tree",
+    "description": "Activate the focused file-tree item."
+  },
+  {
+    "name": "TREE_COLLAPSE_OR_PARENT",
+    "id": "tree.collapse_or_parent",
+    "scope": "file_tree",
+    "group": "file_tree",
+    "description": "Collapse the focused tree item or focus its parent."
+  },
+  {
+    "name": "TREE_EXPAND",
+    "id": "tree.expand",
+    "scope": "file_tree",
+    "group": "file_tree",
+    "description": "Expand the focused tree item."
+  },
+  {
+    "name": "TREE_SIZE_INCREASE",
+    "id": "tree.size.increase",
+    "scope": "global",
+    "group": "file_tree",
+    "description": "Widen the file-tree pane."
+  },
+  {
+    "name": "TREE_SIZE_DECREASE",
+    "id": "tree.size.decrease",
+    "scope": "global",
+    "group": "file_tree",
+    "description": "Narrow the file-tree pane."
+  },
+  {
+    "name": "FOCUS_FILE_TREE",
+    "id": "focus.file_tree",
+    "scope": "diff_pane",
+    "group": "application",
+    "description": "Focus the file tree."
+  },
+  {
+    "name": "FOCUS_DIFF_PANE",
+    "id": "focus.diff_pane",
+    "scope": "file_tree",
+    "group": "application",
+    "description": "Focus the diff pane."
+  },
+  {
+    "name": "SHOW_CHANGES",
+    "id": "tree_mode.changes",
+    "scope": "file_tree",
+    "group": "file_tree",
+    "description": "Show changed files in the file tree."
+  },
+  {
+    "name": "SHOW_FILES",
+    "id": "tree_mode.files",
+    "scope": "file_tree",
+    "group": "file_tree",
+    "description": "Show all repository files in the file tree."
+  },
+  {
+    "name": "OPEN_NEXT_FILE",
+    "id": "file.open.next",
+    "scope": "global",
+    "group": "file_tree",
+    "description": "Open the next file in the active file-tree mode."
+  },
+  {
+    "name": "OPEN_PREVIOUS_FILE",
+    "id": "file.open.previous",
+    "scope": "global",
+    "group": "file_tree",
+    "description": "Open the previous file in the active file-tree mode."
+  },
+  {
+    "name": "OPEN_FILE_FINDER",
+    "id": "file_finder.open",
+    "scope": "global",
+    "group": "application",
+    "description": "Open the file finder."
+  },
+  {
+    "name": "OPEN_FILE_FINDER_ALL",
+    "id": "file_finder.open.all",
+    "scope": "global",
+    "group": "application",
+    "description": "Open the file finder including git-ignored files."
+  },
+  {
+    "name": "DIFF_EXPAND_TOGGLE",
+    "id": "diff.expand.toggle",
+    "scope": "diff_pane",
+    "group": "application",
+    "description": "Toggle all unchanged diff regions."
+  },
+  {
+    "name": "DIFF_RELATIVE_LINE_NUMBERS_TOGGLE",
+    "id": "diff.relative_line_numbers.toggle",
+    "scope": "diff_pane",
+    "group": "application",
+    "description": "Toggle relative line numbers in text views."
+  },
+  {
+    "name": "DIFF_WRAP_TOGGLE",
+    "id": "diff.wrap.toggle",
+    "scope": "diff_pane",
+    "group": "application",
+    "description": "Toggle text wrapping in the diff view."
+  },
+  {
+    "name": "COPY_FILE_PATH_RELATIVE",
+    "id": "file.path.copy_relative",
+    "scope": "active_surface",
+    "group": "file",
+    "description": "Copy the active file repository-relative path."
+  },
+  {
+    "name": "COPY_FILE_PATH_ABSOLUTE",
+    "id": "file.path.copy_absolute",
+    "scope": "active_surface",
+    "group": "file",
+    "description": "Copy the active file absolute path."
+  },
+  {
+    "name": "COPY_COMMENTS",
+    "id": "comments.copy",
+    "scope": "global",
+    "group": "review",
+    "description": "Copy all review comments as Markdown."
+  },
+  {
+    "name": "ADD_COMMENT",
+    "id": "comments.add",
+    "scope": "diff_pane",
+    "group": "review",
+    "description": "Add a comment at the active diff cursor."
+  },
+  {
+    "name": "ADD_FILE_COMMENT",
+    "id": "comments.add_file",
+    "scope": "diff_pane",
+    "group": "review",
+    "description": "Add a comment to the open file."
+  },
+  {
+    "name": "EDIT_COMMENT",
+    "id": "comments.edit",
+    "scope": "active_surface",
+    "group": "review",
+    "description": "Edit the comment in the active context."
+  },
+  {
+    "name": "DELETE_COMMENT",
+    "id": "comments.delete",
+    "scope": "active_surface",
+    "group": "review",
+    "description": "Delete the comment in the active context."
+  },
+  {
+    "name": "CLEAR_COMMENTS",
+    "id": "comments.clear",
+    "scope": "global",
+    "group": "review",
+    "description": "Clear all review comments."
+  }
+]

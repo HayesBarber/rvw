@@ -1,5 +1,6 @@
 import { getConfiguration } from '../review/api.js'
 import {
+  applicationActionCatalog,
   DEFAULT_LEADER_KEY,
   compileApplicationKeymap,
   defaultNormalKeymap,
@@ -86,11 +87,27 @@ function configuredCommentSettings(comments) {
   }
 }
 
+export function configuredCommandAliases(commandLine = {}) {
+  if (!isObject(commandLine) || !onlyFields(commandLine, ['aliases'])) {
+    throw new TypeError('User configuration commandLine must be an object containing only aliases')
+  }
+  const aliases = commandLine.aliases === undefined ? {} : commandLine.aliases
+  if (!isObject(aliases)) throw new TypeError('commandLine.aliases must be an object')
+  for (const [name, action] of Object.entries(aliases)) {
+    if (!name || /\s/u.test(name)) throw new TypeError('Command aliases must be non-empty names without whitespace')
+    if (Object.hasOwn(applicationActionCatalog, name)) throw new TypeError(`Command alias shadows an action: ${name}`)
+    if (typeof action !== 'string' || !Object.hasOwn(applicationActionCatalog, action)) {
+      throw new TypeError(`Unknown command alias target: ${String(action)}`)
+    }
+  }
+  return Object.freeze({ ...aliases })
+}
+
 function configuredKeyboardConfiguration(configuration) {
   if (!isObject(configuration)) {
     throw new TypeError('User configuration must be a JSON object')
   }
-  if (!onlyFields(configuration, ['keybindings', 'diff', 'comments'])) {
+  if (!onlyFields(configuration, ['keybindings', 'diff', 'comments', 'commandLine'])) {
     throw new TypeError('User configuration contains an unsupported top-level field')
   }
 
@@ -177,6 +194,7 @@ export function resolveConfiguration(snapshot) {
       leader: keyboard.leader,
       ...diff,
       ...comments,
+      commandAliases: configuredCommandAliases(snapshot.configuration.commandLine),
       diagnostic: null,
     }
   } catch (error) {

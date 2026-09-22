@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { createCommandLine } from '../actions/command-line.js'
+import CommandLine from '../components/CommandLine.jsx'
 import ApplicationFooter from '../components/ApplicationFooter.jsx'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
@@ -44,6 +46,12 @@ export default function App() {
   }, [])
   const vimController = useVimController()
   const vimState = useVimState()
+  const [commandState, setCommandState] = useState({ open: false, error: null })
+  const [commandLine] = useState(() => createCommandLine({
+    getFocus: () => document.activeElement,
+    setMode: (mode) => vimController.dispatch({ type: 'set_mode', mode }),
+    onChange: setCommandState,
+  }))
   const keyboardConfiguration = useConfiguration(vimController)
   const configurationDiagnostic = keyboardConfiguration.diagnostic
   useEffect(() => {
@@ -101,6 +109,7 @@ export default function App() {
   }
   const {
     activateSurface,
+    dispatchApplicationAction,
     addFileComment: handleAddFileComment,
     diffPaneRef,
     fileTreePaneRef,
@@ -116,6 +125,7 @@ export default function App() {
     workspace,
     dispatchWorkspace,
     vimController,
+    commandLine,
     reviewAvailable: Boolean(overview),
     reloadReview: reloadRequest.reload,
     changeTreeMode: handleTreeModeChange,
@@ -251,7 +261,8 @@ export default function App() {
         ref={diffPaneRef}
         className="pane diff-pane"
         onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) {
+          if (!event.currentTarget.contains(event.relatedTarget) &&
+              !event.relatedTarget?.closest('[data-command-line]')) {
             vimController.dispatch({ type: 'set_mode', mode: 'normal' })
           }
         }}
@@ -319,6 +330,14 @@ export default function App() {
         />
       )}
       <ApplicationFooter
+        commandLine={commandState.open && (
+          <CommandLine
+            controller={commandLine}
+            aliases={keyboardConfiguration.commandAliases}
+            dispatch={dispatchApplicationAction}
+            error={commandState.error}
+          />
+        )}
         clearMessage={clearMessage}
         clearStatus={clearRequest.status}
         commentsCount={comments.length}
