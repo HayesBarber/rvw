@@ -125,41 +125,27 @@ Both the native macOS application and the HTTP development server load the same 
 
 ## Command line
 
-Press `:` in Normal mode to focus the footer command input. The colon is a
-prompt, not part of the value. Enter one canonical action identifier from the
-reference above (for example, `comments.clear` or `review.reload`) and press
-Enter. Surrounding whitespace is trimmed; names are case-sensitive exact
-matches. Keyboard bindings and command names use the same scoped dispatcher
-in both native and HTTP modes. The active workspace surface is preserved, so
-surface actions are available only in their usual context.
+Press `:` in Normal mode, enter an action such as `comments.clear`, and press
+Enter. Names are case-sensitive; surrounding whitespace is trimmed. Commands
+use the keyboard dispatcher and active surface.
 
-Aliases are optional and empty by default:
+Aliases default to an empty map:
 
 ```json
 {
   "commandLine": {
-    "aliases": {
-      "clear": "comments.clear",
-      "reload": "review.reload"
-    }
+    "aliases": { "clear": "comments.clear", "reload": "review.reload" }
   }
 }
 ```
 
-Alias names must be non-empty strings without whitespace and cannot shadow
-canonical action identifiers. Targets must be canonical identifiers; multiple
-aliases can target the same action. Invalid aliases use the same configuration
-fallback and footer diagnostics described above. Canonical names remain
-available even when their keyboard bindings are disabled or replaced.
+Alias names must be non-empty, contain no whitespace, and cannot shadow
+canonical actions. Targets must be canonical actions. Invalid aliases use the
+fallback diagnostics above.
 
-Escape cancels; empty Enter closes without an action. Accepted actions close
-the input and use their existing outcome UI. Unknown names and actions that
-are unavailable in the current context keep the input open with an error.
-Closing restores prior focus; actions that explicitly move focus or open an
-editor or overlay retain that behavior. Clicking away cancels the input.
-Workspace shortcuts are suspended while typing. The opening binding can be
-changed through `keybindings.normal["command_line.open"]`; it does not run in
-text editors or blocking overlays.
+Escape, empty Enter, or clicking away cancels. Accepted commands close the
+input; unknown or unavailable commands stay open. Closing restores focus unless
+the action moves it. Configure the opening key with `command_line.open`.
 
-Only one action name is supported: no arguments, ranges, counts, chaining,
-pipelines, history, completion, recursive aliases, JavaScript, or shell commands.
+Only one name is supported: no arguments, ranges, counts, chaining, history,
+completion, JavaScript, or shell execution.

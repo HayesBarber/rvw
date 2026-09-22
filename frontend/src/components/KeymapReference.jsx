@@ -69,7 +69,6 @@ export default function KeymapReference({ keymap, leader, onClose }) {
           <div>
             <h2 id="keymap-reference-title">Keyboard reference</h2>
             <p>Bindings currently in effect. Press j/k to scroll or Esc to close.</p>
-            <p>Use command_line.open to enter any action identifier below, or a configured alias. One name only; no arguments.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close keyboard reference">
             Close

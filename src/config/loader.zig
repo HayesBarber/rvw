@@ -272,8 +272,18 @@ fn containsWhitespace(name: []const u8) bool {
     const view = std.unicode.Utf8View.init(name) catch return true;
     var iterator = view.iterator();
     while (iterator.nextCodepoint()) |point| {
+        if (point <= std.math.maxInt(u8) and std.ascii.isWhitespace(@intCast(point))) return true;
+        // std.ascii covers ASCII only; retain JavaScript's additional Unicode
+        // whitespace so frontend and backend alias validation agree.
         switch (point) {
-            0x09...0x0d, 0x20, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff => return true,
+            '\u{00a0}' => return true, // No-break space
+            '\u{1680}' => return true, // Ogham space mark
+            '\u{2000}'...'\u{200a}' => return true, // En quad through hair space
+            '\u{2028}', '\u{2029}' => return true, // Line and paragraph separators
+            '\u{202f}' => return true, // Narrow no-break space
+            '\u{205f}' => return true, // Medium mathematical space
+            '\u{3000}' => return true, // Ideographic space
+            '\u{feff}' => return true, // Byte-order mark
             else => {},
         }
     }
