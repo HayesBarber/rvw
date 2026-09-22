@@ -141,3 +141,22 @@ test('virtualizer placeholder unmounts do not reset an already positioned file',
   flush()
   assert.equal(container.scrollTop, 1800)
 })
+
+test('search positioning runs after layout and is not reset by subsequent renders', () => {
+  const { position, flush, file } = setup()
+  const { node, container, instance } = file()
+  let calls = 0
+  const target = (rendered, element) => {
+    assert.equal(rendered, instance)
+    assert.equal(element, node)
+    container.scrollTop = 730
+    calls += 1
+  }
+  position.rendered(node, instance, target)
+  assert.equal(calls, 0)
+  flush()
+  assert.equal(container.scrollTop, 730)
+  position.rendered(node, instance, target)
+  flush()
+  assert.equal(calls, 1)
+})

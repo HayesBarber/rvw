@@ -105,6 +105,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.EDIT_COMMENT]: actionBindings(keySequence('e')),
   [ApplicationAction.DELETE_COMMENT]: actionBindings(keySequence('d', 'd')),
   [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
+  [ApplicationAction.OPEN_TEXT_SEARCH]: actionBindings(keySequence(LEADER_KEY, '/')),
+  [ApplicationAction.OPEN_TEXT_SEARCH_ALL]: actionBindings(keySequence(LEADER_KEY, '?')),
 })
 
 export const visualKeymap = Object.freeze({

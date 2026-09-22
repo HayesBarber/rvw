@@ -22,6 +22,7 @@ export const FILE_TREE_WIDTH = Object.freeze({
 
 export const initialWorkspaceState = Object.freeze({
   selectedPath: null,
+  searchTarget: null,
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
   finderOpen: false,
@@ -46,13 +47,20 @@ export function workspaceReducer(state, action) {
       return state.activeSurface === action.surface
         ? state
         : { ...state, activeSurface: action.surface }
+    case 'text_match_opened':
+      return {
+        ...state,
+        selectedPath: action.match.path,
+        searchTarget: action.match,
+        treeMode: TreeMode.FILES,
+        activeSurface: ActiveSurface.DIFF_PANE,
+      }
     case 'file_selected':
-      return state.selectedPath === action.path
-        ? state
-        : { ...state, selectedPath: action.path }
+      return { ...state, selectedPath: action.path, searchTarget: null }
     case 'tree_mode_changed':
       return {
         ...state,
+        searchTarget: null,
         treeMode: action.mode,
         selectedPath: validPath(
           state.selectedPath,
@@ -95,6 +103,7 @@ export function workspaceReducer(state, action) {
     case 'finder_file_opened':
       return {
         ...state,
+        searchTarget: null,
         selectedPath: action.path,
         treeMode: action.changed ? state.treeMode : TreeMode.FILES,
         finderOpen: false,

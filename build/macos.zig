@@ -120,6 +120,11 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
     const staged_app = b.getInstallPath(.prefix, "Rvw.app");
     const prepare_bundle = b.addSystemCommand(&.{ "node", "build/prepare-bundle.mjs" });
     prepare_bundle.addArg(staged_app);
+    if (b.option([]const u8, "ripgrep", "Standalone ripgrep executable to include in the app bundle")) |rg| {
+        const install_rg = b.addInstallFileWithDir(.{ .cwd_relative = rg }, .prefix, "Rvw.app/Contents/MacOS/rg");
+        install_rg.step.dependOn(&prepare_bundle.step);
+        b.getInstallStep().dependOn(&install_rg.step);
+    }
 
     const install_executable = b.addInstallFileWithDir(
         artifacts.executable,

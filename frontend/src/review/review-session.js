@@ -91,11 +91,9 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   const filesModeEntries = useMemo(
     () => {
       const entries = createFilesModeEntries(overview, allFilesRequest.data)
-      return allFilesRequest.status === RequestStatus.SUCCESS
-        ? entries
-        : includeSelectedFile(entries, workspace.selectedPath)
+      return includeSelectedFile(entries, workspace.selectedPath)
     },
-    [allFilesRequest.data, allFilesRequest.status, overview, workspace.selectedPath],
+    [allFilesRequest.data, overview, workspace.selectedPath],
   )
   const notIgnoredFilesEntries = useMemo(
     () => createFilesModeEntries(overview, notIgnoredFilesRequest.data),
@@ -120,8 +118,8 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   const fileRequest = useReviewFile({
     diffId: overview?.id ?? null,
     path: activePath,
-    changed: changedPaths.has(activePath),
-    generation,
+    changed: changedPaths.has(activePath) && !workspace.searchTarget,
+    generation: `${generation}:${workspace.searchTarget?.requestId ?? ''}`,
   })
 
   const handleReloaded = useCallback((result) => {

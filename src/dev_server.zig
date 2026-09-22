@@ -69,6 +69,7 @@ pub fn main(init: std.process.Init) !void {
         configuration.snapshot,
     );
 
+    defer core.search.cancel(init.io);
     try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
 }
 

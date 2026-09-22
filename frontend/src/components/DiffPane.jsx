@@ -22,6 +22,7 @@ const unavailableDescriptions = {
 }
 
 export default function DiffPane({
+  initialLine,
   fileDiff,
   isCursorVisible,
   visualSelectionEnabled,
@@ -47,6 +48,7 @@ export default function DiffPane({
 }) {
   const [expandUnchanged, setExpandUnchanged] = useState(false)
   const cursor = useDiffCursor({
+    initialLine,
     comments,
     fileDiff,
     isCursorVisible,

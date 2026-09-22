@@ -25,6 +25,8 @@ export function useApplicationActions({
   navigateFile,
   openFileFinder,
   openFileFinderAll,
+  openTextSearch,
+  textSearchOpen,
   openKeymapReference,
   commandLine,
   selectFile,
@@ -116,6 +118,8 @@ export function useApplicationActions({
       openFileFinderAll()
       return true
     },
+    [ApplicationAction.OPEN_TEXT_SEARCH]: () => { openTextSearch(false); return true },
+    [ApplicationAction.OPEN_TEXT_SEARCH_ALL]: () => { openTextSearch(true); return true },
     [ApplicationAction.OPEN_KEYMAP_REFERENCE]: () => {
       if (!reviewAvailable) return false
       openKeymapReference()
@@ -131,6 +135,7 @@ export function useApplicationActions({
     navigateFile,
     openFileFinder,
     openFileFinderAll,
+    openTextSearch,
     openKeymapReference,
     reviewAvailable,
     reloadReview,
@@ -140,7 +145,7 @@ export function useApplicationActions({
     getActiveSurface: () => workspace.activeSurface,
     getSurfaceActions: surfaceActions.get,
     getOverlayActions: () => {
-      if (workspace.keymapReferenceOpen) return blockingOverlayActions
+      if (textSearchOpen || workspace.keymapReferenceOpen) return blockingOverlayActions
       return workspace.finderOpen ? finderActionsRef.current : null
     },
     globalActions,
@@ -148,6 +153,7 @@ export function useApplicationActions({
     globalActions,
     surfaceActions,
     workspace.activeSurface,
+    textSearchOpen,
     workspace.finderOpen,
     workspace.keymapReferenceOpen,
   ])

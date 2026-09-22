@@ -32,6 +32,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
+| `text_search.open` | `<leader> /` | Search current file contents respecting ignore rules. |
+| `text_search.open.all` | `<leader> ?` | Search current file contents including ignored files. |
 | `diff.expand.toggle` | `<leader> e` | Expand all unchanged regions in the active diff; repeat to restore collapsed context. |
 | `diff.relative_line_numbers.toggle` | `<leader> n` | Toggle relative line numbers in the active diff or full-file text view. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |
@@ -151,3 +153,38 @@ the action moves it. Configure the opening key with `command_line.open`.
 
 Only one alias name is currently supported. No arguments, ranges, counts, chaining, history,
 completion, JavaScript, or shell execution.
+
+### Codebase text search
+
+`text_search.open` (default `<leader>/`) searches current files under the opened
+root with ripgrep's ignore rules, including `.gitignore`. `text_search.open.all`
+(default `<leader>?`) searches the same root without ignore filtering. Both
+are independent actions in `keybindings.normal`, and can also be run by name from
+the command line. For example:
+
+```json
+{ "keybindings": { "normal": { "text_search.open": [["<leader>", "/"]], "text_search.open.all": [["<leader>", "?"]] } } }
+```
+
+Both modes include hidden text files, skip binary files and `.git` metadata,
+and do not follow symlinks. Searches use literal text and smart case: lowercase
+queries ignore case, while a query containing uppercase letters matches case.
+Search is independent of the active diff or commit range. Arrow keys select a
+matching line, Enter (or a click) opens current file contents at that line, and
+Escape closes the modal. If the file changed in the meantime, its current line
+is shown (clamped to the last line when necessary); deleted or unavailable files
+show the normal file-loading error or explanation.
+
+Searches debounce for 180 ms, cancel superseded jobs, and cap output at 500
+matching lines, 2 MiB, or ten seconds. The modal reports truncation and partial-search errors;
+narrow the query to see additional results. Files that exceed the existing
+512 KiB viewer limit can be found but cannot be displayed.
+
+Ripgrep must be installed for development and installations without a bundled
+`rg` executable. On macOS, `brew install ripgrep` installs it in a location Rvw
+recognizes even when launched from Finder. Rvw checks for a sibling `rg` in the
+app bundle, then standard Homebrew locations, then PATH. Missing ripgrep produces
+an actionable message in the modal. Builds can bundle a standalone executable
+with `zig build -Dripgrep=/absolute/path/to/rg`; use a binary for the target
+architecture with no non-system dynamic library dependencies. Ordinary local
+builds currently use the installed executable.

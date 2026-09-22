@@ -31,6 +31,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
+    defer if (response == .text_search) response.text_search.deinit(std.heap.page_allocator);
     return switch (response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
@@ -45,6 +46,15 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     };
     const operation = jsonString(object.get("type")) orelse return error.MalformedRequest;
 
+    if (std.mem.eql(u8, operation, "text_search")) {
+        const id = jsonString(object.get("id")) orelse return error.MalformedRequest;
+        const query = try optionalJsonString(object.get("query"));
+        if (id.len == 0 or id.len > 128 or (if (query) |q| q.len > 4096 or std.mem.indexOfScalar(u8, q, 0) != null else false)) return error.MalformedRequest;
+        const all: std.json.Value = object.get("all") orelse .{ .bool = false };
+        const cancel: std.json.Value = object.get("cancel") orelse .{ .bool = false };
+        if (all != .bool or cancel != .bool) return error.MalformedRequest;
+        return .{ .text_search = .{ .id = id, .query = query, .all = all.bool, .cancel = cancel.bool } };
+    }
     if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
@@ -275,4 +285,20 @@ test "null relay options are omitted" {
     const event = (try decodeRequestValue(parsed.value)).log;
     try std.testing.expect(event.context == null);
     try std.testing.expect(event.traceId == null);
+}
+
+test "text search start poll and cancellation decode through the native protocol" {
+    for ([_][]const u8{
+        "{\"type\":\"text_search\",\"id\":\"1\",\"query\":\"literal.*\",\"all\":true}",
+        "{\"type\":\"text_search\",\"id\":\"1\"}",
+        "{\"type\":\"text_search\",\"id\":\"1\",\"cancel\":true}",
+    }) |input| {
+        const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        const request = try decodeRequestValue(parsed.value);
+        try std.testing.expectEqualStrings("1", request.text_search.id);
+    }
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, "{\"type\":\"text_search\",\"id\":\"1\",\"all\":\"yes\"}", .{});
+    defer parsed.deinit();
+    try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
 }

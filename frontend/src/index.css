@@ -951,3 +951,7 @@ textarea {
   color: #ff9c99;
   white-space: normal;
 }
+
+.text-search-results li { display: block; }
+.text-search-results code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.text-search-results mark { background: #e6bb5270; color: inherit; }

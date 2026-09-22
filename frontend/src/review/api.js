@@ -270,3 +270,12 @@ export function sendLogEvent(event) {
     }).catch(() => {})
   } catch { /* Ignore serialization failures. */ }
 }
+
+export function textSearch(parameters) {
+  const request = { type: 'text_search', ...parameters }
+  return requestJson('/api/text-search', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}

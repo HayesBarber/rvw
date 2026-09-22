@@ -17,6 +17,7 @@ pub const Core = struct {
     clipboard: output.Clipboard,
     review_generation: usize = 0,
     logger: log.Logger,
+    search: @import("../provider/text_search.zig").Search = .{},
     configuration: config.Snapshot,
 
     pub fn init(
@@ -65,6 +66,7 @@ pub const Core = struct {
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .log => unreachable,
+            .text_search => |q| .{ .text_search = try self.search.request(self.io, std.heap.page_allocator, self.review_provider.repositoryRoot(), q.id, q.query, q.all, q.cancel) },
             .get_configuration => .{ .configuration = self.configuration },
             .reload_review => blk: {
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
@@ -144,6 +146,7 @@ pub const Core = struct {
 fn operationName(request: model.Request) []const u8 {
     return switch (request) {
         .log => "log",
+        .text_search => "text_search",
         .get_configuration => "get_configuration",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",

@@ -34,6 +34,7 @@ const Handler = struct {
             const status = errorStatus(code);
             return self.failure(res, status, code);
         };
+        defer if (response == .text_search) response.text_search.deinit(std.heap.page_allocator);
         setJsonHeaders(res);
         res.body = try json_protocol.encodeResponse(res.arena, response);
     }
@@ -245,6 +246,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.post("/api/log", submitLog, .{});
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
+    router.post("/api/text-search", textSearch, .{});
     router.post("/api/review/reload", reloadReview, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
     router.get("/api/files", getFiles, .{});
@@ -279,5 +281,14 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     defer parsed.deinit();
     const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);
     if (request != .log) return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(res, request);
+}
+
+fn textSearch(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse return handler.failure(res, .bad_request, .malformed_request);
+    const parsed = std.json.parseFromSlice(std.json.Value, req.arena, body, .{}) catch return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);
+    if (request != .text_search) return handler.failure(res, .bad_request, .malformed_request);
     return handler.dispatchRequest(res, request);
 }

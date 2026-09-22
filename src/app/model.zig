@@ -193,6 +193,7 @@ pub const FileDiff = struct {
 
 pub const Request = union(enum) {
     log: logging.Event,
+    text_search: struct { id: []const u8, query: ?[]const u8 = null, all: bool = false, cancel: bool = false },
     get_configuration,
     reload_review,
     get_diff_overview,
@@ -255,6 +256,7 @@ pub const LogResult = struct {
 
 pub const Response = union(enum) {
     log_result: LogResult,
+    text_search: @import("../provider/text_search.zig").Result,
     configuration: config.Snapshot,
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,

@@ -25,6 +25,7 @@ import { normalizeCommentRange } from './comment-annotations.js'
 import { createInitialFilePosition } from './initial-file-position.js'
 
 export default function useDiffCursor({
+  initialLine,
   comments,
   fileDiff,
   isCursorVisible,
@@ -44,6 +45,13 @@ export default function useDiffCursor({
   const pathRef = useRef(fileDiff?.path ?? null)
   const cursorVisibleRef = useRef(isCursorVisible)
   const relativeLineNumbersRef = useRef(relativeLineNumbers)
+  const positionInitialLine = useCallback((instance, node) => {
+    const rows = cursorRowsRef.current
+    const target = reconcileDiffCursor(rows, { lineNumber: initialLine, side: 'additions' })
+    cursorRef.current = target
+    syncDiffCursorPresentation(instance, target, true)
+    scrollDiffCursorIntoView(instance, node, target)
+  }, [initialLine])
   const [initialPosition] = useState(createInitialFilePosition)
 
   const updateActiveCommentId = useCallback((commentId) => {
@@ -135,7 +143,7 @@ export default function useDiffCursor({
       return
     }
 
-    if (!initialPosition.rendered(node, instance)) return
+    if (!initialPosition.rendered(node, instance, initialLine ? positionInitialLine : undefined)) return
     if (cursorInstanceRef.current !== instance) {
       cursorRef.current = null
       cursorInstanceRef.current = instance
@@ -182,7 +190,7 @@ export default function useDiffCursor({
     )
     layoutAnchorRef.current = null
     finishScrollGuard()
-  }, [finishScrollGuard, initialPosition])
+  }, [finishScrollGuard, initialPosition, initialLine, positionInitialLine])
 
   const guardNextLayoutRender = useCallback(() => {
     if (layoutAnchorRef.current) return

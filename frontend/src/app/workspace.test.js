@@ -269,3 +269,13 @@ test('keyboard reference visibility is idempotent and preserves workspace contex
     type: 'keymap_reference_closed',
   }), closed)
 })
+
+test('text matches select current file contents and regular selection restores diff mode', () => {
+  const match = { path: 'new.txt', line: 90, requestId: 'search-1' }
+  const opened = workspaceReducer(initialWorkspaceState, { type: 'text_match_opened', match })
+  assert.equal(opened.selectedPath, 'new.txt')
+  assert.equal(opened.treeMode, TreeMode.FILES)
+  assert.equal(opened.searchTarget, match)
+  const selected = workspaceReducer(opened, { type: 'file_selected', path: 'new.txt' })
+  assert.equal(selected.searchTarget, null)
+})

@@ -257,5 +257,19 @@
     "scope": "global",
     "group": "review",
     "description": "Clear all review comments."
+  },
+  {
+    "name": "OPEN_TEXT_SEARCH",
+    "id": "text_search.open",
+    "scope": "global",
+    "group": "navigation",
+    "description": "Search current file contents respecting ignore rules."
+  },
+  {
+    "name": "OPEN_TEXT_SEARCH_ALL",
+    "id": "text_search.open.all",
+    "scope": "global",
+    "group": "navigation",
+    "description": "Search current file contents including ignored files."
   }
 ]

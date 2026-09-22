@@ -4,6 +4,7 @@ import CommandLine from '../components/CommandLine.jsx'
 import ApplicationFooter from '../components/ApplicationFooter.jsx'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
+import TextSearch from '../components/TextSearch.jsx'
 import {
   FileHeaderActions,
   FilePathCopyControl,
@@ -33,6 +34,8 @@ export default function App() {
     workspaceReducer,
     initialWorkspaceState,
   )
+  const [textSearchMode, setTextSearchMode] = useState(null)
+  const openTextSearch = useCallback((all) => setTextSearchMode(all), [])
   const reviewShellRef = useRef(null)
   const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false)
   const resizeFileTree = useCallback((width) => {
@@ -135,6 +138,8 @@ export default function App() {
     openFileFinder,
     openFileFinderAll,
     openKeymapReference,
+    openTextSearch,
+    textSearchOpen: textSearchMode !== null,
     selectFile,
   })
   const renderFilePathCopyControl = useCallback(() => (
@@ -272,7 +277,8 @@ export default function App() {
       >
         <div className="pane-body">
           <DiffPane
-            key={activePath ?? 'no-file'}
+            key={`${activePath}:${workspace.searchTarget?.requestId ?? ''}`}
+            initialLine={workspace.searchTarget?.line}
             fileDiff={fileDiff}
             filePath={activePath}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
@@ -300,6 +306,13 @@ export default function App() {
         </div>
       </section>
       </main>
+      {textSearchMode !== null && <TextSearch all={textSearchMode}
+        onClose={() => setTextSearchMode(null)} onOpen={(match) => {
+          dispatchWorkspace({ type: 'text_match_opened', match: { ...match, requestId: crypto.randomUUID() } })
+          setTextSearchMode(null)
+          if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
+          requestAnimationFrame(focusDiffPane)
+        }} />}
       {workspace.finderOpen && (
         <FileFinder
           files={workspace.finderMode === FinderMode.ALL

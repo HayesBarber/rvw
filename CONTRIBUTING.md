@@ -9,6 +9,7 @@ This helps avoid wasted effort on changes that may not align with the project's 
 
 - Zig 0.16
 - Node.js and npm
+- Ripgrep (`rg`, or `brew install ripgrep` on macOS) for text search and its tests
 - Xcode command-line tools (`xcrun swiftc`) for the macOS app
 
 Install frontend dependencies before building the app:

@@ -115,6 +115,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
     core.comments.deinit();
+    core.core.search.cancel(core.threaded.io());
     core.review.deinit();
     core.configuration.deinit();
     core.default_logger.deinit();

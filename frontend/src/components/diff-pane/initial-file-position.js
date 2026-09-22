@@ -21,7 +21,7 @@ export function createInitialFilePosition({
     current = null
   }
 
-  function rendered(node, instance) {
+  function rendered(node, instance, onPosition) {
     if (!node.isConnected) return false
     if (current?.instance !== instance) {
       cancel()
@@ -42,7 +42,8 @@ export function createInitialFilePosition({
         pending.positioned = true
         positionedInstances.add(instance)
         pending.disconnect?.()
-        container.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+        if (onPosition) onPosition(instance, node)
+        else container.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       })
     }
     pending.disconnect ??= observeResize(container, schedule)

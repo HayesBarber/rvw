@@ -53,10 +53,10 @@ pub const FilesystemFileProvider = struct {
     fn getFile(context: *anyopaque, io: Io, path: []const u8) !model.FileContent {
         const self: *FilesystemFileProvider = @ptrCast(@alignCast(context));
         if (!validRequestPath(path)) return error.UnknownFile;
-        const known_path = findPath(self.files, path) orelse return error.UnknownFile;
 
         self.mutex.lockUncancelable(io);
         defer self.mutex.unlock(io);
+        const known_path = findPath(self.files, path) orelse try self.arena.allocator().dupe(u8, path);
 
         const metadata = self.root.statFile(io, known_path, .{ .follow_symlinks = false }) catch |err| switch (err) {
             error.FileNotFound, error.NotDir => return error.UnknownFile,
@@ -115,13 +115,14 @@ fn snapshotFiles(
 }
 
 fn validRequestPath(path: []const u8) bool {
-    if (path.len == 0 or !std.unicode.utf8ValidateSlice(path)) return false;
+    if (path.len == 0 or std.mem.indexOfScalar(u8, path, 0) != null or !std.unicode.utf8ValidateSlice(path)) return false;
     if (std.fs.path.isAbsolute(path) or path[0] == '/' or std.mem.indexOfScalar(u8, path, '\\') != null) return false;
 
     var components = std.mem.splitScalar(u8, path, '/');
     while (components.next()) |component| {
         if (component.len == 0 or
             std.mem.eql(u8, component, ".") or
+            std.mem.eql(u8, component, ".git") or
             std.mem.eql(u8, component, "..")) return false;
     }
     return true;
@@ -173,6 +174,11 @@ test "content provider classifies reads and rejects unsafe paths" {
     defer provider.deinit();
     const files = provider.interface();
 
+    try repository.write("created-later.txt", "new after startup\n");
+    try std.testing.expectEqualStrings("new after startup\n", (try files.getFile(std.testing.io, "created-later.txt")).file.file.contents);
+    try repository.temporary.dir.deleteFile(std.testing.io, "created-later.txt");
+    try std.testing.expectError(error.UnknownFile, files.getFile(std.testing.io, "created-later.txt"));
+    try std.testing.expectError(error.UnknownFile, files.getFile(std.testing.io, ".git/config"));
     const text = (try files.getFile(std.testing.io, "nested/text.txt")).file.file;
     try std.testing.expectEqualStrings("nested/text.txt", text.name);
     try std.testing.expectEqualStrings("review me\n", text.contents);
