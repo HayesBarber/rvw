@@ -129,23 +129,25 @@ Press `:` in Normal mode, enter an action such as `comments.clear`, and press
 Enter. Names are case-sensitive; surrounding whitespace is trimmed. Commands
 use the keyboard dispatcher and active surface.
 
-Aliases default to an empty map:
+Aliases can be created for commands:
 
 ```json
 {
   "commandLine": {
-    "aliases": { "clear": "comments.clear", "reload": "review.reload" }
+    "aliases": {
+      "clear": "comments.clear",
+      "reload": "review.reload"
+    }
   }
 }
 ```
 
 Alias names must be non-empty, contain no whitespace, and cannot shadow
-canonical actions. Targets must be canonical actions. Invalid aliases use the
-fallback diagnostics above.
+canonical actions. Targets must be canonical actions.
 
 Escape, empty Enter, or clicking away cancels. Accepted commands close the
 input; unknown or unavailable commands stay open. Closing restores focus unless
 the action moves it. Configure the opening key with `command_line.open`.
 
-Only one name is supported: no arguments, ranges, counts, chaining, history,
+Only one alias name is currently supported. No arguments, ranges, counts, chaining, history,
 completion, JavaScript, or shell execution.
