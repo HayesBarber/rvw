@@ -928,3 +928,26 @@ textarea {
   padding: 0;
   border: 0;
 }
+
+.command-line {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: monospace;
+}
+
+.command-line input {
+  flex: 1;
+  min-width: 80px;
+  border: 0;
+  background: transparent;
+  color: #eee;
+  font: inherit;
+  outline-offset: 2px;
+}
+
+.command-line [role="alert"] {
+  color: #ff9c99;
+  white-space: normal;
+}

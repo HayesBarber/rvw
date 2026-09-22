@@ -219,3 +219,27 @@ test('clipboard shortcuts clear pending Vim input without preventing WebKit beha
   assert.equal(event.preventDefaultCalls, 0)
   assert.equal(event.stopPropagationCalls, 0)
 })
+
+test('a held submission key cannot repeat workspace actions after input focus is restored', () => {
+  let keydown
+  const dispatched = []
+  const dispose = attachVimKeyboardCapture({
+    target: {
+      addEventListener: (_, listener) => { keydown = listener },
+      removeEventListener() {},
+    },
+    dispatch: (input) => { dispatched.push(input); return { handled: true } },
+  })
+  let prevented = 0
+  const event = {
+    key: 'Enter', target: element('INPUT'), repeat: false,
+    preventDefault: () => prevented++, stopPropagation() {},
+  }
+  keydown(event)
+  keydown({ ...event, repeat: true, target: element('SECTION') })
+  assert.equal(dispatched.length, 0)
+  assert.equal(prevented, 1)
+  keydown({ ...event, target: element('SECTION') })
+  assert.equal(dispatched.length, 1)
+  dispose()
+})

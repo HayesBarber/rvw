@@ -26,6 +26,7 @@ export function useApplicationActions({
   openFileFinder,
   openFileFinderAll,
   openKeymapReference,
+  commandLine,
   selectFile,
 }) {
   const fileTreePaneRef = useRef(null)
@@ -92,6 +93,7 @@ export function useApplicationActions({
   }, [surfaceActions])
 
   const globalActions = useMemo(() => ({
+    [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
     [ApplicationAction.RELOAD_REVIEW]: reloadReview,
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
@@ -123,6 +125,7 @@ export function useApplicationActions({
     [ApplicationAction.CLEAR_COMMENTS]: clearComments,
   }), [
     clearComments,
+    commandLine,
     copyComments,
     dispatchWorkspace,
     navigateFile,
@@ -133,30 +136,31 @@ export function useApplicationActions({
     reloadReview,
   ])
 
-  useEffect(() => {
-    const dispatchApplicationAction = createApplicationDispatcher({
-      getActiveSurface: () => workspace.activeSurface,
-      getSurfaceActions: surfaceActions.get,
-      getOverlayActions: () => {
-        if (workspace.keymapReferenceOpen) return blockingOverlayActions
-        return workspace.finderOpen ? finderActionsRef.current : null
-      },
-      globalActions,
-    })
-    return vimController.subscribeCommands((command) => {
-      if (command.command !== APPLICATION_DISPATCH_COMMAND) return false
-      return dispatchApplicationAction(command.args.actions, command.count)
-    })
-  }, [
+  const dispatchApplicationAction = useMemo(() => createApplicationDispatcher({
+    getActiveSurface: () => workspace.activeSurface,
+    getSurfaceActions: surfaceActions.get,
+    getOverlayActions: () => {
+      if (workspace.keymapReferenceOpen) return blockingOverlayActions
+      return workspace.finderOpen ? finderActionsRef.current : null
+    },
+    globalActions,
+  }), [
     globalActions,
     surfaceActions,
-    vimController,
     workspace.activeSurface,
     workspace.finderOpen,
     workspace.keymapReferenceOpen,
   ])
 
+  useEffect(() => {
+    return vimController.subscribeCommands((command) => {
+      if (command.command !== APPLICATION_DISPATCH_COMMAND) return false
+      return dispatchApplicationAction(command.args.actions, command.count)
+    })
+  }, [dispatchApplicationAction, vimController])
+
   return {
+    dispatchApplicationAction,
     activateSurface,
     addFileComment,
     diffPaneRef,

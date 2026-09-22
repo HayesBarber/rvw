@@ -5,10 +5,11 @@ import { RequestStatus } from '../review/request-state.js'
 
 function diagnosticText(diagnostic) {
   if (!diagnostic) return null
-  return `Keyboard configuration: ${diagnostic.message}. Fix ${diagnostic.path}, then restart rvw. The current keymap remains active.`
+  return `Configuration: ${diagnostic.message}. Fix ${diagnostic.path}, then restart rvw. The current configuration remains active.`
 }
 
 export default function ApplicationFooter({
+  commandLine,
   clearMessage,
   clearStatus,
   commentsCount = 0,
@@ -31,6 +32,7 @@ export default function ApplicationFooter({
 
   return (
     <footer className="application-footer">
+      {commandLine}
       <span className="footer-left">
         <span className="keyboard-input-status" aria-live="polite">
           <strong>{vimState.mode.toUpperCase()}</strong>

@@ -14,6 +14,7 @@ import {
 
 export function useConfiguration(vimController) {
   const [state, setState] = useState({
+    commandAliases: Object.freeze({}),
     commentTypes: DEFAULT_COMMENT_TYPES,
     defaultCommentType: DEFAULT_COMMENT_TYPE,
     diagnostic: null,
@@ -32,6 +33,7 @@ export function useConfiguration(vimController) {
         vimController.setBindings(configuration.bindings)
       }
       setState((current) => ({
+        commandAliases: configuration.commandAliases ?? current.commandAliases,
         commentTypes: configuration.commentTypes ?? current.commentTypes,
         defaultCommentType: configuration.defaultCommentType ?? null,
         diagnostic: configuration.diagnostic,
