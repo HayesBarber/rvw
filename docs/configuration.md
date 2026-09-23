@@ -32,6 +32,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
+| `codebase_search.open` | `<leader> /` | Codebase text search across the opened directory, including unchanged files, with ignore rules applied. |
+| `codebase_search.open.all` | `<leader> ?` | Codebase text search across the opened directory, including unchanged and ignored files. |
 | `diff.expand.toggle` | `<leader> e` | Expand all unchanged regions in the active diff; repeat to restore collapsed context. |
 | `diff.relative_line_numbers.toggle` | `<leader> n` | Toggle relative line numbers in the active diff or full-file text view. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |

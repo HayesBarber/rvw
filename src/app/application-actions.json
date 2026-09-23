@@ -182,6 +182,20 @@
     "description": "Open the file finder including git-ignored files."
   },
   {
+    "name": "OPEN_CODEBASE_SEARCH",
+    "id": "codebase_search.open",
+    "scope": "global",
+    "group": "application",
+    "description": "Codebase text search with ignore rules."
+  },
+  {
+    "name": "OPEN_CODEBASE_SEARCH_ALL",
+    "id": "codebase_search.open.all",
+    "scope": "global",
+    "group": "application",
+    "description": "Codebase text search including ignored files."
+  },
+  {
     "name": "DIFF_EXPAND_TOGGLE",
     "id": "diff.expand.toggle",
     "scope": "diff_pane",

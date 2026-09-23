@@ -94,6 +94,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.OPEN_FILE_FINDER_ALL]: actionBindings(
     keySequence(LEADER_KEY, 'F'),
   ),
+  [ApplicationAction.OPEN_CODEBASE_SEARCH]: actionBindings(keySequence(LEADER_KEY, '/')),
+  [ApplicationAction.OPEN_CODEBASE_SEARCH_ALL]: actionBindings(keySequence(LEADER_KEY, '?')),
   [ApplicationAction.DIFF_EXPAND_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'e')),
   [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'n')),
   [ApplicationAction.DIFF_WRAP_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'w')),
