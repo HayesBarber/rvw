@@ -13,6 +13,8 @@ pub const Core = struct {
     allocator: Allocator,
     io: Io,
     review_provider: provider_module.review.ReviewProvider,
+    text_search_ignore_aware_provider: provider_module.text_search.TextSearchProvider,
+    text_search_all_files_provider: provider_module.text_search.TextSearchProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
     review_generation: usize = 0,
@@ -23,6 +25,8 @@ pub const Core = struct {
         allocator: Allocator,
         io: Io,
         review_provider: provider_module.review.ReviewProvider,
+        text_search_ignore_aware_provider: provider_module.text_search.TextSearchProvider,
+        text_search_all_files_provider: provider_module.text_search.TextSearchProvider,
         comment_provider: provider_module.comment.CommentProvider,
         clipboard: output.Clipboard,
         logger: log.Logger,
@@ -32,6 +36,8 @@ pub const Core = struct {
             .allocator = allocator,
             .io = io,
             .review_provider = review_provider,
+            .text_search_ignore_aware_provider = text_search_ignore_aware_provider,
+            .text_search_all_files_provider = text_search_all_files_provider,
             .comment_provider = comment_provider,
             .clipboard = clipboard,
             .logger = logger,
@@ -74,6 +80,13 @@ pub const Core = struct {
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
             .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
             .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
+            .search_text => |details| blk: {
+                const search_provider = switch (details.mode) {
+                    .@"ignore-aware" => self.text_search_ignore_aware_provider,
+                    .@"all-files" => self.text_search_all_files_provider,
+                };
+                break :blk .{ .text_search = try search_provider.search(self.io, self.review_provider.repositoryRoot(), details.query) };
+            },
             .get_file => |details| .{ .file = .{
                 .path = details.path,
                 .status = .unchanged,
@@ -149,6 +162,7 @@ fn operationName(request: model.Request) []const u8 {
         .get_diff_overview => "get_diff_overview",
         .get_files => "get_files",
         .get_files_not_ignored => "get_files_not_ignored",
+        .search_text => "search_text",
         .get_file => "get_file",
         .get_file_diff => "get_file_diff",
         .get_comments => "get_comments",
@@ -302,7 +316,7 @@ test "request failure logging records only operation and error code" {
     try std.testing.expectEqualStrings("AccessDenied", recorder.error_code.?);
 }
 
-test "core routes file listing variants through their tree providers" {
+test "core routes file listings and text search through their providers" {
     const ReviewStub = struct {
         all_paths: []const []const u8,
         visible_paths: []const []const u8,
@@ -350,10 +364,14 @@ test "core routes file listing variants through their tree providers" {
     };
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         review.interface(),
+        search_ignore_aware_stub.interface(),
+        search_all_files_stub.interface(),
         comments.interface(),
         .{ .context = &all_context, .vtable = &noop_clipboard_vtable },
         .{
@@ -363,6 +381,44 @@ test "core routes file listing variants through their tree providers" {
         },
         .{ .configuration = .{ .object = .empty }, .diagnostic = null },
     );
+
+    const protocol = @import("json_protocol.zig");
+    for (std.enums.values(model.TextSearchMode)) |mode| {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "search_text", .query = "needle", .mode = mode }, .{});
+        defer std.testing.allocator.free(input);
+        const response = try protocol.dispatchJson(std.testing.allocator, core.dispatcher(), input);
+        defer std.testing.allocator.free(response);
+        try std.testing.expectEqualStrings(
+            \\{"ok":true,"data":{"matches":[],"truncated":false}}
+        , response);
+        const empty = (try core.dispatch(.{ .search_text = .{ .query = "", .mode = mode } })).text_search;
+        try std.testing.expectEqual(@as(usize, 0), empty.matches.len);
+        try std.testing.expect(!empty.truncated);
+        try std.testing.expectError(error.InvalidSearchQuery, core.dispatch(.{ .search_text = .{ .query = "a\nb", .mode = mode } }));
+    }
+
+    const RecordingSearch = struct {
+        calls: usize = 0,
+        fn search(ptr: *anyopaque, _: Io, directory: []const u8, query: []const u8) !model.TextSearchResult {
+            const self: *@This() = @ptrCast(@alignCast(ptr));
+            try std.testing.expectEqualStrings("/repository", directory);
+            try std.testing.expectEqualStrings("😀", query);
+            self.calls += 1;
+            return .{ .matches = &.{.{ .path = "unchanged.txt", .lineNumber = 2, .lineText = "a😀", .spans = &.{.{ .start = 1, .end = 3 }} }}, .truncated = true };
+        }
+    };
+    var ignore_aware_recording: RecordingSearch = .{};
+    var all_files_recording: RecordingSearch = .{};
+    core.text_search_ignore_aware_provider = .{ .context = &ignore_aware_recording, .vtable = &.{ .search = RecordingSearch.search } };
+    core.text_search_all_files_provider = .{ .context = &all_files_recording, .vtable = &.{ .search = RecordingSearch.search } };
+    for (std.enums.values(model.TextSearchMode)) |mode| {
+        const result = (try core.dispatch(.{ .search_text = .{ .query = "😀", .mode = mode } })).text_search;
+        try std.testing.expectEqual(@as(usize, 1), ignore_aware_recording.calls);
+        try std.testing.expectEqual(@as(usize, if (mode == .@"all-files") 1 else 0), all_files_recording.calls);
+        try std.testing.expect(result.truncated);
+        try std.testing.expectEqualStrings("unchanged.txt", result.matches[0].path);
+        try std.testing.expectEqual(@as(usize, 2), result.matches[0].lineNumber);
+    }
 
     const all_files = (try core.dispatch(.get_files)).files;
     try std.testing.expectEqual(@as(usize, 2), all_files.len);
@@ -444,10 +500,14 @@ test "core reload replaces the review snapshot without touching comments and pre
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
     var context: u8 = 0;
+    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &review, .vtable = &ReviewStub.vtable },
+        search_ignore_aware_stub.interface(),
+        search_all_files_stub.interface(),
         comments.interface(),
         .{ .context = &context, .vtable = &noop_clipboard_vtable },
         .{
@@ -531,10 +591,14 @@ test "core edits and deletes only the requested comment with useful errors" {
     var context: u8 = 0;
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &context, .vtable = &TestDependencies.review_vtable },
+        search_ignore_aware_stub.interface(),
+        search_all_files_stub.interface(),
         comments.interface(),
         .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
         .{
@@ -654,10 +718,14 @@ test "core copies validated file paths exactly without accessing the file" {
     var dependencies: TestDependencies = .{};
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
+        search_ignore_aware_stub.interface(),
+        search_all_files_stub.interface(),
         comments.interface(),
         .{ .context = &dependencies, .vtable = &TestDependencies.clipboard_vtable },
         .{

@@ -270,3 +270,30 @@ export function sendLogEvent(event) {
     }).catch(() => {})
   } catch { /* Ignore serialization failures. */ }
 }
+
+/**
+ * @typedef {'ignore-aware' | 'all-files'} TextSearchMode
+ * @typedef {{ start: number, end: number }} TextSearchSpan
+ * @typedef {Object} TextSearchMatch
+ * @property {string} path Canonical path relative to the opened review directory.
+ * @property {number} lineNumber One-based working-tree line number.
+ * @property {string} lineText Line text without its LF or CRLF terminator.
+ * @property {TextSearchSpan[]} spans Zero-based UTF-16 offsets; end is exclusive.
+ * @typedef {{ matches: TextSearchMatch[], truncated: boolean }} TextSearchResult
+ */
+
+/**
+ * Searches the opened review directory for a case-sensitive literal query.
+ * The current stubs return no matches for valid queries in either mode.
+ * @param {string} query A single line, without NUL characters.
+ * @param {TextSearchMode} mode
+ * @returns {Promise<TextSearchResult>}
+ */
+export async function searchText(query, mode) {
+  const request = { type: 'search_text', query, mode }
+  return requestJson('/api/search/text', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}

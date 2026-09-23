@@ -11,6 +11,8 @@ const RvwCore = struct {
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
     configuration: rvw.config.Loaded,
+    search_ignore_aware_stub: rvw.provider.text_search.stub.StubProvider,
+    search_all_files_stub: rvw.provider.text_search.stub.StubProvider,
     core: rvw.core.Core,
 };
 
@@ -80,10 +82,14 @@ pub export fn rvw_core_create(
     };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
+    handle.search_ignore_aware_stub = .{};
+    handle.search_all_files_stub = .{};
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),
         handle.review.interface(),
+        handle.search_ignore_aware_stub.interface(),
+        handle.search_all_files_stub.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
         handle.logger,
