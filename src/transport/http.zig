@@ -60,7 +60,6 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .invalid_file_path,
         .invalid_search_query,
         => .bad_request,
-        .search_not_implemented => .not_implemented,
         .search_unavailable => .service_unavailable,
         else => .internal_server_error,
     };
@@ -300,12 +299,12 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     return handler.dispatchRequest(res, request);
 }
 
-test "HTTP text search shares native decoding and stub errors" {
+test "HTTP text search shares native decoding and empty stub results" {
     const StubDispatcher = struct {
         provider: @import("../provider/text_search/stub.zig").StubProvider = .{},
         fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
             const self: *@This() = @ptrCast(@alignCast(context));
-            return .{ .text_search = try self.provider.interface().search(std.testing.io, "/does-not-exist", request.search_text) };
+            return .{ .text_search = try self.provider.interface().search(std.testing.io, "/does-not-exist", request.search_text.query) };
         }
     };
     var stub: StubDispatcher = .{};
@@ -315,10 +314,10 @@ test "HTTP text search shares native decoding and stub errors" {
         defer ht.deinit();
         ht.json(.{ .type = "search_text", .query = "雪", .mode = mode });
         try searchText(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(.not_implemented);
+        try ht.expectStatusCode(.ok);
         try ht.expectHeader("content-type", "application/json; charset=utf-8");
         try ht.expectBody(
-            \\{"error":{"code":"search_not_implemented","message":"Codebase text search is not implemented yet"}}
+            \\{"matches":[],"truncated":false}
         );
 
         var empty = httpz.testing.init(.{});

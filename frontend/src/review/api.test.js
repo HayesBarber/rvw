@@ -390,14 +390,14 @@ for (const mode of ['ignore-aware', 'all-files']) {
       const match = response.matches[0]
       assert.equal(match.lineText.slice(match.spans[0].start, match.spans[0].end), request.query)
       assert.deepEqual(response, result)
-      globalThis.fetch = async () => ({ ok: false, status: 501,
-        json: async () => ({ error: { code: 'search_not_implemented', message: 'Codebase text search is not implemented yet' } }),
+      globalThis.fetch = async () => ({ ok: false, status: 503,
+        json: async () => ({ error: { code: 'search_unavailable', message: 'Search is unavailable' } }),
       })
-      await assert.rejects(searchText(request.query, mode), /not implemented yet/)
+      await assert.rejects(searchText(request.query, mode), /Search is unavailable/)
       globalThis.window = { webkit: { messageHandlers: { native: {
-        postMessage: async () => { throw new Error('Codebase text search is not implemented yet') },
+        postMessage: async () => { throw new Error('Search is unavailable') },
       } } } }
-      await assert.rejects(searchText(request.query, mode), /not implemented yet/)
+      await assert.rejects(searchText(request.query, mode), /Search is unavailable/)
     } finally {
       globalThis.fetch = originalFetch
       delete globalThis.window

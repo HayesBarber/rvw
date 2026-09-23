@@ -8,21 +8,20 @@ pub const StubProvider = struct {
         return .{ .context = self, .vtable = &.{ .search = search } };
     }
 
-    fn search(_: *anyopaque, _: std.Io, _: []const u8, _: model.TextSearchRequest) !model.TextSearchResult {
-        return error.SearchNotImplemented;
+    fn search(_: *anyopaque, _: std.Io, _: []const u8, _: []const u8) !model.TextSearchResult {
+        return .{ .matches = &.{}, .truncated = false };
     }
 };
 
-test "both search modes have deterministic stubs without filesystem access" {
+test "stub returns empty results without filesystem access" {
     var stub: StubProvider = .{};
-    for (std.enums.values(model.TextSearchMode)) |mode| {
-        const provider = stub.interface();
-        try std.testing.expectError(error.SearchNotImplemented, provider.search(std.testing.io, "/does-not-exist", .{ .query = "雪", .mode = mode }));
-        const empty = try provider.search(std.testing.io, "/does-not-exist", .{ .query = "", .mode = mode });
-        try std.testing.expectEqual(@as(usize, 0), empty.matches.len);
-        try std.testing.expect(!empty.truncated);
-        for ([_][]const u8{ "a\nb", "a\rb", "a\x00b", "\xff" }) |invalid| {
-            try std.testing.expectError(error.InvalidSearchQuery, provider.search(std.testing.io, "/does-not-exist", .{ .query = invalid, .mode = mode }));
-        }
+    const provider = stub.interface();
+    for ([_][]const u8{ "雪", "" }) |query| {
+        const result = try provider.search(std.testing.io, "/does-not-exist", query);
+        try std.testing.expectEqual(@as(usize, 0), result.matches.len);
+        try std.testing.expect(!result.truncated);
+    }
+    for ([_][]const u8{ "a\nb", "a\rb", "a\x00b", "\xff" }) |invalid| {
+        try std.testing.expectError(error.InvalidSearchQuery, provider.search(std.testing.io, "/does-not-exist", invalid));
     }
 }

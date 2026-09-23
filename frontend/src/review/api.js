@@ -284,7 +284,7 @@ export function sendLogEvent(event) {
 
 /**
  * Searches the opened review directory for a case-sensitive literal query.
- * Empty queries return no matches. The current stub rejects nonempty queries.
+ * The current stubs return no matches for valid queries in either mode.
  * @param {string} query A single line, without NUL characters.
  * @param {TextSearchMode} mode
  * @returns {Promise<TextSearchResult>}

@@ -74,6 +74,3 @@ Keep changes at the appropriate boundary: define new user operations in
 behind a provider interface, and place UI state or rendering in the frontend.
 Include focused tests alongside the code you change, then run the relevant
 commands above before opening a pull request.
-
-The [text-search contract](docs/text-search.md) defines search requests, results,
-provider ownership, and native/HTTP behavior.
