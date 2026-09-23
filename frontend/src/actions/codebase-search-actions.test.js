@@ -2,25 +2,28 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ApplicationAction, applicationActionCatalog } from './application-actions.js'
 import { createApplicationDispatcher } from './application-dispatch.js'
-import { codebaseSearchActions, openCodebaseSearch, openCodebaseSearchAll } from './codebase-search-actions.js'
+import { openCodebaseSearch, openCodebaseSearchAll } from './codebase-search-actions.js'
 import { resolveConfiguration } from '../app/configuration.js'
 import { VimController } from '../vim/machine.js'
 
 const search = ApplicationAction.OPEN_CODEBASE_SEARCH
 const searchAll = ApplicationAction.OPEN_CODEBASE_SEARCH_ALL
 
-test('both codebase search modes are global and unbound by default', () => {
+test('both codebase search modes are global with distinct default bindings', () => {
   assert.equal(search, 'codebase_search.open')
   assert.equal(searchAll, 'codebase_search.open.all')
   const result = resolveConfiguration({ configuration: {} })
   assert.equal(result.diagnostic, null)
-  for (const action of [search, searchAll]) {
+  for (const [action, key] of [[search, '/'], [searchAll, '?']]) {
     assert.equal(applicationActionCatalog[action].scope, 'global')
-    assert.deepEqual(result.keymap[action], [])
+    assert.deepEqual(result.keymap[action], [['<leader>', key]])
+    const controller = new VimController({ bindings: result.bindings })
+    assert.equal(controller.dispatch({ type: 'key', key: '<Space>' }).command, null)
+    assert.deepEqual(controller.dispatch({ type: 'key', key }).command.args.actions, [action])
   }
 })
 
-test('configured keys dispatch each mode to its separate placeholder on either surface', (t) => {
+test('configured keys dispatch each mode to its separate handler on either surface', (t) => {
   const result = resolveConfiguration({ configuration: {
     keybindings: { leader: ',', normal: {
       [search]: [['<leader>', 'g']],
@@ -28,10 +31,8 @@ test('configured keys dispatch each mode to its separate placeholder on either s
     } },
   } })
   assert.equal(result.diagnostic, null)
-  assert.equal(codebaseSearchActions[search], openCodebaseSearch)
-  assert.equal(codebaseSearchActions[searchAll], openCodebaseSearchAll)
-  const ignoreAware = t.mock.fn(codebaseSearchActions[search])
-  const allFiles = t.mock.fn(codebaseSearchActions[searchAll])
+  const ignoreAware = t.mock.fn(openCodebaseSearch)
+  const allFiles = t.mock.fn(openCodebaseSearchAll)
   for (const surface of ['file_tree', 'diff_pane']) {
     const dispatch = createApplicationDispatcher({
       getActiveSurface: () => surface,
