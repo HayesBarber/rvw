@@ -59,10 +59,12 @@ pub fn main(init: std.process.Init) !void {
         .home = init.environ_map.get("HOME"),
     });
     defer configuration.deinit();
+    var search_stub: rvw.provider.text_search.stub.StubProvider = .{};
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,
         review.interface(),
+        search_stub.interface(),
         comments.interface(),
         clipboard.interface(),
         logger,

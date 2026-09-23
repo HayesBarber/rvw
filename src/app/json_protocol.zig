@@ -51,6 +51,12 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
     if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
+    if (std.mem.eql(u8, operation, "search_text")) {
+        const query = jsonString(object.get("query")) orelse return error.MalformedRequest;
+        const mode_value = jsonString(object.get("mode")) orelse return error.MalformedRequest;
+        const mode = std.meta.stringToEnum(model.TextSearchMode, mode_value) orelse return error.MalformedRequest;
+        return .{ .search_text = .{ .query = query, .mode = mode } };
+    }
     if (std.mem.eql(u8, operation, "get_file")) {
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
         if (path.len == 0) return error.MalformedRequest;
@@ -275,4 +281,44 @@ test "null relay options are omitted" {
     const event = (try decodeRequestValue(parsed.value)).log;
     try std.testing.expect(event.context == null);
     try std.testing.expect(event.traceId == null);
+}
+
+test "text search parses both modes and requires query and mode strings" {
+    for (std.enums.values(model.TextSearchMode)) |mode| {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "search_text", .query = "雪😀", .mode = mode }, .{});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        const request = (try decodeRequestValue(parsed.value)).search_text;
+        try std.testing.expectEqual(mode, request.mode);
+        try std.testing.expectEqualStrings("雪😀", request.query);
+    }
+    for ([_][]const u8{
+        \\{"type":"search_text","mode":"ignore-aware"}
+        ,
+        \\{"type":"search_text","query":"x"}
+        ,
+        \\{"type":"search_text","query":null,"mode":"all-files"}
+        ,
+        \\{"type":"search_text","query":"x","mode":"unknown"}
+        ,
+        \\{"type":"search_text","query":"x","mode":false}
+        ,
+    }) |input| {
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
+    }
+}
+
+test "text search serializes navigation metadata UTF-16 spans and truncation" {
+    const response: model.Response = .{ .text_search = .{
+        .matches = &.{.{ .path = "src/雪.txt", .lineNumber = 12, .lineText = "a😀é", .spans = &.{.{ .start = 1, .end = 3 }} }},
+        .truncated = true,
+    } };
+    const encoded = try encodeResponse(std.testing.allocator, response);
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings(
+        \\{"matches":[{"path":"src/雪.txt","lineNumber":12,"lineText":"a😀é","spans":[{"start":1,"end":3}]}],"truncated":true}
+    , encoded);
 }

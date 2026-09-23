@@ -10,6 +10,7 @@ import {
   getConfiguration,
   getFilesNotIgnored,
   reloadReview,
+  searchText,
 } from './api.js'
 
 test('review reload uses equivalent native and HTTP requests', async () => {
@@ -362,3 +363,44 @@ test('range comments preserve normalized old-side coordinates across native and 
     delete globalThis.window
   }
 })
+
+for (const mode of ['ignore-aware', 'all-files']) {
+  test(`text search preserves ${mode} requests and Unicode results on both transports`, async () => {
+    const request = { type: 'search_text', query: '😀', mode }
+    const result = { matches: [{ path: 'src/雪.txt', lineNumber: 12,
+      lineText: 'a😀é', spans: [{ start: 1, end: 3 }] }], truncated: true }
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.window = { webkit: { messageHandlers: { native: {
+        postMessage(actual) {
+          assert.deepEqual(actual, request)
+          return Promise.resolve(result)
+        },
+      } } } }
+      assert.deepEqual(await searchText(request.query, mode), result)
+      globalThis.window = {}
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/api/search/text')
+        assert.equal(options.method, 'POST')
+        assert.equal(options.headers['Content-Type'], 'application/json')
+        assert.deepEqual(JSON.parse(options.body), request)
+        return { ok: true, json: async () => result }
+      }
+      const response = await searchText(request.query, mode)
+      const match = response.matches[0]
+      assert.equal(match.lineText.slice(match.spans[0].start, match.spans[0].end), request.query)
+      assert.deepEqual(response, result)
+      globalThis.fetch = async () => ({ ok: false, status: 501,
+        json: async () => ({ error: { code: 'search_not_implemented', message: 'Codebase text search is not implemented yet' } }),
+      })
+      await assert.rejects(searchText(request.query, mode), /not implemented yet/)
+      globalThis.window = { webkit: { messageHandlers: { native: {
+        postMessage: async () => { throw new Error('Codebase text search is not implemented yet') },
+      } } } }
+      await assert.rejects(searchText(request.query, mode), /not implemented yet/)
+    } finally {
+      globalThis.fetch = originalFetch
+      delete globalThis.window
+    }
+  })
+}

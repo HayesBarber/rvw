@@ -191,6 +191,39 @@ pub const FileDiff = struct {
     content: FileContent,
 };
 
+/// Wire values also name the two provider modes.
+pub const TextSearchMode = enum { @"ignore-aware", @"all-files" };
+
+/// A case-sensitive literal query. Empty queries succeed with no matches.
+pub const TextSearchRequest = struct {
+    query: []const u8,
+    mode: TextSearchMode,
+};
+
+/// Zero-based UTF-16 code-unit offsets into lineText; end is exclusive.
+/// Boundaries must not split a surrogate pair.
+pub const TextSearchSpan = struct { start: usize, end: usize };
+
+pub const TextSearchMatch = struct {
+    /// Canonical path relative to the opened directory, with '/' separators.
+    path: []const u8,
+    /// One-based line number in the working-tree file.
+    lineNumber: usize,
+    /// Valid UTF-8, without the LF or CRLF line terminator.
+    lineText: []const u8,
+    spans: []const TextSearchSpan,
+};
+
+pub const TextSearchResult = struct {
+    matches: []const TextSearchMatch,
+    /// True if a result or output limit stopped the search. Matches are partial.
+    truncated: bool,
+};
+
+pub fn validTextSearchQuery(query: []const u8) bool {
+    return std.unicode.utf8ValidateSlice(query) and std.mem.indexOfAny(u8, query, "\x00\r\n") == null;
+}
+
 pub const Request = union(enum) {
     log: logging.Event,
     get_configuration,
@@ -198,6 +231,7 @@ pub const Request = union(enum) {
     get_diff_overview,
     get_files,
     get_files_not_ignored,
+    search_text: TextSearchRequest,
     get_file: struct { path: []const u8 },
     get_file_diff: struct {
         diff_id: []const u8,
@@ -259,6 +293,7 @@ pub const Response = union(enum) {
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     files: []const []const u8,
+    text_search: TextSearchResult,
     file: FileDiff,
     file_diff: FileDiff,
     comments: []const Comment,
@@ -278,6 +313,10 @@ pub const AppError = error{
     NoComments,
     InvalidFilePath,
     ReloadUnavailable,
+    InvalidSearchQuery,
+    SearchNotImplemented,
+    SearchUnavailable,
+    SearchFailed,
 };
 
 pub const ErrorCode = enum {
@@ -291,6 +330,10 @@ pub const ErrorCode = enum {
     no_comments,
     invalid_file_path,
     reload_unavailable,
+    invalid_search_query,
+    search_not_implemented,
+    search_unavailable,
+    search_failed,
     file_path_clipboard_unavailable,
     clipboard_unavailable,
     internal_error,
@@ -305,6 +348,10 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.UnknownComment => .unknown_comment,
         error.NoComments => .no_comments,
         error.InvalidFilePath => .invalid_file_path,
+        error.InvalidSearchQuery => .invalid_search_query,
+        error.SearchNotImplemented => .search_not_implemented,
+        error.SearchUnavailable => .search_unavailable,
+        error.SearchFailed => .search_failed,
         error.ReloadUnavailable => .reload_unavailable,
         error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
         error.ClipboardCommandFailed,
@@ -327,6 +374,10 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .unknown_comment => "Comment was not found",
         .no_comments => "No review comments to copy",
         .invalid_file_path => "File path is invalid",
+        .invalid_search_query => "Search query must be valid UTF-8 without NUL or line breaks",
+        .search_not_implemented => "Codebase text search is not implemented yet",
+        .search_unavailable => "Search is unavailable; install ripgrep and make its executable available to Rvw",
+        .search_failed => "Search failed; check directory access and try again",
         .reload_unavailable => "Unable to reload the review snapshot",
         .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",

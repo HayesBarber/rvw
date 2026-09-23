@@ -58,7 +58,10 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .invalid_comment_id,
         .no_comments,
         .invalid_file_path,
+        .invalid_search_query,
         => .bad_request,
+        .search_not_implemented => .not_implemented,
+        .search_unavailable => .service_unavailable,
         else => .internal_server_error,
     };
 }
@@ -81,6 +84,20 @@ fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !v
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
         .reload_review => return handler.dispatchRequest(res, request),
+        else => return handler.failure(res, .bad_request, .malformed_request),
+    }
+}
+
+fn searchText(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse
+        return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    switch (request) {
+        .search_text => return handler.dispatchRequest(res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -246,6 +263,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.post("/api/review/reload", reloadReview, .{});
+    router.post("/api/search/text", searchText, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
     router.get("/api/files", getFiles, .{});
     router.get("/api/files/not-ignored", getFilesNotIgnored, .{});
@@ -280,4 +298,50 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);
     if (request != .log) return handler.failure(res, .bad_request, .malformed_request);
     return handler.dispatchRequest(res, request);
+}
+
+test "HTTP text search shares native decoding and stub errors" {
+    const StubDispatcher = struct {
+        provider: @import("../provider/text_search/stub.zig").StubProvider = .{},
+        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            return .{ .text_search = try self.provider.interface().search(std.testing.io, "/does-not-exist", request.search_text) };
+        }
+    };
+    var stub: StubDispatcher = .{};
+    var handler: Handler = .{ .dispatcher = .{ .context = &stub, .dispatchFn = StubDispatcher.dispatch } };
+    for (std.enums.values(model.TextSearchMode)) |mode| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.json(.{ .type = "search_text", .query = "雪", .mode = mode });
+        try searchText(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.not_implemented);
+        try ht.expectHeader("content-type", "application/json; charset=utf-8");
+        try ht.expectBody(
+            \\{"error":{"code":"search_not_implemented","message":"Codebase text search is not implemented yet"}}
+        );
+
+        var empty = httpz.testing.init(.{});
+        defer empty.deinit();
+        empty.json(.{ .type = "search_text", .query = "", .mode = mode });
+        try searchText(&handler, empty.req, empty.res);
+        try empty.expectStatusCode(.ok);
+        try empty.expectBody("{\"matches\":[],\"truncated\":false}");
+    }
+    for ([_][]const u8{
+        "{}",
+        \\{"type":"search_text","query":"x","mode":"invalid"}
+        ,
+        \\{"type":"get_files"}
+        ,
+    }) |input| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.body(input);
+        try searchText(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.bad_request);
+    }
+    try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_search_query));
+    try std.testing.expectEqual(std.http.Status.service_unavailable, errorStatus(.search_unavailable));
+    try std.testing.expectEqual(std.http.Status.internal_server_error, errorStatus(.search_failed));
 }
