@@ -8,6 +8,7 @@ import {
   createApplicationDispatcher,
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
+import { codebaseSearchActions } from '../actions/codebase-search-actions.js'
 import { closeApplication } from '../review/api.js'
 import { ActiveSurface, TreeMode } from './workspace.js'
 
@@ -93,6 +94,7 @@ export function useApplicationActions({
   }, [surfaceActions])
 
   const globalActions = useMemo(() => ({
+    ...codebaseSearchActions,
     [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
     [ApplicationAction.RELOAD_REVIEW]: reloadReview,

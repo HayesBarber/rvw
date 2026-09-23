@@ -417,6 +417,31 @@ test "valid keybinding configuration preserves ordered multi-key sequences" {
     try std.testing.expectEqual(@as(usize, 0), normal.get("comments.copy").?.array.items.len);
 }
 
+test "codebase search modes accept independent bindings and command aliases" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const parsed = try parseConfiguration(arena.allocator(),
+        \\{
+        \\  "keybindings": {"normal": {
+        \\    "codebase_search.open": [["<leader>", "g"]],
+        \\    "codebase_search.open.all": [["<leader>", "G"]]
+        \\  }},
+        \\  "commandLine": {"aliases": {
+        \\    "search": "codebase_search.open",
+        \\    "searchAll": "codebase_search.open.all"
+        \\  }}
+        \\}
+    );
+    try std.testing.expect(parsed == .configuration);
+    const normal = parsed.configuration.object.get("keybindings").?.object.get("normal").?.object;
+    try std.testing.expectEqualStrings("g", normal.get("codebase_search.open").?.array.items[0].array.items[1].string);
+    try std.testing.expectEqualStrings("G", normal.get("codebase_search.open.all").?.array.items[0].array.items[1].string);
+    const disabled = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"normal":{"codebase_search.open":[],"codebase_search.open.all":[]}}}
+    );
+    try std.testing.expect(disabled == .configuration);
+}
+
 test "malformed JSON and invalid keybinding schema are distinct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

@@ -32,6 +32,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
+| `codebase_search.open` | None | Placeholder for codebase text search that respects ignore rules. |
+| `codebase_search.open.all` | None | Placeholder for codebase text search that includes ignored files. |
 | `diff.expand.toggle` | `<leader> e` | Expand all unchanged regions in the active diff; repeat to restore collapsed context. |
 | `diff.relative_line_numbers.toggle` | `<leader> n` | Toggle relative line numbers in the active diff or full-file text view. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |
@@ -106,6 +108,32 @@ This complete example replaces four actions, disables one action, starts with wr
 ```
 
 An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the keyboard binding; the canonical command name remains available. An action absent from the file retains all of its defaults. `<leader>` expands to the `keybindings.leader` value, or `<Space>` when `leader` is omitted.
+
+## Codebase text-search actions
+
+`codebase_search.open` is reserved for text search across files in the opened
+directory, including unchanged files, with ignore rules applied.
+`codebase_search.open.all` has the same codebase scope but includes ignored files.
+These actions are separate from search within the current file.
+
+Both actions currently call separate placeholder handlers. They do not run a
+search, open a dialog, or change the active file. They have no default keys.
+You can run either action by its canonical name in the command line, or assign
+independent bindings in `~/.config/rvw/config.json`:
+
+```json
+{
+  "keybindings": {
+    "normal": {
+      "codebase_search.open": [["<leader>", "g"]],
+      "codebase_search.open.all": [["<leader>", "G"]]
+    }
+  }
+}
+```
+
+Use an empty array to disable either binding. As with other global actions,
+an open overlay blocks these actions.
 
 ## Key notation
 
