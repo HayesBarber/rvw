@@ -31,6 +31,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
+    defer if (response == .text_search) response.text_search.deinit();
     return switch (response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };

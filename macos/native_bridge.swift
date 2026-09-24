@@ -104,10 +104,13 @@ final class NativeBridge: NSObject, WKScriptMessageHandlerWithReply {
         didReceive message: WKScriptMessage,
         replyHandler: @escaping (Any?, String?) -> Void
     ) {
-        do {
-            replyHandler(try router.handle(message.body), nil)
-        } catch {
-            replyHandler(nil, error.localizedDescription)
+        router.handle(message.body) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case let .success(response): replyHandler(response, nil)
+                case let .failure(error): replyHandler(nil, error.localizedDescription)
+                }
+            }
         }
     }
 }

@@ -49,6 +49,9 @@ fn addAppArtifacts(context: Context) AppArtifacts {
             .imports = &.{.{ .name = "rvw", .module = rvw }},
         }),
     });
+    // Swift links this static library without Zig's compiler driver. Include
+    // the runtime helpers used by structured JSON number conversion.
+    library.bundle_compiler_rt = true;
     const cli = b.addExecutable(.{
         .name = "rvw",
         .root_module = b.createModule(.{

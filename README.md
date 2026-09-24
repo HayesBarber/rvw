@@ -42,6 +42,39 @@ usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
        rvw -v | --version
 ```
 
+## Codebase text search prerequisite
+
+The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
+installation. Rvw does not bundle ripgrep. On macOS, install it with:
+
+```bash
+brew install ripgrep
+```
+
+Rvw finds `rg` on its process `PATH`. To select an executable explicitly, set
+`RVW_RIPGREP` to its absolute path before you start Rvw. This also works when the
+GUI does not inherit your shell's `PATH`:
+
+```bash
+RVW_RIPGREP=/opt/homebrew/bin/rg rvw .
+```
+
+The HTTP server uses the same environment variable. The selected file must be
+executable. Search reports an error if Rvw cannot find or run it. Other review
+operations do not require ripgrep.
+
+Search uses case-sensitive literal text and starts at the opened directory.
+Normal mode uses ripgrep's ignore rules and skips hidden files. All-files mode
+uses `--no-ignore --hidden` to include ignored and hidden files. Neither mode
+follows symbolic links. Ripgrep configuration files are disabled for consistent
+API behavior. Files with non-UTF-8 paths or matching lines are omitted.
+
+Each response contains at most 1,000 matching lines. Process output is limited
+to 4 MiB for standard output and 4 KiB for errors. A result or standard-output
+limit sets `truncated` to `true`; only complete match records are returned.
+An error-output limit produces a search error. Narrow the query if results are
+truncated. The search modal is tracked separately in issue #186.
+
 ## Usage
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
@@ -54,4 +87,3 @@ Rvw is built with Vim in mind. See the docs for [configuring the keybindings and
 
 - Rvw was inspired by [tuicr](https://tuicr.dev/)
 - The frontend is centered around [pierre/diffs](https://diffs.com/) and [pierre/trees](https://trees.software/)
-
