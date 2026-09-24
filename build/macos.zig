@@ -9,6 +9,7 @@ pub const Context = struct {
 
 const AppArtifacts = struct {
     executable: std.Build.LazyPath,
+    library: *std.Build.Step.Compile,
     cli: *std.Build.Step.Compile,
     frontend: *std.Build.Step.Run,
 };
@@ -16,6 +17,7 @@ const AppArtifacts = struct {
 pub fn addApp(context: Context) void {
     const artifacts = addAppArtifacts(context);
     addSwiftTests(context);
+    addNativeCoreTests(context, artifacts.library);
     addBundleInstallation(context.b, artifacts);
     addRunStep(context.b);
 }
@@ -89,9 +91,32 @@ fn addAppArtifacts(context: Context) AppArtifacts {
 
     return .{
         .executable = swift.addOutputFileArg("Rvw"),
+        .library = library,
         .cli = cli,
         .frontend = frontend,
     };
+}
+
+fn addNativeCoreTests(context: Context, library: *std.Build.Step.Compile) void {
+    const b = context.b;
+    // Link the same Zig library as the app. Host tests use a simulated core and
+    // cannot detect failures in child processes started from a DispatchQueue.
+    const compile = b.addSystemCommand(&.{ "xcrun", "swiftc", "-I", "include", "-framework", "WebKit" });
+    for ([_][]const u8{
+        "macos/launch_configuration.swift",
+        "macos/native_host.swift",
+        "macos/native_request_router.swift",
+        "macos/native_bridge.swift",
+        "macos/test_support.swift",
+        "macos/native_core_tests.swift",
+    }) |source| compile.addFileArg(b.path(source));
+    compile.addFileArg(library.getEmittedBin());
+    compile.addArg("-o");
+    const executable = compile.addOutputFileArg("NativeCoreTests");
+    const run = b.addSystemCommand(&.{"/usr/bin/env"});
+    run.addFileArg(executable);
+    context.test_step.dependOn(&run.step);
+    b.step("test-native-core", "Test the Swift bridge with the Zig core").dependOn(&run.step);
 }
 
 fn addSwiftTests(context: Context) void {
