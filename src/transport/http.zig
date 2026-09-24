@@ -34,6 +34,7 @@ const Handler = struct {
             const status = errorStatus(code);
             return self.failure(res, status, code);
         };
+        defer if (response == .text_search) response.text_search.deinit();
         setJsonHeaders(res);
         res.body = try json_protocol.encodeResponse(res.arena, response);
     }
@@ -299,33 +300,28 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     return handler.dispatchRequest(res, request);
 }
 
-test "HTTP text search shares native decoding and empty stub results" {
-    const StubDispatcher = struct {
-        provider: @import("../provider/text_search/stub.zig").StubProvider = .{},
-        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            return .{ .text_search = try self.provider.interface().search(std.testing.io, "/does-not-exist", request.search_text.query) };
+test "HTTP text search validates requests and returns empty results without execution" {
+    const SearchDispatcher = struct {
+        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
+            var provider: @import("../provider/text_search/ripgrep.zig").RipgrepProvider = .{
+                .allocator = std.testing.allocator,
+                .mode = request.search_text.mode,
+            };
+            return .{ .text_search = try provider.interface().search(std.testing.io, "/does-not-exist", request.search_text.query) };
         }
     };
-    var stub: StubDispatcher = .{};
-    var handler: Handler = .{ .dispatcher = .{ .context = &stub, .dispatchFn = StubDispatcher.dispatch } };
+    var context: u8 = 0;
+    var handler: Handler = .{ .dispatcher = .{ .context = &context, .dispatchFn = SearchDispatcher.dispatch } };
     for (std.enums.values(model.TextSearchMode)) |mode| {
         var ht = httpz.testing.init(.{});
         defer ht.deinit();
-        ht.json(.{ .type = "search_text", .query = "雪", .mode = mode });
+        ht.json(.{ .type = "search_text", .query = "", .mode = mode });
         try searchText(&handler, ht.req, ht.res);
         try ht.expectStatusCode(.ok);
         try ht.expectHeader("content-type", "application/json; charset=utf-8");
         try ht.expectBody(
             \\{"matches":[],"truncated":false}
         );
-
-        var empty = httpz.testing.init(.{});
-        defer empty.deinit();
-        empty.json(.{ .type = "search_text", .query = "", .mode = mode });
-        try searchText(&handler, empty.req, empty.res);
-        try empty.expectStatusCode(.ok);
-        try empty.expectBody("{\"matches\":[],\"truncated\":false}");
     }
     for ([_][]const u8{
         "{}",
@@ -343,4 +339,54 @@ test "HTTP text search shares native decoding and empty stub results" {
     try std.testing.expectEqual(std.http.Status.bad_request, errorStatus(.invalid_search_query));
     try std.testing.expectEqual(std.http.Status.service_unavailable, errorStatus(.search_unavailable));
     try std.testing.expectEqual(std.http.Status.internal_server_error, errorStatus(.search_failed));
+}
+
+test "real ripgrep results cross HTTP and native JSON transports in both modes" {
+    var repository = try @import("../testing/repository.zig").Repository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.write(".gitignore", "ignored.txt\n");
+    try repository.write("unchanged.txt", "a😀雪\n");
+    try repository.commit("initial");
+    try repository.write("ignored.txt", "a😀雪\n");
+    const SearchDispatcher = struct {
+        root: []const u8,
+        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            var provider: @import("../provider/text_search/ripgrep.zig").RipgrepProvider = .{
+                .allocator = std.testing.allocator,
+                .mode = request.search_text.mode,
+            };
+            return .{ .text_search = try provider.interface().search(std.testing.io, self.root, request.search_text.query) };
+        }
+    };
+    var search: SearchDispatcher = .{ .root = repository.root };
+    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &search, .dispatchFn = SearchDispatcher.dispatch };
+    var handler: Handler = .{ .dispatcher = dispatcher };
+    for (std.enums.values(model.TextSearchMode)) |mode| {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "search_text", .mode = mode, .query = "雪" }, .{});
+        defer std.testing.allocator.free(input);
+        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
+        defer std.testing.allocator.free(native);
+        var envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        defer envelope.deinit();
+        try std.testing.expect(envelope.value.object.get("ok").?.bool);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.body(input);
+        try searchText(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        var http = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, ht.res.body, .{});
+        defer http.deinit();
+        for ([_]std.json.Value{ envelope.value.object.get("data").?, http.value }) |data| {
+            const matches = data.object.get("matches").?.array.items;
+            try std.testing.expectEqual(@as(usize, if (mode == .@"all-files") 2 else 1), matches.len);
+            try std.testing.expectEqual(@as(usize, 2), data.object.count());
+            for (matches) |match| {
+                try std.testing.expectEqualStrings("a😀雪", match.object.get("lineText").?.string);
+                const span = match.object.get("spans").?.array.items[0];
+                try std.testing.expectEqual(@as(i64, 3), span.object.get("start").?.integer);
+                try std.testing.expectEqual(@as(i64, 4), span.object.get("end").?.integer);
+            }
+        }
+    }
 }

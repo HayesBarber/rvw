@@ -153,3 +153,25 @@ the action moves it. Configure the opening key with `command_line.open`.
 
 Only one alias name is currently supported. No arguments, ranges, counts, chaining, history,
 completion, JavaScript, or shell execution.
+
+## Codebase text search
+
+The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
+installation. Rvw does not bundle ripgrep. On macOS, install it with:
+
+```bash
+brew install ripgrep
+```
+
+Rvw finds `rg` on its process `PATH`. To select an executable explicitly, set
+`RVW_RIPGREP` to its absolute path before you start Rvw. This also works when the
+GUI does not inherit your shell's `PATH`:
+
+```bash
+RVW_RIPGREP=/opt/homebrew/bin/rg rvw .
+```
+
+The HTTP server uses the same environment variable. The selected file must be
+executable. Search reports an error if Rvw cannot find or run it. Other review
+operations do not require ripgrep.
+

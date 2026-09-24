@@ -11,8 +11,8 @@ const RvwCore = struct {
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
     configuration: rvw.config.Loaded,
-    search_ignore_aware_stub: rvw.provider.text_search.stub.StubProvider,
-    search_all_files_stub: rvw.provider.text_search.stub.StubProvider,
+    search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider,
+    search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider,
     core: rvw.core.Core,
 };
 
@@ -41,7 +41,10 @@ pub export fn rvw_core_create(
         }
     }
     const handle = allocator.create(RvwCore) catch return null;
-    handle.threaded = .init(allocator, .{});
+    // Threaded defaults to an empty environment. Preserve PATH for rg discovery.
+    handle.threaded = .init(allocator, .{
+        .environ = .{ .block = .{ .slice = std.mem.span(std.c.environ) } },
+    });
     handle.default_logger = rvw.log.DefaultLogger.init(allocator, handle.threaded.io(), .{
         .home = environmentVariable("HOME"),
         .xdg_state_home = environmentVariable("XDG_STATE_HOME"),
@@ -82,14 +85,14 @@ pub export fn rvw_core_create(
     };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.clipboard = .{};
-    handle.search_ignore_aware_stub = .{};
-    handle.search_all_files_stub = .{};
+    handle.search_ignore_aware = .{ .allocator = allocator, .mode = .@"ignore-aware", .executable = environmentVariable("RVW_RIPGREP") };
+    handle.search_all_files = .{ .allocator = allocator, .mode = .@"all-files", .executable = environmentVariable("RVW_RIPGREP") };
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),
         handle.review.interface(),
-        handle.search_ignore_aware_stub.interface(),
-        handle.search_all_files_stub.interface(),
+        handle.search_ignore_aware.interface(),
+        handle.search_all_files.interface(),
         handle.comments.interface(),
         handle.clipboard.interface(),
         handle.logger,

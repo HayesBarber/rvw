@@ -218,6 +218,19 @@ pub const TextSearchResult = struct {
     matches: []const TextSearchMatch,
     /// True if a result or output limit stopped the search. Matches are partial.
     truncated: bool,
+    /// Request-owned storage; null for static or stub results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    pub fn deinit(self: TextSearchResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: TextSearchResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .matches = self.matches, .truncated = self.truncated });
+    }
 };
 
 pub fn validTextSearchQuery(query: []const u8) bool {
@@ -372,7 +385,7 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .no_comments => "No review comments to copy",
         .invalid_file_path => "File path is invalid",
         .invalid_search_query => "Search query must be valid UTF-8 without NUL or line breaks",
-        .search_unavailable => "Search is unavailable; install ripgrep and make its executable available to Rvw",
+        .search_unavailable => "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH",
         .search_failed => "Search failed; check directory access and try again",
         .reload_unavailable => "Unable to reload the review snapshot",
         .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",

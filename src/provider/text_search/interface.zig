@@ -9,6 +9,7 @@ pub const TextSearchProvider = struct {
         search: *const fn (*anyopaque, std.Io, []const u8, []const u8) anyerror!model.TextSearchResult,
     };
 
+    /// The caller must release each result with result.deinit() after use.
     pub fn search(self: TextSearchProvider, io: std.Io, directory: []const u8, query: []const u8) !model.TextSearchResult {
         if (!model.validTextSearchQuery(query)) return error.InvalidSearchQuery;
         if (query.len == 0) return .{ .matches = &.{}, .truncated = false };

@@ -1,4 +1,7 @@
+import Foundation
+
 final class NativeRequestRouter {
+    private let coreQueue = DispatchQueue(label: "rvw.core.requests", qos: .userInitiated)
     private let nativeHost: NativeHost
     private let dispatchCore: (Any) throws -> Any?
 
@@ -7,10 +10,15 @@ final class NativeRequestRouter {
         self.dispatchCore = dispatchCore
     }
 
-    func handle(_ messageBody: Any) throws -> Any? {
+    // Host actions stay on the calling UI thread. Core requests run in order.
+    // The bridge sends each completion back to the main queue.
+    func handle(_ messageBody: Any, completion: @escaping (Result<Any?, Error>) -> Void) {
         if let response = nativeHost.handle(messageBody) {
-            return response
+            completion(.success(response))
+            return
         }
-        return try dispatchCore(messageBody)
+        coreQueue.async {
+            completion(Result { try self.dispatchCore(messageBody) })
+        }
     }
 }

@@ -42,6 +42,8 @@ usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
        rvw -v | --version
 ```
 
+Text search requires [a local ripgrep installation](./docs/configuration.md#codebase-text-search).
+
 ## Usage
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
@@ -54,4 +56,3 @@ Rvw is built with Vim in mind. See the docs for [configuring the keybindings and
 
 - Rvw was inspired by [tuicr](https://tuicr.dev/)
 - The frontend is centered around [pierre/diffs](https://diffs.com/) and [pierre/trees](https://trees.software/)
-
