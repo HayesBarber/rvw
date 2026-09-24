@@ -156,6 +156,21 @@ completion, JavaScript, or shell execution.
 
 ## Codebase text search
 
+Use `<leader> /` or the **Search text** button to open the search modal with
+ignore rules applied. Use `<leader> ?` to include ignored files. The modal also
+has buttons for both modes. Each mode searches the opened directory.
+
+Type a literal query to search. Results show relative paths, line numbers, and
+highlighted matches. Use the arrow keys to select a result. Press `<Esc>` to
+move focus from the input to the results, then use `j`/`k`, counts, or `gg`/`G`.
+You can also click a result. Selection keeps the current file open; navigation
+to the matching line is not yet available. Press `<Esc>` outside the input,
+click **Close**, or click outside the modal to close it.
+
+Search runs after a short delay. A query or mode change clears old results.
+The modal reports search errors and limited results. Use **Retry** after you
+correct an error, or use a more specific query when results are limited.
+
 The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
 installation. Rvw does not bundle ripgrep. On macOS, install it with:
 

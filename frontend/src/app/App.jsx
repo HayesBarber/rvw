@@ -4,6 +4,8 @@ import CommandLine from '../components/CommandLine.jsx'
 import ApplicationFooter from '../components/ApplicationFooter.jsx'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
+import CodebaseSearch from '../components/CodebaseSearch.jsx'
+import { ApplicationAction } from '../actions/application-actions.js'
 import {
   FileHeaderActions,
   FilePathCopyControl,
@@ -205,6 +207,13 @@ export default function App() {
               </button>
             </div>
             <button
+              className="codebase-search-button"
+              type="button"
+              onClick={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
+            >
+              Search text
+            </button>
+            <button
               className="file-finder-button"
               type="button"
               aria-keyshortcuts="Meta+P Control+P"
@@ -277,7 +286,7 @@ export default function App() {
             filePath={activePath}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
-              !workspace.finderOpen && !workspace.keymapReferenceOpen}
+              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen}
             loading={fileLoading}
             error={fileError}
             comments={comments}
@@ -300,6 +309,13 @@ export default function App() {
         </div>
       </section>
       </main>
+      {workspace.searchMode && (
+        <CodebaseSearch
+          initialMode={workspace.searchMode}
+          onClose={() => dispatchWorkspace({ type: 'search_closed' })}
+          registerActionAdapter={registerFinderActions}
+        />
+      )}
       {workspace.finderOpen && (
         <FileFinder
           files={workspace.finderMode === FinderMode.ALL

@@ -951,3 +951,23 @@ textarea {
   color: #ff9c99;
   white-space: normal;
 }
+
+.codebase-search-button,
+.text-search-dialog button {
+  border: 1px solid #414145;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.text-search-dialog { width: min(800px, calc(100vw - 48px)); }
+.text-search-header { display: flex; justify-content: space-between; align-items: center; }
+.text-search-modes { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 14px 12px; }
+.text-search-modes button[aria-pressed='true'] { background: #29375b; border-color: #6686d5; }
+.text-search-location { color: #adadb1; font-size: 0.8rem; margin-bottom: 4px; }
+.text-search-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+.text-search-line mark { background: #d9b85d; color: #141415; border-radius: 2px; }
+.text-search-help { color: #adadb1; font-size: 0.75rem; padding: 8px 14px; margin: 0; border-top: 1px solid #303033; }
+.text-search-results:focus-visible { outline: 2px solid #6686d5; outline-offset: -2px; }
