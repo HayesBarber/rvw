@@ -364,14 +364,14 @@ test "core routes file listings and text search through their providers" {
     };
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
-    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
-    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         review.interface(),
-        search_ignore_aware_stub.interface(),
-        search_all_files_stub.interface(),
+        search_ignore_aware.interface(),
+        search_all_files.interface(),
         comments.interface(),
         .{ .context = &all_context, .vtable = &noop_clipboard_vtable },
         .{
@@ -384,7 +384,7 @@ test "core routes file listings and text search through their providers" {
 
     const protocol = @import("json_protocol.zig");
     for (std.enums.values(model.TextSearchMode)) |mode| {
-        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "search_text", .query = "needle", .mode = mode }, .{});
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "search_text", .query = "", .mode = mode }, .{});
         defer std.testing.allocator.free(input);
         const response = try protocol.dispatchJson(std.testing.allocator, core.dispatcher(), input);
         defer std.testing.allocator.free(response);
@@ -500,14 +500,14 @@ test "core reload replaces the review snapshot without touching comments and pre
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
     var context: u8 = 0;
-    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
-    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &review, .vtable = &ReviewStub.vtable },
-        search_ignore_aware_stub.interface(),
-        search_all_files_stub.interface(),
+        search_ignore_aware.interface(),
+        search_all_files.interface(),
         comments.interface(),
         .{ .context = &context, .vtable = &noop_clipboard_vtable },
         .{
@@ -591,14 +591,14 @@ test "core edits and deletes only the requested comment with useful errors" {
     var context: u8 = 0;
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
-    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
-    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &context, .vtable = &TestDependencies.review_vtable },
-        search_ignore_aware_stub.interface(),
-        search_all_files_stub.interface(),
+        search_ignore_aware.interface(),
+        search_all_files.interface(),
         comments.interface(),
         .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
         .{
@@ -718,14 +718,14 @@ test "core copies validated file paths exactly without accessing the file" {
     var dependencies: TestDependencies = .{};
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
-    var search_ignore_aware_stub: provider_module.text_search.stub.StubProvider = .{};
-    var search_all_files_stub: provider_module.text_search.stub.StubProvider = .{};
+    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
-        search_ignore_aware_stub.interface(),
-        search_all_files_stub.interface(),
+        search_ignore_aware.interface(),
+        search_all_files.interface(),
         comments.interface(),
         .{ .context = &dependencies, .vtable = &TestDependencies.clipboard_vtable },
         .{

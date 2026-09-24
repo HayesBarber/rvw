@@ -237,6 +237,9 @@ test "ripgrep failures map to actionable contract errors" {
     try std.testing.expectError(error.SearchFailed, provider.interface().search(std.testing.io, repository.root, "needle"));
     provider.executable = null;
     try std.testing.expectError(error.SearchFailed, provider.interface().search(std.testing.io, "/rvw-missing-directory", "needle"));
+    for ([_][]const u8{ "a\nb", "a\rb", "a\x00b", "\xff" }) |invalid| {
+        try std.testing.expectError(error.InvalidSearchQuery, provider.interface().search(std.testing.io, repository.root, invalid));
+    }
     // Empty queries do not require an executable.
     provider.executable = "/rvw-missing-rg";
     const blank = try provider.interface().search(std.testing.io, repository.root, "");

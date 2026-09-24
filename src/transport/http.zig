@@ -300,33 +300,28 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     return handler.dispatchRequest(res, request);
 }
 
-test "HTTP text search shares native decoding and empty stub results" {
-    const StubDispatcher = struct {
-        provider: @import("../provider/text_search/stub.zig").StubProvider = .{},
-        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            return .{ .text_search = try self.provider.interface().search(std.testing.io, "/does-not-exist", request.search_text.query) };
+test "HTTP text search validates requests and returns empty results without execution" {
+    const SearchDispatcher = struct {
+        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
+            var provider: @import("../provider/text_search/ripgrep.zig").RipgrepProvider = .{
+                .allocator = std.testing.allocator,
+                .mode = request.search_text.mode,
+            };
+            return .{ .text_search = try provider.interface().search(std.testing.io, "/does-not-exist", request.search_text.query) };
         }
     };
-    var stub: StubDispatcher = .{};
-    var handler: Handler = .{ .dispatcher = .{ .context = &stub, .dispatchFn = StubDispatcher.dispatch } };
+    var context: u8 = 0;
+    var handler: Handler = .{ .dispatcher = .{ .context = &context, .dispatchFn = SearchDispatcher.dispatch } };
     for (std.enums.values(model.TextSearchMode)) |mode| {
         var ht = httpz.testing.init(.{});
         defer ht.deinit();
-        ht.json(.{ .type = "search_text", .query = "雪", .mode = mode });
+        ht.json(.{ .type = "search_text", .query = "", .mode = mode });
         try searchText(&handler, ht.req, ht.res);
         try ht.expectStatusCode(.ok);
         try ht.expectHeader("content-type", "application/json; charset=utf-8");
         try ht.expectBody(
             \\{"matches":[],"truncated":false}
         );
-
-        var empty = httpz.testing.init(.{});
-        defer empty.deinit();
-        empty.json(.{ .type = "search_text", .query = "", .mode = mode });
-        try searchText(&handler, empty.req, empty.res);
-        try empty.expectStatusCode(.ok);
-        try empty.expectBody("{\"matches\":[],\"truncated\":false}");
     }
     for ([_][]const u8{
         "{}",

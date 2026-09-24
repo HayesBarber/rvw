@@ -41,6 +41,7 @@ pub export fn rvw_core_create(
         }
     }
     const handle = allocator.create(RvwCore) catch return null;
+    // Threaded defaults to an empty environment. Preserve PATH for rg discovery.
     handle.threaded = .init(allocator, .{
         .environ = .{ .block = .{ .slice = std.mem.span(std.c.environ) } },
     });
