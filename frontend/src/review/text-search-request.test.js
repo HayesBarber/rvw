@@ -96,3 +96,34 @@ test('mode-only changes discard older results that finish last', async () => {
   assert.equal(request.getSnapshot().matches[0].path, 'ignored.txt')
   assert.deepEqual(pending.map(({ mode }) => mode), ['ignore-aware', 'all-files'])
 })
+
+for (const mode of ['ignore-aware', 'all-files']) {
+  test(`effect restart resumes a pending ${mode} query and ignores the canceled response`, async () => {
+    const pending = []
+    const request = createTextSearchRequest({ mode, delay: 0, search: (query, searchMode) => new Promise((resolve) => {
+      pending.push({ query, mode: searchMode, resolve })
+    }) })
+    request.resume()
+    await flush()
+    assert.equal(pending.length, 0)
+    request.update('needle')
+    await flush()
+    request.cancel()
+    request.resume()
+    await flush()
+    assert.equal(pending.length, 2)
+    assert.equal(pending[1].query, 'needle')
+    assert.equal(pending[1].mode, mode)
+    pending[0].resolve(result('canceled'))
+    await flush()
+    assert.equal(request.getSnapshot().status, 'loading')
+    pending[1].resolve(result('current'))
+    await flush()
+    assert.equal(request.getSnapshot().status, 'success')
+    assert.equal(request.getSnapshot().matches[0].path, 'current')
+    request.cancel()
+    request.resume()
+    await flush()
+    assert.equal(pending.length, 2)
+  })
+}

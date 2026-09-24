@@ -19,7 +19,10 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
     setActiveIndex: request.select,
     onOpen: () => listRef.current?.focus({ preventScroll: true }),
   })), [request, results, selectedIndex, registerActionAdapter])
-  useEffect(() => () => request.cancel(), [request])
+  useEffect(() => {
+    request.resume()
+    return () => request.cancel()
+  }, [request])
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement

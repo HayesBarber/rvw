@@ -36,6 +36,10 @@ export function createTextSearchRequest({ search, mode = 'ignore-aware', delay =
       return () => listeners.delete(listener)
     },
     update,
+    resume: () => {
+      // React refresh can preserve the query after effect cleanup cancels it.
+      if (state.status === 'loading') update(state.query, state.mode)
+    },
     select: (index) => {
       if (index >= 0 && index < state.matches.length) publish({ ...state, activeIndex: index })
     },
