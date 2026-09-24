@@ -175,14 +175,3 @@ The HTTP server uses the same environment variable. The selected file must be
 executable. Search reports an error if Rvw cannot find or run it. Other review
 operations do not require ripgrep.
 
-Search uses case-sensitive literal text and starts at the opened directory.
-Normal mode uses ripgrep's ignore rules and skips hidden files. All-files mode
-uses `--no-ignore --hidden` to include ignored and hidden files. Neither mode
-follows symbolic links. Ripgrep configuration files are disabled for consistent
-API behavior. Files with non-UTF-8 paths or matching lines are omitted.
-
-Each response contains at most 1,000 matching lines. Process output is limited
-to 4 MiB for standard output and 4 KiB for errors. A result or standard-output
-limit sets `truncated` to `true`; only complete match records are returned.
-An error-output limit produces a search error. Narrow the query if results are
-truncated.
