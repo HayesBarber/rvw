@@ -119,11 +119,11 @@ export function useApplicationActions({
     },
     [ApplicationAction.OPEN_CODEBASE_SEARCH]: () => {
       if (!reviewAvailable) return false
-      return openCodebaseSearch()
+      return openCodebaseSearch(dispatchWorkspace)
     },
     [ApplicationAction.OPEN_CODEBASE_SEARCH_ALL]: () => {
       if (!reviewAvailable) return false
-      return openCodebaseSearchAll()
+      return openCodebaseSearchAll(dispatchWorkspace)
     },
     [ApplicationAction.OPEN_KEYMAP_REFERENCE]: () => {
       if (!reviewAvailable) return false
@@ -150,7 +150,9 @@ export function useApplicationActions({
     getSurfaceActions: surfaceActions.get,
     getOverlayActions: () => {
       if (workspace.keymapReferenceOpen) return blockingOverlayActions
-      return workspace.finderOpen ? finderActionsRef.current : null
+      return workspace.finderOpen || workspace.searchMode
+        ? finderActionsRef.current ?? blockingOverlayActions
+        : null
     },
     globalActions,
   }), [
@@ -158,6 +160,7 @@ export function useApplicationActions({
     surfaceActions,
     workspace.activeSurface,
     workspace.finderOpen,
+    workspace.searchMode,
     workspace.keymapReferenceOpen,
   ])
 

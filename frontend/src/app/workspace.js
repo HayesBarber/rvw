@@ -24,6 +24,7 @@ export const initialWorkspaceState = Object.freeze({
   selectedPath: null,
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
+  searchMode: null,
   finderOpen: false,
   finderMode: null,
   keymapReferenceOpen: false,
@@ -80,6 +81,10 @@ export function workspaceReducer(state, action) {
         ? state
         : { ...state, fileTreeWidth }
     }
+    case 'search_opened':
+      return { ...state, searchMode: action.mode === 'all-files' ? 'all-files' : 'ignore-aware' }
+    case 'search_closed':
+      return { ...state, searchMode: null }
     case 'finder_opened': {
       const finderMode = action.mode === FinderMode.ALL
         ? FinderMode.ALL

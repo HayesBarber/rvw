@@ -18,6 +18,7 @@ export default function ApplicationFooter({
   diagnostic,
   onCopyComments,
   onReload,
+  onSearchText,
   reloadDisabled = false,
   reloadMessage,
   reloadMessageIsError = false,
@@ -88,6 +89,9 @@ export default function ApplicationFooter({
                 Reload
               </button>
             </span>
+            <button className="reload-button" type="button" onClick={onSearchText}>
+              Search text
+            </button>
             <span className="footer-copy-action">
               {copyIsError && (
                 <span className="copy-status error" role="alert" title={copyMessage}>

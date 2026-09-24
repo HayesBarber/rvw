@@ -31,8 +31,10 @@ test('configured keys dispatch each mode to its separate handler on either surfa
     } },
   } })
   assert.equal(result.diagnostic, null)
-  const ignoreAware = t.mock.fn(openCodebaseSearch)
-  const allFiles = t.mock.fn(openCodebaseSearchAll)
+  const transitions = []
+  const dispatchWorkspace = (action) => transitions.push(action)
+  const ignoreAware = t.mock.fn(() => openCodebaseSearch(dispatchWorkspace))
+  const allFiles = t.mock.fn(() => openCodebaseSearchAll(dispatchWorkspace))
   for (const surface of ['file_tree', 'diff_pane']) {
     const dispatch = createApplicationDispatcher({
       getActiveSurface: () => surface,
@@ -46,6 +48,9 @@ test('configured keys dispatch each mode to its separate handler on either surfa
       assert.deepEqual(command.args.actions, [action])
       const before = [ignoreAware.mock.callCount(), allFiles.mock.callCount()]
       assert.equal(dispatch(command.args.actions, command.count), true)
+      assert.deepEqual(transitions.at(-1), {
+        type: 'search_opened', mode: action === search ? 'ignore-aware' : 'all-files',
+      })
       assert.equal(ignoreAware.mock.callCount(), before[0] + (action === search ? 1 : 0))
       assert.equal(allFiles.mock.callCount(), before[1] + (action === searchAll ? 1 : 0))
     }
