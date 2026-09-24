@@ -89,21 +89,14 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
     <div className="file-finder-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose()
     }}>
-      <section ref={dialogRef} className="file-finder-dialog text-search-dialog"
+      <section ref={dialogRef} className="file-finder-dialog"
         role="dialog" aria-modal="true" aria-labelledby="text-search-title"
         tabIndex={-1} data-vim-capture onKeyDown={handleDialogKeyDown}>
-        <header className="file-finder-header text-search-header">
-          <h2 id="text-search-title">Search codebase</h2>
-          <button data-vim-ignore type="button" onClick={onClose}>Close</button>
+        <header className="file-finder-header">
+          <h2 id="text-search-title">
+            {mode === 'all-files' ? 'Search codebase including ignored' : 'Search codebase'}
+          </h2>
         </header>
-        <div className="text-search-modes" role="group" aria-label="Search mode">
-          {[['ignore-aware', 'Respect ignore rules'], ['all-files', 'All files including ignored']].map(([value, label]) => (
-            <button key={value} data-vim-ignore type="button" aria-pressed={mode === value} onClick={() => {
-              request.update(query, value)
-              inputRef.current?.focus()
-            }}>{label}</button>
-          ))}
-        </div>
         <label className="visually-hidden" htmlFor="text-search-input">Search text</label>
         <input ref={inputRef} id="text-search-input" className="file-finder-input"
           type="text" value={query} placeholder="Search text…" autoComplete="off"
@@ -139,7 +132,6 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
             ))}
           </ul>
         </div>
-        <p className="text-search-help">↑/↓ select · Esc leaves input · j/k select outside input · Esc closes</p>
       </section>
     </div>
   )

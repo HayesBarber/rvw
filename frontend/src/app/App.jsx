@@ -207,13 +207,6 @@ export default function App() {
               </button>
             </div>
             <button
-              className="codebase-search-button"
-              type="button"
-              onClick={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
-            >
-              Search text
-            </button>
-            <button
               className="file-finder-button"
               type="button"
               aria-keyshortcuts="Meta+P Control+P"
@@ -362,6 +355,7 @@ export default function App() {
         diagnostic={configurationDiagnostic}
         onCopyComments={handleCopyComments}
         onReload={reloadRequest.reload}
+        onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
         reloadMessage={reloadMessage}
         reloadMessageIsError={reloadMessageIsError}
