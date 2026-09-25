@@ -127,11 +127,33 @@ initial-open p95 and frame-gap p95 within 10% of this baseline. Confirm changes
 with at least three runs on the same machine. These are comparison targets,
 not claims about native WebKit performance.
 
-## Native follow-up
+## Cleanup after the targets are met
 
-Build and open the macOS app with debug logging. Open a changed file and an
-unchanged file. Switch files quickly, then reload the review. Check that content
-matches the selected file and that JSONL events share a trace ID across native
-queue, core, serialization, reply, and render stages. Repeat at the default log
-level and confirm that no `file load timing` events are written. Native UI tests
-are a manual follow-up; the automated baseline uses HTTP and Chrome.
+Complete this cleanup as part of #173, after #189–#192 meet the targets above
+in at least three comparable runs. Keep the detailed traces until the final
+comparison is recorded. Disabling debug logs alone does not complete cleanup.
+
+- Record the final results, environment, and tested commit beside the original
+  baseline. Keep both records and the fixed workload for future comparisons.
+- Keep a small benchmark for selection-to-visible time, rapid-switch outcomes,
+  and frame gaps. Move its measurement hooks into the benchmark before removing
+  the application probes. The benchmark must still exercise the production
+  request and renderer paths.
+- Remove the temporary stage collector in `frontend/src/review/file-timing.js`
+  and its calls in the API, selected-file hook, review session, and `DiffSurface`.
+  Remove the styled-token DOM inspection, extra animation-frame callbacks, and
+  per-stage log requests from the application.
+- Remove the file-timing code from the Zig dispatcher, core, and response
+  encoders, and from the Swift request router and bridge. This includes the
+  extra native log dispatches used to measure queue and JSON conversion time.
+- Remove the `debugTimings` response fields and file-request `traceId` fields,
+  validation helpers, and tests if no retained diagnostic uses them. Keep the
+  shared JSONL logger, its general `traceId` support, and error logging.
+- Update the benchmark report, tests, and this guide to match the retained
+  measurements. Remove obsolete stage assertions and instructions. Keep
+  Playwright while the browser benchmark uses it; remove dependencies only
+  when they have no remaining use.
+
+Run the retained benchmark, repository tests, lint, and app build after cleanup.
+Confirm that the targets still hold and that rapid switching and reload still
+show the correct file. Record the cleanup commit with the final results.
