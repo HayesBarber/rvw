@@ -204,7 +204,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     workspace.treeMode,
   ])
 
-  const openFinderFile = useCallback((path) => {
+  const openFinderFile = useCallback((path, lineNumber) => {
     const changed = changedPaths.has(path)
     if (
       !changed &&
@@ -213,7 +213,8 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       allFilesRequest.load()
     }
     dispatchWorkspace({
-      type: 'finder_file_opened',
+      type: lineNumber === undefined ? 'finder_file_opened' : 'search_result_opened',
+      lineNumber,
       path,
       changed,
     })

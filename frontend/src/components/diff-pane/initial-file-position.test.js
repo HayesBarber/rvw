@@ -141,3 +141,54 @@ test('virtualizer placeholder unmounts do not reset an already positioned file',
   flush()
   assert.equal(container.scrollTop, 1800)
 })
+
+test('search reveals collapsed context before positioning the new-side match', () => {
+  const { position, flush, file } = setup()
+  const { node, instance, container } = file()
+  const target = { path: 'example.txt', lineNumber: 180 }
+  const revealed = []
+  instance.revealLine = (line) => {
+    revealed.push(line)
+    return revealed.length === 1
+  }
+  const navigated = []
+  const navigate = (match) => { navigated.push(match); container.scrollTop = 3500 }
+  position.rendered(node, instance, target, navigate)
+  flush()
+  assert.deepEqual(navigated, [])
+  position.rendered(node, instance, target, navigate)
+  flush()
+  assert.deepEqual(revealed, [180, 180])
+  assert.deepEqual(navigated, [target])
+  assert.equal(container.scrollTop, 3500)
+  position.rendered(node, instance, target, navigate)
+  flush()
+  assert.equal(navigated.length, 1)
+})
+
+test('new search requests reposition an already-open file, including the same line', () => {
+  const { position, flush, file } = setup()
+  const { node, instance } = file()
+  position.rendered(node, instance)
+  flush()
+  const navigated = []
+  const navigate = (target) => navigated.push(target.lineNumber)
+  for (const lineNumber of [42, 95, 95]) {
+    position.rendered(node, instance, { lineNumber }, navigate)
+    flush()
+  }
+  assert.deepEqual(navigated, [42, 95, 95])
+})
+
+test('a newer result cancels an earlier pending line target', () => {
+  const { position, flush, file, frames } = setup()
+  const { node, instance } = file()
+  const navigated = []
+  const navigate = (target) => navigated.push(target.lineNumber)
+  position.rendered(node, instance, { lineNumber: 10 }, navigate)
+  const stale = [...frames.values()][0]
+  position.rendered(node, instance, { lineNumber: 20 }, navigate)
+  stale()
+  flush()
+  assert.deepEqual(navigated, [20])
+})

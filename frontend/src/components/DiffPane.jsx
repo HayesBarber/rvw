@@ -23,6 +23,7 @@ const unavailableDescriptions = {
 
 export default function DiffPane({
   fileDiff,
+  lineNavigation,
   isCursorVisible,
   visualSelectionEnabled,
   loading,
@@ -49,6 +50,7 @@ export default function DiffPane({
   const cursor = useDiffCursor({
     comments,
     fileDiff,
+    lineNavigation,
     isCursorVisible,
     relativeLineNumbers,
   })
