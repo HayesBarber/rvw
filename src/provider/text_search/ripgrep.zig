@@ -42,7 +42,7 @@ pub const RipgrepProvider = struct {
             error.FileNotFound, error.AccessDenied, error.InvalidExe => return error.SearchUnavailable,
             else => return error.SearchFailed,
         };
-        defer child.kill(io);
+        defer stopSearch(&child, io);
 
         var buffer: std.Io.File.MultiReader.Buffer(2) = undefined;
         var reader: std.Io.File.MultiReader = undefined;
@@ -69,13 +69,24 @@ pub const RipgrepProvider = struct {
         }
         var output = reader.reader(0).buffered();
         if (truncated) {
-            child.kill(io);
+            stopSearch(&child, io);
             output = output[0..@min(output.len, self.output_limit)];
             output = output[0..if (std.mem.lastIndexOfScalar(u8, output, '\n')) |end| end + 1 else 0];
         }
         return parseOutput(self.allocator, output, self.match_limit, truncated);
     }
 };
+
+fn stopSearch(child: *std.process.Child, io: std.Io) void {
+    // Zig 0.16 Child.kill sends SIGTERM, then waits. A child started from a
+    // macOS DispatchQueue inherits blocked SIGTERM and cannot exit that way.
+    // Search output is already complete or rejected here; force termination
+    // before Child.kill reaps the process and closes its pipes.
+    if (@import("builtin").os.tag != .windows) {
+        if (child.id) |pid| std.posix.kill(pid, .KILL) catch {};
+    }
+    child.kill(io);
+}
 
 const Text = struct { text: ?[]const u8 = null, bytes: ?[]const u8 = null };
 const MatchData = struct {
