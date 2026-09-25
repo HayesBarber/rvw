@@ -68,7 +68,15 @@ final class NativeCore {
         guard let pointer else {
             throw NativeCoreError.requestFailed("rvw is no longer available")
         }
+        let traceId = fileTimingTraceId(messageBody)
+        let encodeStart = traceId == nil ? nil : DispatchTime.now().uptimeNanoseconds
         let request = try JSONSerialization.data(withJSONObject: messageBody)
+        let encodeMs = encodeStart.map { Double(DispatchTime.now().uptimeNanoseconds - $0) / 1_000_000 }
+        defer {
+            if let traceId, let encodeMs {
+                _ = try? dispatch(fileTimingEvent(traceId, "native_request_serialize", encodeMs))
+            }
+        }
         let response = request.withUnsafeBytes { bytes in
             rvw_core_dispatch(pointer, bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
         }
@@ -77,6 +85,13 @@ final class NativeCore {
         }
         defer { rvw_buffer_free(pointer, response) }
 
+        let parseStart = traceId == nil ? nil : DispatchTime.now().uptimeNanoseconds
+        defer {
+            if let traceId, let parseStart {
+                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - parseStart) / 1_000_000
+                _ = try? dispatch(fileTimingEvent(traceId, "native_response_parse", elapsed))
+            }
+        }
         guard let envelope = try JSONSerialization.jsonObject(
             with: Data(bytes: responsePointer, count: response.len)
         ) as? [String: Any] else {

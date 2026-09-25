@@ -1,3 +1,4 @@
+import { markFileSelection } from './file-timing.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { FinderMode, TreeMode } from '../app/workspace.js'
@@ -176,8 +177,9 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   }, [allFilesRequest, dispatchWorkspace, filesModeEntries, overview])
 
   const selectFile = useCallback((path) => {
+    if (path !== activePath) markFileSelection(path)
     dispatchWorkspace({ type: 'file_selected', path })
-  }, [dispatchWorkspace])
+  }, [activePath, dispatchWorkspace])
 
   const navigateFile = useCallback((direction, count) => {
     const listAvailable = workspace.treeMode === TreeMode.CHANGES

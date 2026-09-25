@@ -59,6 +59,23 @@ func testNativeRequestRouter() {
     }
     expect(order == [1, 2], "core requests must stay serial")
 
+    var timingEvents: [[String: Any]] = []
+    let timedRouter = NativeRequestRouter(nativeHost: host) { body in
+        let request = body as! [String: Any]
+        if request["type"] as? String == "log" { timingEvents.append(request) }
+        return ["ok": true]
+    }
+    _ = try? response(timedRouter, ["type": "get_file", "path": "PRIVATE", "traceId": "trace-188"])
+    expect(timingEvents.count == 1, "traced file requests record queue time")
+    expect(timingEvents[0]["traceId"] as? String == "trace-188", "queue timing keeps the trace ID")
+    let timingContext = timingEvents[0]["context"] as! [String: Any]
+    expect(timingContext["stage"] as? String == "native_queue", "queue time has a stable stage")
+    expect(timingContext["durationMs"] as! Double >= 0, "queue time cannot be negative")
+    expect(timingContext.count == 2, "queue timing excludes paths and contents")
+    _ = try? response(timedRouter, ["type": "get_file", "path": "PRIVATE"])
+    expect(timingEvents.count == 1, "untraced requests do not produce timing events")
+    expect(fileTimingTraceId(["type": "get_file", "traceId": "private/path"]) == nil, "unsafe IDs are rejected")
+
     enum ExpectedFailure: Error { case requestFailed }
     let failingRouter = NativeRequestRouter(nativeHost: host) { _ in
         throw ExpectedFailure.requestFailed

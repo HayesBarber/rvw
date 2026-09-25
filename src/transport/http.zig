@@ -36,7 +36,9 @@ const Handler = struct {
         };
         defer if (response == .text_search) response.text_search.deinit();
         setJsonHeaders(res);
+        const timing = self.dispatcher.startTiming(request);
         res.body = try json_protocol.encodeResponse(res.arena, response);
+        timing.finish("response_serialize", res.body.len);
     }
 
     fn dispatchCreated(self: *Handler, res: *httpz.Response, request: model.Request) !void {
@@ -116,7 +118,9 @@ fn getFile(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const path = query.get("path") orelse
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
-    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path } });
+    const trace_id = json_protocol.optionalTraceId(if (query.get("traceId")) |id| .{ .string = id } else null) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path, .trace_id = trace_id } });
 }
 
 fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -132,6 +136,8 @@ fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !vo
 
     return handler.dispatchRequest(res, .{ .get_file_diff = .{
         .diff_id = diff_id,
+        .trace_id = json_protocol.optionalTraceId(if (query.get("traceId")) |id| .{ .string = id } else null) catch
+            return handler.failure(res, .bad_request, .malformed_request),
         .path = path,
     } });
 }
@@ -389,4 +395,35 @@ test "real ripgrep results cross HTTP and native JSON transports in both modes" 
             }
         }
     }
+}
+
+test "HTTP file timings preserve validated trace IDs" {
+    const Capture = struct {
+        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
+            const id = switch (request) {
+                .get_file => |r| r.trace_id,
+                .get_file_diff => |r| r.trace_id,
+                else => unreachable,
+            };
+            try std.testing.expectEqualStrings("trace-188", id.?);
+            return error.UnknownFile;
+        }
+    };
+    var context: u8 = 0;
+    var handler: Handler = .{ .dispatcher = .{ .context = &context, .dispatchFn = Capture.dispatch } };
+    for ([_]bool{ false, true }) |diff| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.query("path", "private.js");
+        ht.query("traceId", "trace-188");
+        ht.param("diff_id", "active");
+        if (diff) try getFileDiff(&handler, ht.req, ht.res) else try getFile(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.not_found);
+    }
+    var ht = httpz.testing.init(.{});
+    defer ht.deinit();
+    ht.query("path", "private.js");
+    ht.query("traceId", "private/path");
+    try getFile(&handler, ht.req, ht.res);
+    try ht.expectStatusCode(.bad_request);
 }
