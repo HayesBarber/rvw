@@ -5,6 +5,8 @@ pub const Context = struct {
     optimize: std.builtin.OptimizeMode,
     test_step: *std.Build.Step,
     build_options: *std.Build.Step.Options,
+    release: bool,
+    version: []const u8,
 };
 
 const AppArtifacts = struct {
@@ -18,7 +20,7 @@ pub fn addApp(context: Context) void {
     const artifacts = addAppArtifacts(context);
     addSwiftTests(context);
     addNativeCoreTests(context, artifacts.library);
-    addBundleInstallation(context.b, artifacts);
+    addBundleInstallation(context, artifacts);
     addRunStep(context.b);
 }
 
@@ -144,7 +146,8 @@ fn addSwiftTests(context: Context) void {
     context.test_step.dependOn(&run_swift_tests.step);
 }
 
-fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
+fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
+    const b = context.b;
     const staged_app = b.getInstallPath(.prefix, "Rvw.app");
     const prepare_bundle = b.addSystemCommand(&.{ "node", "build/prepare-bundle.mjs" });
     prepare_bundle.addArg(staged_app);
@@ -186,11 +189,30 @@ fn addBundleInstallation(b: *std.Build, artifacts: AppArtifacts) void {
     install_frontend.step.dependOn(&prepare_bundle.step);
     install_frontend.step.dependOn(&artifacts.frontend.step);
 
-    b.getInstallStep().dependOn(&install_executable.step);
-    b.getInstallStep().dependOn(&install_cli.step);
-    b.getInstallStep().dependOn(&install_plist.step);
-    if (install_icon) |icon| b.getInstallStep().dependOn(&icon.step);
-    b.getInstallStep().dependOn(&install_frontend.step);
+    const assembled = b.step("assemble-app", "Assemble the macOS application bundle");
+    assembled.dependOn(&install_executable.step);
+    assembled.dependOn(&install_cli.step);
+    assembled.dependOn(&install_plist.step);
+    if (install_icon) |icon| assembled.dependOn(&icon.step);
+    assembled.dependOn(&install_frontend.step);
+
+    if (context.release) {
+        const output = b.getInstallPath(.prefix, "release");
+        const preflight = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs", staged_app, output, context.version, "--check" });
+        preflight.has_side_effects = true;
+        // Invalidate old artifacts and check configuration before any build
+        // work can fail. Never accept a cached notarization result.
+        prepare_bundle.step.dependOn(&preflight.step);
+        artifacts.frontend.step.dependOn(&preflight.step);
+        artifacts.library.step.dependOn(&preflight.step);
+        artifacts.cli.step.dependOn(&preflight.step);
+        const release = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs", staged_app, output, context.version });
+        release.has_side_effects = true;
+        release.step.dependOn(assembled);
+        b.getInstallStep().dependOn(&release.step);
+    } else {
+        b.getInstallStep().dependOn(assembled);
+    }
 }
 
 fn addRunStep(b: *std.Build) void {

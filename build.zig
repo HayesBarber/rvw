@@ -4,6 +4,10 @@ const macos = @import("build/macos.zig");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const release = b.option(bool, "release", "Sign, notarize, and package a macOS release") orelse false;
+    if (release and b.graph.host.result.os.tag != .macos) {
+        @panic("Release preparation requires macOS");
+    }
 
     const version = b.option([]const u8, "version", "Application version") orelse "dev";
     const build_options = b.addOptions();
@@ -59,6 +63,8 @@ pub fn build(b: *std.Build) void {
 
     const frontend_tests = b.addSystemCommand(&.{ "npm", "test", "--prefix", "frontend" });
     test_step.dependOn(&frontend_tests.step);
+    const release_tests = b.addSystemCommand(&.{ "node", "--test", "build/prepare-release.test.mjs" });
+    test_step.dependOn(&release_tests.step);
 
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
@@ -73,6 +79,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .test_step = test_step,
             .build_options = build_options,
+            .release = release,
+            .version = version,
         });
     }
 }

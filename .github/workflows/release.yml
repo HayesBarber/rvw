@@ -30,24 +30,26 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
-      - name: Build Rvw
+      - name: Build signed release
+        env:
+          RVW_CERTIFICATE_BASE64: ${{ secrets.RVW_CERTIFICATE_BASE64 }}
+          RVW_CERTIFICATE_PASSWORD: ${{ secrets.RVW_CERTIFICATE_PASSWORD }}
+          RVW_SIGNING_IDENTITY: ${{ secrets.RVW_SIGNING_IDENTITY }}
+          RVW_NOTARY_KEY_BASE64: ${{ secrets.RVW_NOTARY_KEY_BASE64 }}
+          RVW_NOTARY_KEY_ID: ${{ secrets.RVW_NOTARY_KEY_ID }}
+          RVW_NOTARY_ISSUER_ID: ${{ secrets.RVW_NOTARY_ISSUER_ID }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=${VERSION}" >> "$GITHUB_ENV"
-          zig build -Dversion="${VERSION}" -Doptimize=ReleaseFast
-
-      - name: Package Rvw.app
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent zig-out/Rvw.app "Rvw-${{ env.version }}.zip"
-          shasum -a 256 "Rvw-${{ env.version }}.zip"
+          zig build -Drelease=true -Dversion="${VERSION}" -Doptimize=ReleaseFast
 
       - name: Upload release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "Rvw-${{ env.version }}.zip" --clobber
+            gh release upload "$GITHUB_REF_NAME" "zig-out/release/Rvw-${{ env.version }}.zip" "zig-out/release/Rvw-${{ env.version }}.zip.sha256" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "Rvw-${{ env.version }}.zip" \
+            gh release create "$GITHUB_REF_NAME" "zig-out/release/Rvw-${{ env.version }}.zip" "zig-out/release/Rvw-${{ env.version }}.zip.sha256" \
               --title "$GITHUB_REF_NAME" --generate-notes
           fi
