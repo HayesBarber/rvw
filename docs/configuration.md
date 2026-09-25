@@ -6,7 +6,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 | Action identifier | Default keys | Behavior |
 | --- | --- | --- |
-| `application.close` | `q` | Close Rvw through the native application host. In HTTP development mode, this action is a no-op. |
+| `application.close` | `q` | Close Rvw. |
 | `review.reload` | `<leader> r` | Reload repository files and changes while preserving saved comments and session display settings. Reload is blocked while a comment draft or editor is open. |
 | `command_line.open` | `:` | Open the footer command input. |
 | `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
@@ -48,41 +48,44 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-The file finder opens with its search input focused. Press `<Esc>` once to move
-focus to the result list and enable its Vim bindings without changing the
-query, then press `<Esc>` again to close the finder. Outside that transition,
-`<Esc>` clears a pending count or multi-key sequence. An unmatched key after a
-pending sequence also clears that pending input without running an action.
+Press `?` to show the current bindings. Press `<Esc>` to close the reference.
 
-Press `?` to open the keyboard reference. It is grouped by purpose and reads
-from the effective keymap, so valid user replacements and disabled actions are
-shown exactly as installed. While the reference is open, workspace commands
-are blocked. Use `j` and `k` to scroll the reference. Press `<Esc>` to close it
-and restore focus to the prior workspace context.
-
-In the active text/diff pane, `V` anchors an inclusive line selection. In Visual
-mode, `j`/`k`, arrows, counts, `<C-u>`/`<C-d>` (or Page Up/Down), and `gg`/`G`
-extend or reverse the endpoint. Movement stays on the original diff side and
-skips non-code rows; ranges spanning collapsed context include intervening source
-lines. `c` opens one range-comment composer. Saving or cancelling restores normal
-mode and diff focus. `<Esc>` or `V` clears selection. Changing files, leaving the
-diff pane, or opening an overlay also exits Visual mode.
-
-The entry action `diff.visual_line` is configurable in `keybindings.normal`.
-Visual-mode bindings themselves are fixed and independent of normal-mode overrides.
-Mouse range selection remains available; normal-mode `c` uses an active mouse range.
+Press `V` in the diff pane to select lines, then press `c` to add a range comment.
+Visual-mode bindings are fixed. You can change the entry key with `diff.visual_line`.
 
 ## User configuration
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts optional `keybindings`, `diff`, `comments`, and `commandLine` objects. `keybindings` accepts an optional `normal` object and an optional `leader` key. Each key in `normal` must be an action identifier from the table above, and its value must be an array of key sequences. A key sequence is a non-empty array of normalized key strings. The `leader` key selects the concrete key that replaces `<leader>` in `normal` sequences and defaults to `<Space>` when omitted.
+The JSON root accepts optional `keybindings`, `diff`, `comments`, and `commandLine` objects.
 
-`diff` accepts optional `wrapLines` and `relativeLineNumbers` boolean keys. Text wraps by default; set `"wrapLines": false` to start with long lines scrolling horizontally instead. Line numbers are absolute by default; set `"relativeLineNumbers": true` to show the cursor row's source line and each other code row's vertical movement distance. The `diff.wrap.toggle` and `diff.relative_line_numbers.toggle` actions change their settings for the current session only, apply to subsequently opened files, and are active while the diff pane has focus. `diff.expand.toggle` affects only the open diff and each newly opened file starts with collapsed context.
+Use `keybindings.normal` to change bindings. Each key must be an action identifier
+from the table above. Each value must be an array of key sequences.
+A sequence is a non-empty array of key strings. Set `keybindings.leader` to change
+the `<leader>` key. The default is `<Space>`.
 
-`comments.types` is an ordered list of comment type names. Without it, Rvw offers `ISSUE`, `QUESTION`, and `NITPICK`. A configured list replaces those built-ins; an empty list disables typed comments. `comments.defaultType` may be `null` or one of the configured names and defaults to `null`. Names must be unique, non-blank, single-line strings. In a comment text editor, `Tab` and `Shift+Tab` cycle through no type and the configured types. The dropdown supports mouse selection and clearing.
+Use `diff.wrapLines` and `diff.relativeLineNumbers` to set the initial display.
+Both values must be booleans. Text wraps by default, and line numbers are absolute.
+Set `"wrapLines": false` to scroll long lines horizontally.
+Set `"relativeLineNumbers": true` to show each code row's distance from the cursor.
+The cursor row shows its source line number.
+The toggle actions change these settings for the current session, including files opened later.
+The `diff.expand.toggle` action changes only the open diff. Each new file starts with collapsed context.
 
-This complete example replaces four actions, disables one action, starts with wrapping disabled and relative line numbers enabled, selects `\` as the leader key, and leaves every other action at its default binding:
+Use `comments.types` to set an ordered list of comment types.
+The default types are `ISSUE`, `QUESTION`, and `NITPICK`. An empty list disables comment types.
+Names must be unique, non-blank strings with no line breaks.
+Set `comments.defaultType` to `null` (the default) or a name from the list.
+In the comment editor, use `Tab`, `Shift+Tab`, or the dropdown to change the type.
+
+Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
+Names are case-sensitive. Press `<Esc>` to cancel.
+Use `commandLine.aliases` to map aliases to action identifiers from the table above.
+Alias names must be non-empty, contain no whitespace, and differ from all action identifiers.
+Configure the opening key with `command_line.open`.
+
+This example changes bindings for four actions and disables the `comments.copy` binding.
+It also sets the leader key, display options, comment types, and command aliases:
 
 ```json
 {
@@ -92,7 +95,7 @@ This complete example replaces four actions, disables one action, starts with wr
       "cursor.up": [["w"], ["<Up>"]],
       "cursor.down": [["s"], ["<Down>"]],
       "focus.file_tree": [["<leader>", "t"]],
-      "comments.edit": [["c", "e"]],
+      "comments.edit": [["<leader>", "c"]],
       "comments.copy": []
     }
   },
@@ -103,38 +106,7 @@ This complete example replaces four actions, disables one action, starts with wr
   "comments": {
     "types": ["ISSUE", "QUESTION", "NITPICK"],
     "defaultType": null
-  }
-}
-```
-
-An action present in the file replaces all of that action's defaults; bindings are not appended. An empty array disables the keyboard binding; the canonical command name remains available. An action absent from the file retains all of its defaults. `<leader>` expands to the `keybindings.leader` value, or `<Space>` when `leader` is omitted.
-
-## Key notation
-
-- Printable keys use the character produced by the keyboard, such as `j`, `G`, `/`, or `0`. Letter case is significant.
-- Named keys use angle brackets: `<BS>`, `<Del>`, `<Down>`, `<End>`, `<Enter>`, `<Esc>`, `<Home>`, `<Left>`, `<PageDown>`, `<PageUp>`, `<Right>`, `<Space>`, `<Tab>`, and `<Up>`.
-- Modified keys use `C` for Control, `M` for Option/Alt, `D` for Command/Meta, and `S` for Shift. Combine modifiers in that order, followed by a lowercase printable key or a named key: `<C-p>`, `<D-p>`, `<C-S-k>`, or `<M-Left>`.
-- Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
-- Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
-
-## Validation and diagnostics
-
-Rvw validates the JSON schema, action identifiers, normalized key notation, duplicate bindings, and ambiguous prefixes before installing the complete keymap. A binding cannot also be a prefix of another binding; for example, binding both `g` and `g g` is ambiguous.
-
-Malformed JSON, invalid fields or actions, unsupported key notation, duplicate bindings, ambiguous prefixes, and file read failures leave the built-in or last valid keymap active. The application footer reports the problem and configuration path while review loading continues. Fix the reported file and restart Rvw to try the configuration again.
-
-Both the native macOS application and the HTTP development server load the same startup snapshot and apply the same frontend validation.
-
-## Command line
-
-Press `:` in Normal mode, enter an action such as `comments.clear`, and press
-Enter. Names are case-sensitive; surrounding whitespace is trimmed. Commands
-use the keyboard dispatcher and active surface.
-
-Aliases can be created for commands:
-
-```json
-{
+  },
   "commandLine": {
     "aliases": {
       "clear": "comments.clear",
@@ -144,15 +116,20 @@ Aliases can be created for commands:
 }
 ```
 
-Alias names must be non-empty, contain no whitespace, and cannot shadow
-canonical actions. Targets must be canonical actions.
+A configured action replaces all its default bindings. An empty array disables its
+keyboard binding, but its action name remains available in the command line.
+Actions absent from the file keep their default bindings.
 
-Escape, empty Enter, or clicking away cancels. Accepted commands close the
-input; unknown or unavailable commands stay open. Closing restores focus unless
-the action moves it. Configure the opening key with `command_line.open`.
+A binding cannot also be a prefix of another binding. For example, do not bind
+both `g` and `g g`.
 
-Only one alias name is currently supported. No arguments, ranges, counts, chaining, history,
-completion, JavaScript, or shell execution.
+## Key notation
+
+- Printable keys use the character produced by the keyboard, such as `j`, `G`, `/`, or `0`. Letter case is significant.
+- Named keys use angle brackets: `<BS>`, `<Del>`, `<Down>`, `<End>`, `<Enter>`, `<Esc>`, `<Home>`, `<Left>`, `<PageDown>`, `<PageUp>`, `<Right>`, `<Space>`, `<Tab>`, and `<Up>`.
+- Modified keys use `C` for Control, `M` for Option/Alt, `D` for Command/Meta, and `S` for Shift. Combine modifiers in that order, followed by a lowercase printable key or a named key: `<C-p>`, `<D-p>`, `<C-S-k>`, or `<M-Left>`.
+- Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
+- Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
 
 ## Codebase text search
 
@@ -171,7 +148,6 @@ GUI does not inherit your shell's `PATH`:
 RVW_RIPGREP=/opt/homebrew/bin/rg rvw .
 ```
 
-The HTTP server uses the same environment variable. The selected file must be
-executable. Search reports an error if Rvw cannot find or run it. Other review
-operations do not require ripgrep.
+The selected file must be executable. Search reports an error if Rvw cannot find or run it.
+Other review operations do not require ripgrep.
 
