@@ -30,6 +30,7 @@ Run these commands from the repository root.
 | `zig build dev -- --directory /path/to/repository` | Start the Zig HTTP server and Vite development server against a repository. Add `--range A..B` to review a commit range or `--pr 100` to review a GitHub PR. |
 | `zig build serve -- serve --directory /path/to/repository` | Run only the Zig HTTP service. Add `--host` or `--port` as needed. |
 | `npm run lint --prefix frontend` | Lint the React frontend. |
+| `npm run benchmark:file-load --prefix frontend -- /tmp/file-load-results.json` | Measure the fixed file-load workload in Chrome. See [the benchmark guide](docs/file-load-performance.md). |
 | `npm test --prefix frontend` | Run frontend unit tests. |
 | `npm run build --prefix frontend` | Build frontend assets into `frontend/dist`. |
 | `zig fmt src build` | Format Zig source files after backend or build-script changes. |

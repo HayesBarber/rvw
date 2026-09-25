@@ -15,6 +15,7 @@ pub const Diagnostic = struct {
 /// The immutable user configuration and optional problem discovered while
 /// loading it. A problem always accompanies the empty fallback configuration.
 pub const Snapshot = struct {
+    debugTimings: bool = false,
     configuration: std.json.Value,
     diagnostic: ?Diagnostic,
 };

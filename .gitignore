@@ -4,3 +4,5 @@ zig-pkg/
 *.o
 .DS_Store
 
+
+/file-load-results.json

@@ -32,9 +32,12 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
     defer if (response == .text_search) response.text_search.deinit();
-    return switch (response) {
+    const timing = dispatcher.startTiming(request);
+    const encoded = try switch (response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
+    timing.finish("response_serialize", encoded.len);
+    return encoded;
 }
 
 pub const DecodeError = error{ MalformedRequest, UnknownOperation };
@@ -61,12 +64,12 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "get_file")) {
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
         if (path.len == 0) return error.MalformedRequest;
-        return .{ .get_file = .{ .path = path } };
+        return .{ .get_file = .{ .path = path, .trace_id = try optionalTraceId(object.get("traceId")) } };
     }
     if (std.mem.eql(u8, operation, "get_file_diff")) {
         const diff_id = jsonString(object.get("diffId")) orelse return error.MalformedRequest;
         const path = jsonString(object.get("path")) orelse return error.MalformedRequest;
-        return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path } };
+        return .{ .get_file_diff = .{ .diff_id = diff_id, .path = path, .trace_id = try optionalTraceId(object.get("traceId")) } };
     }
     if (std.mem.eql(u8, operation, "get_comments")) return .get_comments;
     if (std.mem.eql(u8, operation, "copy_comments_as_markdown")) return .copy_comments_as_markdown;
@@ -322,4 +325,32 @@ test "text search serializes navigation metadata UTF-16 spans and truncation" {
     try std.testing.expectEqualStrings(
         \\{"matches":[{"path":"src/雪.txt","lineNumber":12,"lineText":"a😀é","spans":[{"start":1,"end":3}]}],"truncated":true}
     , encoded);
+}
+
+// Restrict trace IDs to bounded opaque identifiers, never paths or contents.
+pub fn optionalTraceId(value: ?std.json.Value) DecodeError!?[]const u8 {
+    const id = try optionalJsonString(value) orelse return null;
+    if (id.len == 0 or id.len > 64) return error.MalformedRequest;
+    for (id) |c| if (!std.ascii.isAlphanumeric(c) and c != '-') return error.MalformedRequest;
+    return id;
+}
+
+test "file requests preserve optional trace IDs and reject unbounded or unsafe IDs" {
+    for ([_][]const u8{ "get_file", "get_file_diff" }) |operation| {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = operation, .diffId = "active", .path = "PRIVATE", .traceId = "trace-188" }, .{});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        const request = try decodeRequestValue(parsed.value);
+        const id = switch (request) {
+            .get_file => |r| r.trace_id,
+            .get_file_diff => |r| r.trace_id,
+            else => unreachable,
+        };
+        try std.testing.expectEqualStrings("trace-188", id.?);
+    }
+    for ([_][]const u8{ "", "file/name", "line\ncontent", "x" ** 65 }) |id| {
+        try std.testing.expectError(error.MalformedRequest, optionalTraceId(.{ .string = id }));
+    }
+    try std.testing.expect(try optionalTraceId(null) == null);
 }

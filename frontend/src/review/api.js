@@ -1,3 +1,5 @@
+import { configureFileTiming } from './file-timing.js'
+
 /** Shared review transport for native and development environments. */
 
 /**
@@ -37,10 +39,15 @@
  * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents } | { kind: 'unavailable', reason: 'binary' | 'invalid-utf8' | 'too-large' | 'symlink' | 'submodule' }} content
  */
 
-async function requestJson(url, nativeRequest, options = {}) {
+async function requestJson(url, nativeRequest, options = {}, timing) {
   const native = window.webkit?.messageHandlers?.native
-  if (native) return native.postMessage(nativeRequest)
+  const started = timing?.now()
+  if (native) {
+    try { return await native.postMessage(nativeRequest) }
+    finally { timing?.stage('native_roundtrip', started) }
+  }
 
+  if (timing) url += `&traceId=${encodeURIComponent(timing.traceId)}`
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -49,9 +56,12 @@ async function requestJson(url, nativeRequest, options = {}) {
     },
   })
 
+  timing?.stage('http_headers', started)
+  const parsing = timing?.now()
   let body
   try {
     body = await response.json()
+    timing?.stage('response_read_parse', parsing)
   } catch {
     throw new Error(`The rvw service returned an invalid response (${response.status})`)
   }
@@ -95,7 +105,9 @@ export function closeApplication() {
  * @returns {Promise<{ configuration: Object, diagnostic: ConfigurationDiagnostic | null }>}
  */
 export async function getConfiguration() {
-  return requestJson('/api/configuration', { type: 'get_configuration' })
+  const snapshot = await requestJson('/api/configuration', { type: 'get_configuration' })
+  configureFileTiming(snapshot.debugTimings)
+  return snapshot
 }
 
 /**
@@ -103,7 +115,9 @@ export async function getConfiguration() {
  * @returns {Promise<DiffOverview>}
  */
 export async function getDiffOverview() {
-  return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
+  const overview = await requestJson('/api/diffs/active', { type: 'get_diff_overview' })
+  configureFileTiming(overview.debugTimings)
+  return overview
 }
 
 /** Rebuilds the repository-backed review snapshot without changing comments. */
@@ -122,10 +136,11 @@ export async function reloadReview() {
  * @param {string} path
  * @returns {Promise<FileDiff>}
  */
-export async function getFileDiff(diffId, path) {
+export async function getFileDiff(diffId, path, timing) {
   return requestJson(
     `/api/diffs/${encodeURIComponent(diffId)}/files?path=${encodeURIComponent(path)}`,
-    { type: 'get_file_diff', diffId, path },
+    { type: 'get_file_diff', diffId, path, ...(timing && { traceId: timing.traceId }) },
+    {}, timing,
   )
 }
 
@@ -151,10 +166,11 @@ export async function getFilesNotIgnored() {
  * @param {string} path
  * @returns {Promise<FileDiff>}
  */
-export async function getFile(path) {
+export async function getFile(path, timing) {
   return requestJson(
     `/api/files/content?path=${encodeURIComponent(path)}`,
-    { type: 'get_file', path },
+    { type: 'get_file', path, ...(timing && { traceId: timing.traceId }) },
+    {}, timing,
   )
 }
 

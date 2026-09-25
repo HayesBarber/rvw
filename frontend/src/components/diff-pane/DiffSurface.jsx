@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { recordFileRender } from '../../review/file-timing.js'
+import { useCallback, useMemo } from 'react'
 import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
 import { File, MultiFileDiff, Virtualizer } from '@pierre/diffs/react'
 
@@ -55,6 +56,10 @@ export default function DiffSurface({
   onSelectLines,
   wrapLines = true,
 }) {
+  const handlePostRender = useCallback((node, instance, phase) => {
+    recordFileRender(fileDiff, node, phase)
+    onPostRender?.(node, instance, phase)
+  }, [fileDiff, onPostRender])
   const options = useMemo(() => ({
     ...baseOptions,
     expandUnchanged,
@@ -65,8 +70,8 @@ export default function DiffSurface({
     onLineSelectionStart: onSelectLines,
     onLineSelectionChange: onSelectLines,
     onLineSelectionEnd: onSelectLines,
-    onPostRender,
-  }), [expandUnchanged, onBeginComment, onPostRender, onSelectLines, wrapLines])
+    onPostRender: handlePostRender,
+  }), [expandUnchanged, onBeginComment, handlePostRender, onSelectLines, wrapLines])
 
   return (
     <Virtualizer className="diff-scroll">

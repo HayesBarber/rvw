@@ -46,7 +46,7 @@ pub const Core = struct {
     }
 
     pub fn dispatcher(self: *Core) dispatcher_module.Dispatcher {
-        return .{ .context = self, .dispatchFn = dispatchOpaque };
+        return .{ .context = self, .dispatchFn = dispatchOpaque, .io = self.io, .logger = self.logger };
     }
 
     fn dispatchOpaque(context: *anyopaque, request: model.Request) !model.Response {
@@ -59,6 +59,8 @@ pub const Core = struct {
             self.logger.log(self.io, request.log);
             return .{ .log_result = .{ .accepted = true } };
         }
+        const timing = self.dispatcher().startTiming(request);
+        defer timing.finish("backend_file", 0);
         const operation = operationName(request);
         return self.dispatchRequest(request) catch |err| {
             if (shouldLogRequestFailure(err)) {
@@ -71,13 +73,21 @@ pub const Core = struct {
     fn dispatchRequest(self: *Core, request: model.Request) !model.Response {
         return switch (request) {
             .log => unreachable,
-            .get_configuration => .{ .configuration = self.configuration },
+            .get_configuration => blk: {
+                var snapshot = self.configuration;
+                snapshot.debugTimings = self.logger.minimum_level == .debug;
+                break :blk .{ .configuration = snapshot };
+            },
             .reload_review => blk: {
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
                 self.review_generation +%= 1;
                 break :blk .{ .reload_review_result = .{ .generation = self.review_generation } };
             },
-            .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
+            .get_diff_overview => blk: {
+                var overview = try self.review_provider.getDiffOverview(self.io);
+                overview.debugTimings = self.logger.minimum_level == .debug;
+                break :blk .{ .diff_overview = overview };
+            },
             .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
             .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
             .search_text => |details| blk: {

@@ -119,6 +119,7 @@ pub const Comment = struct {
 };
 
 pub const DiffOverview = struct {
+    debugTimings: bool = false,
     id: []const u8,
     repository: Repository,
     source: DiffSource,
@@ -245,9 +246,10 @@ pub const Request = union(enum) {
     get_files,
     get_files_not_ignored,
     search_text: TextSearchRequest,
-    get_file: struct { path: []const u8 },
+    get_file: struct { path: []const u8, trace_id: ?[]const u8 = null },
     get_file_diff: struct {
         diff_id: []const u8,
+        trace_id: ?[]const u8 = null,
         path: []const u8,
     },
     get_comments,
