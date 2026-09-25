@@ -277,6 +277,7 @@ export default function App() {
             key={activePath ?? 'no-file'}
             fileDiff={fileDiff}
             filePath={activePath}
+            lineNavigation={workspace.lineNavigation}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
               !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen}
@@ -305,6 +306,10 @@ export default function App() {
       {workspace.searchMode && (
         <CodebaseSearch
           initialMode={workspace.searchMode}
+          onOpen={(match) => {
+            handleFinderOpen(match.path, match.lineNumber)
+            requestAnimationFrame(focusDiffPane)
+          }}
           onClose={() => dispatchWorkspace({ type: 'search_closed' })}
           registerActionAdapter={registerFinderActions}
         />

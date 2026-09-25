@@ -156,6 +156,13 @@ completion, JavaScript, or shell execution.
 
 ## Codebase text search
 
+Open text search with `<leader> /`, or use `<leader> ?` to include ignored files.
+Press Enter or click a result to close search and open its file at the matching
+line. Changed files open as diffs on the new side. Rvw expands collapsed context
+when needed. Unchanged files open in Files mode. Use the arrow keys to select a
+result. Press Escape to leave the input, then use `j` and `k` to select results.
+Press Escape again to close search without opening a result.
+
 The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
 installation. Rvw does not bundle ripgrep. On macOS, install it with:
 

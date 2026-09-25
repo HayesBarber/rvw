@@ -27,6 +27,7 @@ import { createInitialFilePosition } from './initial-file-position.js'
 export default function useDiffCursor({
   comments,
   fileDiff,
+  lineNavigation,
   isCursorVisible,
   relativeLineNumbers,
 }) {
@@ -122,6 +123,17 @@ export default function useDiffCursor({
     scrollGuardRef.current = null
   }, [])
 
+  const navigateToLine = useCallback((target) => {
+    cursorRowsRef.current = createDiffCursorRows(renderInstanceRef.current, {
+      includeFileComment: commentsRef.current.some((comment) => (
+        comment.target.kind === 'file' && comment.target.path === pathRef.current
+      )),
+    })
+    const cursor = { lineNumber: target.lineNumber, side: 'additions' }
+    activateCursor(cursor)
+    centerCursor(cursor)
+  }, [activateCursor, centerCursor])
+
   const handlePostRender = useCallback((node, instance, phase) => {
     if (phase === 'unmount') {
       initialPosition.unmounted(instance)
@@ -135,7 +147,11 @@ export default function useDiffCursor({
       return
     }
 
-    if (!initialPosition.rendered(node, instance)) return
+    if (!initialPosition.rendered(
+      node, instance,
+      lineNavigation?.path === fileDiff?.path ? lineNavigation : null,
+      navigateToLine,
+    )) return
     if (cursorInstanceRef.current !== instance) {
       cursorRef.current = null
       cursorInstanceRef.current = instance
@@ -182,7 +198,13 @@ export default function useDiffCursor({
     )
     layoutAnchorRef.current = null
     finishScrollGuard()
-  }, [finishScrollGuard, initialPosition])
+  }, [fileDiff?.path, finishScrollGuard, initialPosition, lineNavigation, navigateToLine])
+
+  useLayoutEffect(() => {
+    const node = renderedFileRef.current
+    const instance = renderInstanceRef.current
+    if (node && instance) handlePostRender(node, instance)
+  }, [handlePostRender])
 
   const guardNextLayoutRender = useCallback(() => {
     if (layoutAnchorRef.current) return

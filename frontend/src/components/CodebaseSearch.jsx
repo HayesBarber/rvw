@@ -4,7 +4,7 @@ import { searchText } from '../review/api.js'
 import { createTextSearchRequest } from '../review/text-search-request.js'
 import SearchMatch from './SearchMatch.js'
 
-export default function CodebaseSearch({ initialMode, onClose, registerActionAdapter }) {
+export default function CodebaseSearch({ initialMode, onOpen, onClose, registerActionAdapter }) {
   const [request] = useState(() => createTextSearchRequest({ search: searchText, mode: initialMode }))
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot)
   const { query, mode, status, error, matches: results, activeIndex, truncated } = state
@@ -17,8 +17,8 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
     getResults: () => results,
     getActiveIndex: () => selectedIndex,
     setActiveIndex: request.select,
-    onOpen: () => listRef.current?.focus({ preventScroll: true }),
-  })), [request, results, selectedIndex, registerActionAdapter])
+    onOpen,
+  })), [onOpen, request, results, selectedIndex, registerActionAdapter])
   useEffect(() => {
     request.resume()
     return () => request.cancel()
@@ -47,7 +47,7 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
       request.select(moveFileFinderSelection(results.length, selectedIndex, -1))
     } else if (event.key === 'Enter' && selectedIndex >= 0) {
       event.preventDefault()
-      listRef.current?.focus({ preventScroll: true })
+      onOpen(results[selectedIndex])
     } else if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -128,7 +128,7 @@ export default function CodebaseSearch({ initialMode, onClose, registerActionAda
                 onMouseMove={() => request.select(index)}
                 onClick={() => {
                   request.select(index)
-                  listRef.current?.focus({ preventScroll: true })
+                  onOpen(match)
                 }}>
                 <SearchMatch match={match} />
               </li>
