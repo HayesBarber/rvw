@@ -13,7 +13,6 @@ import {
   createDiffCursorRows,
   reconcileDiffCursor,
   restoreDiffLayoutAnchor,
-  scrollDiffCursorIntoView,
   syncDiffCursorPresentation,
   syncRelativeLineNumbers,
 } from '../../actions/diff-cursor-actions.js'
@@ -22,6 +21,7 @@ import {
   commentTargetAtCursor,
 } from '../../actions/comment-actions.js'
 import { normalizeCommentRange } from './comment-annotations.js'
+import { createCursorScroll } from './cursor-scroll.js'
 import { createInitialFilePosition } from './initial-file-position.js'
 
 export default function useDiffCursor({
@@ -46,6 +46,7 @@ export default function useDiffCursor({
   const cursorVisibleRef = useRef(isCursorVisible)
   const relativeLineNumbersRef = useRef(relativeLineNumbers)
   const [initialPosition] = useState(createInitialFilePosition)
+  const [cursorScroll] = useState(createCursorScroll)
 
   const updateActiveCommentId = useCallback((commentId) => {
     activeCommentIdRef.current = commentId
@@ -63,17 +64,37 @@ export default function useDiffCursor({
     activeCommentIdRef.current = null
   }, [fileDiff?.path])
 
+  const guardNextAnnotationRender = useCallback(() => {
+    cursorScroll.cancel()
+    if (scrollGuardRef.current) return
+
+    const node = renderedFileRef.current
+    const pre = node?.shadowRoot?.querySelector('pre')
+    const scrollContainer = node?.closest('.diff-scroll')
+    const height = pre?.offsetHeight ?? 0
+    if (!pre || !scrollContainer || height === 0) return
+
+    scrollGuardRef.current = {
+      left: scrollContainer.scrollLeft,
+      top: scrollContainer.scrollTop,
+      pre,
+      previousMinHeight: pre.style.minHeight,
+      scrollContainer,
+    }
+    pre.style.minHeight = `${height}px`
+  }, [cursorScroll])
+
   const activateCursor = useCallback((cursor, scroll = true) => {
     const instance = renderInstanceRef.current
     const node = renderedFileRef.current
     if (!instance || !node || !cursor) return false
 
     cursorRef.current = cursor
-    updateActiveCommentId(commentAtCursor(
-      commentsRef.current,
-      pathRef.current,
-      cursor,
-    )?.id ?? null)
+    const commentId = commentAtCursor(commentsRef.current, pathRef.current, cursor)?.id ?? null
+    // Active comment changes rebuild the code columns. Keep WebKit from
+    // clamping the viewport against their temporary empty height.
+    if (scroll && commentId !== activeCommentIdRef.current) guardNextAnnotationRender()
+    updateActiveCommentId(commentId)
     syncDiffCursorPresentation(instance, cursor, cursorVisibleRef.current)
     syncRelativeLineNumbers(
       node,
@@ -81,9 +102,10 @@ export default function useDiffCursor({
       cursor,
       relativeLineNumbersRef.current,
     )
-    if (scroll) scrollDiffCursorIntoView(instance, node, cursor)
+    if (scroll) cursorScroll.request(instance, node, cursor)
+    else cursorScroll.cancel()
     return true
-  }, [updateActiveCommentId])
+  }, [cursorScroll, guardNextAnnotationRender, updateActiveCommentId])
 
   useLayoutEffect(() => {
     cursorVisibleRef.current = isCursorVisible
@@ -104,11 +126,10 @@ export default function useDiffCursor({
     )
   }, [relativeLineNumbers])
 
-  const centerCursor = useCallback((cursor) => centerDiffCursor(
-    renderInstanceRef.current,
-    renderedFileRef.current,
-    cursor,
-  ), [])
+  const centerCursor = useCallback((cursor) => {
+    cursorScroll.cancel()
+    return centerDiffCursor(renderInstanceRef.current, renderedFileRef.current, cursor)
+  }, [cursorScroll])
 
   const finishScrollGuard = useCallback(() => {
     const guard = scrollGuardRef.current
@@ -130,13 +151,14 @@ export default function useDiffCursor({
       )),
     })
     const cursor = { lineNumber: target.lineNumber, side: 'additions' }
-    activateCursor(cursor)
+    activateCursor(cursor, false)
     centerCursor(cursor)
   }, [activateCursor, centerCursor])
 
   const handlePostRender = useCallback((node, instance, phase) => {
     if (phase === 'unmount') {
       initialPosition.unmounted(instance)
+      cursorScroll.unmounted(instance)
       if (renderInstanceRef.current !== instance) return
       gutterObserverRef.current?.disconnect()
       gutterObserverRef.current = null
@@ -198,7 +220,8 @@ export default function useDiffCursor({
     )
     layoutAnchorRef.current = null
     finishScrollGuard()
-  }, [fileDiff?.path, finishScrollGuard, initialPosition, lineNavigation, navigateToLine])
+    cursorScroll.rendered(instance)
+  }, [cursorScroll, fileDiff?.path, finishScrollGuard, initialPosition, lineNavigation, navigateToLine])
 
   useLayoutEffect(() => {
     const node = renderedFileRef.current
@@ -207,32 +230,14 @@ export default function useDiffCursor({
   }, [handlePostRender])
 
   const guardNextLayoutRender = useCallback(() => {
+    cursorScroll.cancel()
     if (layoutAnchorRef.current) return
     layoutAnchorRef.current = captureDiffLayoutAnchor(
       renderInstanceRef.current,
       renderedFileRef.current,
       cursorRef.current,
     )
-  }, [])
-
-  const guardNextAnnotationRender = useCallback(() => {
-    if (scrollGuardRef.current) return
-
-    const node = renderedFileRef.current
-    const pre = node?.shadowRoot?.querySelector('pre')
-    const scrollContainer = node?.closest('.diff-scroll')
-    const height = pre?.offsetHeight ?? 0
-    if (!pre || !scrollContainer || height === 0) return
-
-    scrollGuardRef.current = {
-      left: scrollContainer.scrollLeft,
-      top: scrollContainer.scrollTop,
-      pre,
-      previousMinHeight: pre.style.minHeight,
-      scrollContainer,
-    }
-    pre.style.minHeight = `${height}px`
-  }, [])
+  }, [cursorScroll])
 
   const activateRangeCommentContext = useCallback((range) => {
     if (!fileDiff || !range) {
@@ -256,6 +261,8 @@ export default function useDiffCursor({
       cursor,
     )?.id ?? null)
   }, [fileDiff, updateActiveCommentId])
+
+  useEffect(() => () => cursorScroll.cancel(), [cursorScroll])
 
   const getActiveComment = useCallback(() => commentsRef.current.find(
     (comment) => comment.id === activeCommentIdRef.current,

@@ -319,15 +319,17 @@ function viewportState(viewport) {
   }
 }
 
-function renderedCursorBounds(node) {
-  const elements = node?.shadowRoot?.querySelectorAll?.('[data-editor-active-line]')
+function renderedCursorBounds(node, cursor) {
+  const elements = node?.shadowRoot?.querySelectorAll?.(`[data-line="${cursor.lineNumber}"]`)
   if (!elements || elements.length === 0) return null
 
   let top = Infinity
   let bottom = -Infinity
   for (const element of elements) {
+    const column = element.closest?.('[data-additions], [data-deletions]')
+    if (column && !column.hasAttribute(`data-${cursor.side}`)) continue
     const rect = element.getBoundingClientRect?.()
-    if (!rect || !Number.isFinite(rect.top) || !Number.isFinite(rect.bottom)) continue
+    if (!rect || rect.bottom <= rect.top || !Number.isFinite(rect.top) || !Number.isFinite(rect.bottom)) continue
     top = Math.min(top, rect.top)
     bottom = Math.max(bottom, rect.bottom)
   }
@@ -403,13 +405,17 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
     '[data-diffs-header][data-sticky]',
   )
   const stickyHeaderHeight = stickyHeader?.getBoundingClientRect?.().height ?? 0
-  const renderedBounds = renderedCursorBounds(node)
+  const renderedBounds = renderedCursorBounds(node, cursor)
   const viewportContentTop = viewportTop + stickyHeaderHeight
   const viewportBottomEdge = viewportTop + viewportHeight
 
   if (renderedBounds) {
     let nextScrollTop
-    if (renderedBounds.top < viewportContentTop) {
+    if (
+      renderedBounds.top < viewportContentTop ||
+      (renderedBounds.bottom - renderedBounds.top > viewportBottomEdge - viewportContentTop &&
+        renderedBounds.bottom > viewportBottomEdge)
+    ) {
       nextScrollTop = Math.max(
         0,
         scrollTop + renderedBounds.top - viewportContentTop,
@@ -427,7 +433,7 @@ export function scrollDiffCursorIntoView(instance, node, cursor) {
 
   if (!position || position.height <= 0 || !Number.isFinite(position.top)) return false
   const rowTop = scrollTop + nodeTop - viewportTop + position.top
-  const rowBottom = rowTop + position.height
+  const rowBottom = rowTop + Math.min(position.height, viewportHeight - stickyHeaderHeight)
   const viewportBottom = scrollTop + viewportHeight
   const estimatedContentTop = scrollTop + stickyHeaderHeight
 
