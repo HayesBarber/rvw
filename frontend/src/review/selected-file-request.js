@@ -1,7 +1,7 @@
 import { startFileTiming } from './file-timing.js'
 import { useEffect, useMemo, useState } from 'react'
 
-import { getFile, getFileDiff } from './api.js'
+import { createReviewFileCache } from './file-cache.js'
 import { RequestStatus } from './request-state.js'
 
 const idleFileRequest = Object.freeze({
@@ -18,7 +18,7 @@ const initialRequest = Object.freeze({
 
 export function fileRequestKey(diffId, path, changed, generation = 0) {
   if (!path || (changed && !diffId)) return null
-  return `${generation}\u0000${changed ? diffId : 'file'}\u0000${path}`
+  return JSON.stringify([diffId, generation, changed === true, path])
 }
 
 export function selectFileRequest(request, key, path) {
@@ -39,22 +39,23 @@ export function selectFileRequest(request, key, path) {
   }
 }
 
-export function useReviewFile({ diffId, path, changed, generation }) {
+export function useReviewFile({ diffId, path, changed, generation, cache: providedCache }) {
+  const [cache] = useState(() => providedCache ?? createReviewFileCache())
   const [request, setRequest] = useState(initialRequest)
   const key = fileRequestKey(diffId, path, changed, generation)
+
+  useEffect(() => () => cache.invalidate(), [cache, diffId, generation])
 
   useEffect(() => {
     if (!key) return undefined
 
     let active = true
     const timing = startFileTiming(path, changed)
-    const pendingRequest = changed
-      ? getFileDiff(diffId, path, timing)
-      : getFile(path, timing)
+    const pendingRequest = cache.load({ diffId, path, changed, generation }, timing)
 
     pendingRequest
       .then((file) => {
-        if (active) {
+        if (active && file) {
           timing?.attach(file)
           setRequest({
             status: RequestStatus.SUCCESS,
@@ -82,7 +83,7 @@ export function useReviewFile({ diffId, path, changed, generation }) {
       active = false
       timing?.finish('superseded')
     }
-  }, [changed, diffId, generation, key, path])
+  }, [cache, changed, diffId, generation, key, path])
 
   return useMemo(
     () => selectFileRequest(request, key, path),
