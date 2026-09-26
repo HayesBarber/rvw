@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { getConfiguration, getDiffOverview } from '../src/review/api.js'
 import { markFileSelection, observeFileTiming } from '../src/review/file-timing.js'
@@ -13,10 +13,14 @@ await getConfiguration()
 
 export default function Benchmark() {
   const [selection, setSelection] = useState({ path: null, generation: 0 })
-  const request = useReviewFile({ diffId: overview.id, ...selection })
+  const [files, setFiles] = useState([])
+  const paths = useMemo(() => files.map((file) => file.path), [files])
+  const changedPaths = useMemo(() => new Set(files.filter((file) => file.changed).map((file) => file.path)), [files])
+  const request = useReviewFile({ diffId: overview.id, ...selection, paths, changedPaths })
   useEffect(() => {
     window.benchmark = {
       events,
+      configure: setFiles,
       select(path, changed) {
         markFileSelection(path)
         setSelection({ path, changed, generation: 0 })

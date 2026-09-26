@@ -39,7 +39,7 @@ export function selectFileRequest(request, key, path) {
   }
 }
 
-export function useReviewFile({ diffId, path, changed, generation, cache: providedCache }) {
+export function useReviewFile({ diffId, path, changed, generation, cache: providedCache, paths, changedPaths }) {
   const [cache] = useState(() => providedCache ?? createReviewFileCache())
   const [request, setRequest] = useState(initialRequest)
   const key = fileRequestKey(diffId, path, changed, generation)
@@ -84,6 +84,13 @@ export function useReviewFile({ diffId, path, changed, generation, cache: provid
       timing?.finish('superseded')
     }
   }, [cache, changed, diffId, generation, key, path])
+
+  useEffect(() => {
+    if (key && paths && changedPaths) {
+      cache.warm({ diffId, path, changed, generation }, paths, changedPaths)
+    }
+    return () => cache.stopWarming()
+  }, [cache, key, diffId, path, changed, generation, paths, changedPaths])
 
   return useMemo(
     () => selectFileRequest(request, key, path),

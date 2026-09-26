@@ -144,3 +144,192 @@ test('a parser failure is not cached', async () => {
   await cache.load(selection('added', true))
   assert.equal(parses, 2)
 })
+
+function scheduledFixture(options = {}) {
+  const tasks = new Set()
+  const calls = []
+  const cache = createReviewFileCache({
+    capacity: 3,
+    schedule(callback) { tasks.add(callback); return () => tasks.delete(callback) },
+    fetchFile: async (path) => {
+      calls.push(path)
+      return { path, content: { kind: 'file', file: contents(path, path) } }
+    },
+    ...options,
+  })
+  const tick = async () => {
+    for (let i = 0; i < 12; i++) await Promise.resolve()
+    const task = tasks.values().next().value
+    if (task) { tasks.delete(task); task() }
+    for (let i = 0; i < 12; i++) await Promise.resolve()
+  }
+  const drain = async () => { while (tasks.size) await tick() }
+  const warm = (path, paths = ['a', 'b', 'c', 'd', 'e']) => cache.warm(selection(path), paths, new Set())
+  return { cache, calls, tasks, tick, drain, warm }
+}
+
+test('nearby paths follow navigation order, nearest first, without wrapping', async () => {
+  const { nearbyFilePaths } = await import('./file-cache.js')
+  const paths = ['e', 'a', 'd', 'b', 'c', 'f']
+  assert.deepEqual(nearbyFilePaths(paths, 'd'), ['b', 'a', 'c', 'e'])
+  assert.deepEqual(nearbyFilePaths(paths, 'e'), ['a', 'd'])
+  assert.deepEqual(nearbyFilePaths(paths, 'f'), ['c', 'b'])
+  assert.deepEqual(nearbyFilePaths(paths, 'missing'), [])
+})
+
+test('warming is deferred, capacity bounded, and preserves the selected file', async () => {
+  const { cache, calls, warm, drain } = scheduledFixture()
+  await cache.load(selection('c'))
+  warm('c')
+  assert.deepEqual(calls, ['c'])
+  await drain()
+  assert.deepEqual(calls, ['c', 'd', 'b'])
+  await cache.load(selection('c'))
+  await cache.load(selection('d'))
+  assert.deepEqual(calls, ['c', 'd', 'b'])
+})
+
+test('one-entry cache does no speculative work', async () => {
+  const { cache, calls, warm, drain } = scheduledFixture({ capacity: 1 })
+  await cache.load(selection('c'))
+  warm('c')
+  await drain()
+  await cache.load(selection('c'))
+  assert.deepEqual(calls, ['c'])
+})
+
+test('active loads take priority; pending loads are shared and warming is serial', async () => {
+  const pending = new Map()
+  const { cache, warm, tick, tasks } = scheduledFixture({
+    fetchFile: (path) => new Promise((resolve) => pending.set(path, resolve)),
+  })
+  const a = cache.load(selection('a'))
+  warm('a')
+  assert.equal(tasks.size, 0)
+  pending.get('a')({ content: { kind: 'file' } })
+  await a
+  await tick()
+  assert.deepEqual([...pending.keys()], ['a', 'b'])
+  assert.equal(tasks.size, 0)
+  const b = cache.load(selection('b'))
+  warm('b')
+  await tick()
+  assert.equal(pending.size, 2)
+  pending.get('b')({ path: 'b', content: { kind: 'file' } })
+  assert.equal((await b).path, 'b')
+  await tick()
+  assert.deepEqual([...pending.keys()], ['a', 'b', 'c'])
+})
+
+test('selection replaces queued neighbors and discards obsolete responses', async () => {
+  let finish
+  const { cache, warm, tick, drain } = scheduledFixture({
+    fetchFile: (path) => path === 'b'
+      ? new Promise((resolve) => { finish = resolve })
+      : Promise.resolve({ path, content: { kind: 'file' } }),
+  })
+  await cache.load(selection('a'))
+  warm('a')
+  await tick()
+  await cache.load(selection('e'))
+  warm('e')
+  finish({ path: 'obsolete', content: { kind: 'file' } })
+  await tick()
+  await drain()
+  const b = cache.load(selection('b'))
+  finish({ path: 'fresh', content: { kind: 'file' } })
+  assert.equal((await b).path, 'fresh')
+})
+
+test('reload cancels scheduled parsing and prevents old warm responses from inserting', async () => {
+  let parses = 0
+  const { cache, tick, tasks } = scheduledFixture({
+    fetchDiff: async () => ({ content: { kind: 'diff', oldFile: null, newFile: contents('b', 'new') } }),
+    parseDiff: () => { parses++; return {} },
+  })
+  await cache.load(selection('a'))
+  cache.warm(selection('a'), ['a', 'b'], new Set(['b']))
+  await tick()
+  assert.equal(tasks.size, 1, 'parsing waits for a separate idle task')
+  cache.invalidate()
+  await tick()
+  assert.equal(parses, 0)
+  await cache.load(selection('b', true))
+  assert.equal(parses, 1)
+})
+
+test('selecting a warm diff promotes idle parsing and reuses its metadata', async () => {
+  let fetches = 0, parses = 0
+  const { cache, tick } = scheduledFixture({
+    fetchDiff: async () => { fetches++; return { content: { kind: 'diff' } } },
+    parseDiff: () => { parses++; return { hunks: [] } },
+  })
+  await cache.load(selection('a'))
+  cache.warm(selection('a'), ['a', 'b'], new Set(['b']))
+  await tick()
+  const b = await cache.load(selection('b', true))
+  assert.equal((await cache.load(selection('b', true))).parsedDiff, b.parsedDiff)
+  assert.equal(fetches, 1)
+  assert.equal(parses, 1)
+})
+
+test('background errors are silent and active selections retry', async () => {
+  let attempts = 0
+  const { cache, warm, drain } = scheduledFixture({
+    fetchFile: async (path) => {
+      if (path === 'b' && ++attempts === 1) throw new Error('background failure')
+      return { path, content: { kind: 'file' } }
+    },
+  })
+  await cache.load(selection('a'))
+  warm('a')
+  await drain()
+  assert.equal((await cache.load(selection('b'))).path, 'b')
+  assert.equal(attempts, 2)
+})
+
+test('speculative eviction skips the selected entry after active requests finish out of order', async () => {
+  let finish
+  const calls = []
+  const { cache, warm, drain } = scheduledFixture({
+    fetchFile: (path) => {
+      calls.push(path)
+      if (path === 'old') return new Promise((resolve) => { finish = resolve })
+      return Promise.resolve({ path, content: { kind: 'file' } })
+    },
+  })
+  const old = cache.load(selection('old'))
+  await cache.load(selection('c'))
+  finish({ path: 'old', content: { kind: 'file' } })
+  await old
+  warm('c')
+  await drain()
+  await cache.load(selection('c'))
+  assert.deepEqual(calls, ['old', 'c', 'd', 'b'])
+})
+
+test('reload discards an in-flight warm fetch and retains the single physical slot', async () => {
+  let finish
+  const calls = []
+  const { cache, warm, tick, drain } = scheduledFixture({
+    fetchFile: (path) => {
+      calls.push(path)
+      if (path === 'b') return new Promise((resolve) => { finish = resolve })
+      return Promise.resolve({ path, content: { kind: 'file' } })
+    },
+  })
+  await cache.load(selection('a'))
+  warm('a')
+  await tick()
+  cache.invalidate()
+  await cache.load(selection('e'))
+  warm('e')
+  await tick()
+  assert.deepEqual(calls, ['a', 'b', 'e'])
+  finish({ path: 'stale', content: { kind: 'file' } })
+  await tick()
+  await drain()
+  const b = cache.load(selection('b'))
+  finish({ path: 'fresh', content: { kind: 'file' } })
+  assert.equal((await b).path, 'fresh')
+})

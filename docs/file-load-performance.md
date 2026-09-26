@@ -24,7 +24,8 @@ The fixed workload has six JavaScript files: changed and unchanged files with
 number. The source size ranges from about 2.7 KiB to 238 KiB, below the review
 limit. The command runs:
 
-- One initial open of each file in a fresh browser context.
+- One initial open of each file in a fresh browser context, with a 250 ms
+  reading interval after each visible file to allow nearby warming.
 - Five passes that reopen every file in the same order.
 - Five rapid-switch passes. Each selection waits only for request scheduling;
   the last selection in each pass waits for visible content.
@@ -179,7 +180,7 @@ an invalidation token. A late response from an older token is discarded before
 parsing or insertion. Selection guards also prevent a response for a previously
 selected file from replacing the current file. Unchanged content remains fixed
 while cached; use Reload to read filesystem changes. Nearby-file warming and
-pending-request deduplication remain part of #191.
+pending-request deduplication are described below.
 
 The cache events use the existing opt-in timing trace. They contain no file
 identity or content. Their event counts are the hit, miss, and eviction counts;
@@ -222,6 +223,78 @@ and 11 before, and 8 in each after run, out of 30 selections per run.
 The cache removes repeated fetching and parsing. It does not remove renderer
 or highlighting work. These results do not meet the parent issue's 50%
 rendering targets. Warming and highlighter preloading remain separate work.
+
+## Nearby-file warming (#191)
+
+The cache warms up to two files on each side of the selection. It uses the
+same ordered paths as keyboard navigation in the current tree mode. The next
+file has priority, followed by the previous file, then the two outer neighbors.
+The window stops at list boundaries. It never wraps. Changed files use the diff
+endpoint; unchanged files use the file endpoint.
+
+Only one speculative load runs at a time. Warming starts in an idle callback
+after the selected request completes. Browsers without `requestIdleCallback`
+use a 50 ms timer. An active selection starts immediately, or shares an existing
+request for that file. Queued neighbors are replaced on selection changes.
+Already submitted transport requests cannot be cancelled through the shared API.
+An obsolete speculative response is discarded before parsing or insertion.
+The physical warming slot stays occupied until that request ends, including
+across reloads. Background failures are silent and remain retryable.
+
+The selected entry is excluded from eviction. The window is also limited to
+capacity minus one, so a one-entry cache does no warming. Successful speculative
+entries share the 20-entry LRU limit with active entries. Reload cancels queued
+work and pending idle parsing. The existing generation token rejects late
+responses. Per-selection response guards still prevent stale display updates.
+
+Diff parsing runs in a separate idle callback on the UI thread. Selecting a
+file whose parse is waiting promotes that parse immediately. The installed
+`@pierre/diffs` worker API performs highlighting on already parsed metadata;
+it has no public task for `parseDiffFromFile`. A custom module worker could
+run the parser, but would add worker startup, source/result cloning, and native
+WebView asset-loading requirements. This change retains the shared parser and
+measures frame gaps. One synchronous parse cannot be interrupted once started.
+The choice does not guarantee a maximum frame time for every repository.
+Highlighter preloading remains part of #192.
+
+The benchmark passes the fixed workload order into the production hook. Set
+`RVW_BENCH_WARM=0` to disable warming for a comparison run. Both settings use
+the same reading interval, cache, renderer, and rapid-switch workload. The first
+selection is cold; later initial selections can be warm. This differs from the
+initial-open workload in the older reports. Compare paired runs with the same
+setting for the reading interval, rather than treating the old reports as a
+controlled warming comparison.
+
+## Warming comparison (#191)
+
+[file-load-warming.json](file-load-warming.json) retains three paired runs on
+Apple M1 with Chrome 154. Runs alternated warming disabled and enabled, without
+concurrent builds or tests. Both settings used the source in this PR and the
+250 ms reading interval. The recorded revision is the base revision.
+
+The table shows the median of the three p95 values, in milliseconds:
+
+| Measurement | Disabled | Enabled |
+| --- | ---: | ---: |
+| Initial diff content ready | 86.0 | 7.2 |
+| Initial unchanged content ready | 15.0 | 6.8 |
+| Initial diff visible | 896.9 | 841.8 |
+| Initial unchanged visible | 429.2 | 422.6 |
+| Repeated diff visible | 788.1 | 791.8 |
+| Repeated unchanged visible | 385.4 | 387.2 |
+| Frame gap | 366.6 | 366.7 |
+
+Each enabled run recorded five initial cache hits after the first cold file,
+compared with zero when disabled. Those five selections made no backend file
+request and did not parse a diff again. Repeated and rapid selections recorded
+60 hits per run with either setting. The cache avoids fetching and parsing;
+rendering remains the largest cost. The first cold file's median visible time
+was 98.2 ms with warming disabled and 97.6 ms with warming enabled. One enabled
+run took 240.0 ms for that first file; the other two took 97.6 and 95.4 ms.
+The paired medians show no material active-load or frame-gap regression, but
+three runs do not establish a worst-case bound. Frame gaps are not an input
+latency measurement, and this benchmark excludes application startup.
+These results do not meet the parent issue's 50% rendering targets.
 
 ## Cleanup after the targets are met
 
