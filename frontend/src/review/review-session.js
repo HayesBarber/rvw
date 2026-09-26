@@ -122,6 +122,8 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   )
   const fileRequest = useReviewFile({
     cache: fileCache,
+    paths: visibleFilePaths,
+    changedPaths,
     diffId: overview?.id ?? null,
     path: activePath,
     changed: changedPaths.has(activePath),

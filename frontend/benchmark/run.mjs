@@ -74,6 +74,7 @@ try {
   page.on('pageerror', (error) => { console.error(error); process.exitCode = 1 })
   await page.goto(`${web.resolvedUrls.local[0]}benchmark/index.html`)
   await page.waitForFunction(() => window.benchmark)
+  if (process.env.RVW_BENCH_WARM !== '0') await page.evaluate((files) => window.benchmark.configure(files), files)
   await page.evaluate(() => {
     window.benchmark.frameGaps = []
     let previous = performance.now()
@@ -98,7 +99,11 @@ try {
     }
     samples.push({ scenario, ...file, traceId })
   }
-  for (const file of files) await select(file, 'initial')
+  for (const file of files) {
+    await select(file, 'initial')
+    // A fixed reading interval gives nearby work time to complete.
+    await pause(250)
+  }
   for (let repeat = 0; repeat < 5; repeat++) for (const file of files) await select(file, 'repeated')
   for (let repeat = 0; repeat < 5; repeat++) {
     for (const file of files) await select(file, 'rapid', false)
@@ -145,7 +150,7 @@ try {
   const summary = Object.fromEntries([...groups].map(([key, values]) => [key, statistics(values)]))
   const byFile = Object.fromEntries([...fileGroups].map(([key, values]) => [key, statistics(values)]))
   const packages = Object.fromEntries(await Promise.all(['@pierre/diffs', 'react', 'vite', 'playwright'].map(async (name) => [name, JSON.parse(await readFile(resolve(root, 'frontend/node_modules', name, 'package.json'), 'utf8')).version])))
-  const result = { environment: { date: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), platform: platform(), release: release(), cpu: cpus()[0].model, node: process.version, zig: execFileSync('zig', ['version'], { encoding: 'utf8' }).trim(), browser: browser.version(), viewport: '1440x900', optimize: 'ReleaseFast', packages }, files, samples, events, backendEvents, summary, byFile, frameGaps: statistics(frameGaps) }
+  const result = { warming: process.env.RVW_BENCH_WARM !== '0', adjacentReadMs: 250, environment: { date: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), platform: platform(), release: release(), cpu: cpus()[0].model, node: process.version, zig: execFileSync('zig', ['version'], { encoding: 'utf8' }).trim(), browser: browser.version(), viewport: '1440x900', optimize: 'ReleaseFast', packages }, files, samples, events, backendEvents, summary, byFile, frameGaps: statistics(frameGaps) }
   await writeFile(output, JSON.stringify(result, null, 2) + '\n')
   console.table(summary)
   console.log(`Results: ${output}`)
