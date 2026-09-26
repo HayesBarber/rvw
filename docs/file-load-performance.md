@@ -88,8 +88,9 @@ marked as frontend events.
 `highlight_tokens` detects token markup in the renderer's shadow root without
 reading text or private renderer fields. Plain text and unavailable files can
 have no token marker. The fixed JavaScript workload requires both visible and
-token markers. The current MultiFileDiff API combines parsing and rendering;
-these stages do not claim separate parser or highlighter CPU time. Their timing
+token markers. `DiffSurface` parses old/new inputs with `parseDiffFromFile` and
+passes the metadata to `FileDiff`. The render stages still include parsing;
+they do not claim separate parser or highlighter CPU time. Their timing
 includes waits for asynchronous highlighting. A late callback from a superseded
 request does not produce a completion event.
 
@@ -126,6 +127,32 @@ Also target a 50% reduction in the 8,000-line repeated-open median. Keep
 initial-open p95 and frame-gap p95 within 10% of this baseline. Confirm changes
 with at least three runs on the same machine. These are comparison targets,
 not claims about native WebKit performance.
+
+## Explicit parsing comparison (#189)
+
+[file-load-explicit-parsing.json](file-load-explicit-parsing.json) records three
+runs before and three runs after the switch to `FileDiff`. All six runs used
+the same Apple M1, Chrome 154, dependencies, and fixed workload. The report
+retains each run's environment, stage summaries, per-file values, and frame gaps.
+The before runs use revision `cf9aa9f`; the after runs add the `DiffSurface`
+change in the pull request that contains this report.
+
+The table shows the median of the three p95 values, in milliseconds:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Initial diff open | 857.9 | 846.0 |
+| Initial unchanged-file open | 392.3 | 388.3 |
+| Repeated diff open | 837.5 | 839.2 |
+| Repeated unchanged-file open | 397.5 | 391.6 |
+| Frame gap | 783.4 | 783.2 |
+
+The median of the three 8,000-line repeated-open medians changed from
+822.6 to 828.3 ms for diffs and from 386.8 to 384.9 ms for unchanged files.
+Rapid-switch superseded counts were 10, 12, and 13 before, and 12, 12, and 13
+after, out of 30 selections per run. These results show no material regression.
+They do not establish a performance improvement. Caching, warming, and
+highlighter preloading remain separate work.
 
 ## Cleanup after the targets are met
 
