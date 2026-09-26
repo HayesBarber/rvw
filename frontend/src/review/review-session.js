@@ -1,3 +1,4 @@
+import { createReviewFileCache } from './file-cache.js'
 import { markFileSelection } from './file-timing.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -65,6 +66,7 @@ export function selectEmptyReviewTreeMode(overview, treeMode) {
 }
 
 export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft }) {
+  const [fileCache] = useState(createReviewFileCache)
   const [generation, setGeneration] = useState(0)
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
@@ -119,6 +121,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     [visibleFiles],
   )
   const fileRequest = useReviewFile({
+    cache: fileCache,
     diffId: overview?.id ?? null,
     path: activePath,
     changed: changedPaths.has(activePath),
@@ -126,13 +129,14 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   })
 
   const handleReloaded = useCallback((result) => {
+    fileCache.invalidate()
     setGeneration(result.generation)
     return Promise.all([
       overviewRequest.load(),
       allFilesRequest.load(),
       notIgnoredFilesRequest.load(),
     ])
-  }, [allFilesRequest, notIgnoredFilesRequest, overviewRequest])
+  }, [allFilesRequest, fileCache, notIgnoredFilesRequest, overviewRequest])
   const reloadRequest = useReloadReview({
     hasUnsavedDraft,
     onReloaded: handleReloaded,

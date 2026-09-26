@@ -1,6 +1,6 @@
 import { recordFileRender } from '../../review/file-timing.js'
 import { useCallback, useMemo } from 'react'
-import { DEFAULT_VIRTUAL_FILE_METRICS, parseDiffFromFile } from '@pierre/diffs'
+import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
 import { File, FileDiff, Virtualizer } from '@pierre/diffs/react'
 
 const diffCursorCSS = `
@@ -56,10 +56,6 @@ export default function DiffSurface({
   onSelectLines,
   wrapLines = true,
 }) {
-  const { kind, oldFile, newFile } = fileDiff.content
-  const parsedDiff = useMemo(() => (
-    kind === 'diff' ? parseDiffFromFile(oldFile, newFile) : null
-  ), [kind, oldFile, newFile])
   const handlePostRender = useCallback((node, instance, phase) => {
     recordFileRender(fileDiff, node, phase)
     onPostRender?.(node, instance, phase)
@@ -82,7 +78,7 @@ export default function DiffSurface({
       {fileDiff.content.kind === 'diff' ? (
         <FileDiff
           key={expandUnchanged ? 'expanded' : 'collapsed'}
-          fileDiff={parsedDiff}
+          fileDiff={fileDiff.parsedDiff}
           lineAnnotations={lineAnnotations}
           metrics={metrics}
           selectedLines={selectedLines}

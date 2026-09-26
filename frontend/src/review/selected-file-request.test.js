@@ -8,11 +8,15 @@ import {
 } from './selected-file-request.js'
 
 test('selected-file keys distinguish changed diffs from repository files', () => {
-  assert.equal(fileRequestKey('diff-1', 'src/main.js', true), '0\u0000diff-1\u0000src/main.js')
-  assert.equal(fileRequestKey('diff-1', 'src/main.js', false), '0\u0000file\u0000src/main.js')
+  assert.equal(fileRequestKey('diff-1', 'src/main.js', true), JSON.stringify(['diff-1', 0, true, 'src/main.js']))
+  assert.equal(fileRequestKey('diff-1', 'src/main.js', false), JSON.stringify(['diff-1', 0, false, 'src/main.js']))
   assert.notEqual(
     fileRequestKey('diff-1', 'src/main.js', true, 1),
     fileRequestKey('diff-1', 'src/main.js', true, 2),
+  )
+  assert.notEqual(
+    fileRequestKey('diff-1', 'src/main.js', false),
+    fileRequestKey('diff-2', 'src/main.js', false),
   )
   assert.equal(fileRequestKey(null, 'src/main.js', true), null)
   assert.equal(fileRequestKey('diff-1', null, false), null)

@@ -31,7 +31,7 @@ limit. The command runs:
 
 Initial opens share one browser context. Thus, only the first file has a cold
 JavaScript highlighter. OS file caches are not cleared. Repeated opens retain the
-review generation, so future caches can reuse data. The benchmark uses the same
+review generation, so the file cache can reuse data. The benchmark uses the same
 `useReviewFile` hook and `DiffSurface` as the application. It excludes the file
 tree, comments, startup, and development StrictMode.
 
@@ -70,8 +70,10 @@ include file paths, source text, diffs, or exception messages.
 | `native_response_parse` | Native response JSON decoding and envelope validation. |
 | `backend_file` | Core file request, including provider lookup or filesystem read. |
 | `response_serialize` | Backend JSON encoding; `bytes` is the encoded response size. |
-| `response_ready` | Selection to accepted response. |
-| `render_first` | Accepted response to the first renderer callback, including React scheduling, diff parsing, and rendering. |
+| `cache_hit` / `cache_miss` | Cache lookup outcome for one selection. Count these events to measure reuse. |
+| `cache_eviction` | One least-recently-used entry was removed after a load. |
+| `response_ready` | Selection to prepared content, including diff parsing on a cache miss. |
+| `render_first` | Accepted response to the first renderer callback, including React scheduling and rendering. |
 | `highlight_tokens` | Accepted response to the first callback with styled token markup. |
 | `visible` | Selection to two animation frames after the first renderer callback. |
 | `completed` | Selection ended after the visible marker. |
@@ -88,9 +90,10 @@ marked as frontend events.
 `highlight_tokens` detects token markup in the renderer's shadow root without
 reading text or private renderer fields. Plain text and unavailable files can
 have no token marker. The fixed JavaScript workload requires both visible and
-token markers. `DiffSurface` parses old/new inputs with `parseDiffFromFile` and
-passes the metadata to `FileDiff`. The render stages still include parsing;
-they do not claim separate parser or highlighter CPU time. Their timing
+token markers. The file loader parses old/new inputs with `parseDiffFromFile` on a cache miss.
+`DiffSurface` passes this metadata to `FileDiff`. Parsing is now included in
+`response_ready`, rather than `render_first`. These stages do not claim separate
+parser or highlighter CPU time. Their timing
 includes waits for asynchronous highlighting. A late callback from a superseded
 request does not produce a completion event.
 
@@ -153,6 +156,72 @@ Rapid-switch superseded counts were 10, 12, and 13 before, and 12, 12, and 13
 after, out of 30 selections per run. These results show no material regression.
 They do not establish a performance improvement. Caching, warming, and
 highlighter preloading remain separate work.
+
+## File cache policy (#190)
+
+Each mounted review session retains at most 20 files in one LRU cache. Changed
+and unchanged files share this limit. Entries contain parsed `FileDiffMetadata`
+and its source inputs, or unchanged file content. The snapshot identity contains
+the backend diff ID and reload generation. File identity contains the canonical
+path and whether the file is changed. Thus, the same path cannot reuse content
+from another snapshot or from the other file kind.
+
+A hit moves the entry to the most-recent position. A successful miss inserts
+an entry and removes the least-recent entry if the count exceeds 20. Errors and
+unavailable content are not cached. This is an entry limit, not a byte limit;
+large files consume more memory than small files. The backend content-size
+limits still apply. Each selection has a separate timing object, while source
+content and parsed metadata remain shared.
+
+A successful `review.reload` clears the cache before the session updates its
+generation. Snapshot changes and unmount also clear it. Each pending load holds
+an invalidation token. A late response from an older token is discarded before
+parsing or insertion. Selection guards also prevent a response for a previously
+selected file from replacing the current file. Unchanged content remains fixed
+while cached; use Reload to read filesystem changes. Nearby-file warming and
+pending-request deduplication remain part of #191.
+
+The cache events use the existing opt-in timing trace. They contain no file
+identity or content. Their event counts are the hit, miss, and eviction counts;
+their duration is elapsed selection time, not cache CPU time.
+
+## File cache comparison (#190)
+
+[file-load-cache.json](file-load-cache.json) records three runs before and three
+runs after the cache change. All six runs used the same Apple M1, Chrome 154,
+dependencies, and fixed workload. Before uses revision `13f5094`; after adds the
+source changes in the pull request that contains this report. One preliminary
+after run overlapped compilation and was excluded. The retained runs were
+sequential, without concurrent builds or tests.
+
+The table shows the median of the three p95 values, in milliseconds:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Initial diff open | 848.3 | 859.0 |
+| Initial unchanged-file open | 389.1 | 390.0 |
+| Repeated diff open | 830.5 | 802.8 |
+| Repeated unchanged-file open | 393.9 | 408.2 |
+| Repeated diff content ready | 6.9 | 1.4 |
+| Repeated unchanged content ready | 8.5 | 2.2 |
+| Frame gap | 783.3 | 750.0 |
+
+The 8,000-line repeated-open median changed from 823.5 to 783.8 ms for diffs
+and from 384.2 to 380.7 ms for unchanged files. These values are the median
+of each run's median. Diff repeated-open timings improved modestly. Unchanged
+file results are mixed: the large-file median decreased, but p95 increased
+3.6%. The runs do not establish a clear unchanged-file rendering improvement.
+Cold-load and frame-gap p95 remain within the 10% comparison limit.
+
+Each after run recorded six initial misses and 60 hits across repeated and
+rapid selections. None of those 60 selections had a backend file request.
+The six-file workload fits within the capacity and caused no eviction; unit
+tests verify eviction separately. Rapid-switch superseded counts were 10, 12,
+and 11 before, and 8 in each after run, out of 30 selections per run.
+
+The cache removes repeated fetching and parsing. It does not remove renderer
+or highlighting work. These results do not meet the parent issue's 50%
+rendering targets. Warming and highlighter preloading remain separate work.
 
 ## Cleanup after the targets are met
 
