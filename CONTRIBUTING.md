@@ -40,6 +40,12 @@ and fabricates staged and unstaged additions, modifications, and deletions for
 reviewing. The worktree is removed when development stops. Set `RVW_PORT` to
 use a different development port.
 
+## Release builds
+
+See [macOS releases](docs/releases.md) for signing credentials, local and CI
+build commands, cleanup, and real artifact verification. Release preparation
+requires the explicit `-Drelease=true` option.
+
 ## Tech stack
 
 - **Zig:** application core, Git and filesystem providers, HTTP server, CLI, configuration, logging, and macOS C bindings.
