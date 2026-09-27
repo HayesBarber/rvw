@@ -1,3 +1,4 @@
+import { useHighlighterPreload } from './use-highlighter-preload.js'
 import { createReviewFileCache } from './file-cache.js'
 import { markFileSelection } from './file-timing.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -129,6 +130,11 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     changed: changedPaths.has(activePath),
     generation,
   })
+
+  const preloadPaths = useMemo(() => [
+    ...changedPaths, ...allFilesRequest.data, ...notIgnoredFilesRequest.data,
+  ], [changedPaths, allFilesRequest.data, notIgnoredFilesRequest.data])
+  useHighlighterPreload(preloadPaths, fileRequest.status === RequestStatus.LOADING)
 
   const handleReloaded = useCallback((result) => {
     fileCache.invalidate()

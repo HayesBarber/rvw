@@ -1,3 +1,4 @@
+import { REVIEW_THEME } from '../../review/highlighter-preload.js'
 import { recordFileRender } from '../../review/file-timing.js'
 import { useCallback, useMemo } from 'react'
 import { DEFAULT_VIRTUAL_FILE_METRICS } from '@pierre/diffs'
@@ -30,6 +31,7 @@ const diffCursorCSS = `
 `
 
 const baseOptions = {
+  theme: REVIEW_THEME,
   diffStyle: 'split',
   enableGutterUtility: true,
   enableLineSelection: true,
