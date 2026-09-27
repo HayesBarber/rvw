@@ -12,6 +12,7 @@ pub const Context = struct {
 const AppArtifacts = struct {
     executable: std.Build.LazyPath,
     library: *std.Build.Step.Compile,
+    aligned_library: std.Build.LazyPath,
     cli: *std.Build.Step.Compile,
     frontend: *std.Build.Step.Run,
 };
@@ -19,7 +20,7 @@ const AppArtifacts = struct {
 pub fn addApp(context: Context) void {
     const artifacts = addAppArtifacts(context);
     addSwiftTests(context);
-    addNativeCoreTests(context, artifacts.library);
+    addNativeCoreTests(context, artifacts.aligned_library);
     addBundleInstallation(context, artifacts);
     addRunStep(context.b);
 }
@@ -56,6 +57,11 @@ fn addAppArtifacts(context: Context) AppArtifacts {
     // Swift links this static library without Zig's compiler driver. Include
     // the runtime helpers used by structured JSON number conversion.
     library.bundle_compiler_rt = true;
+    // Xcode 26 requires 8-byte alignment for archive members. Zig 0.16 can
+    // write a member at a 4-byte offset, so use Apple's archiver before linking.
+    const align_library = b.addSystemCommand(&.{ "node", "build/align-static-archive.mjs" });
+    align_library.addFileArg(library.getEmittedBin());
+    const aligned_library = align_library.addOutputFileArg("librvw_macos.a");
     const cli = b.addExecutable(.{
         .name = "rvw",
         .root_module = b.createModule(.{
@@ -87,19 +93,19 @@ fn addAppArtifacts(context: Context) AppArtifacts {
         "macos/window_lifecycle.swift",
         "macos/application_controller.swift",
     }) |source| swift.addFileArg(b.path(source));
-    swift.step.dependOn(&library.step);
-    swift.addFileArg(library.getEmittedBin());
+    swift.addFileArg(aligned_library);
     swift.addArg("-o");
 
     return .{
         .executable = swift.addOutputFileArg("Rvw"),
         .library = library,
+        .aligned_library = aligned_library,
         .cli = cli,
         .frontend = frontend,
     };
 }
 
-fn addNativeCoreTests(context: Context, library: *std.Build.Step.Compile) void {
+fn addNativeCoreTests(context: Context, library: std.Build.LazyPath) void {
     const b = context.b;
     // Link the same Zig library as the app. Host tests use a simulated core and
     // cannot detect failures in child processes started from a DispatchQueue.
@@ -112,7 +118,7 @@ fn addNativeCoreTests(context: Context, library: *std.Build.Step.Compile) void {
         "macos/test_support.swift",
         "macos/native_core_tests.swift",
     }) |source| compile.addFileArg(b.path(source));
-    compile.addFileArg(library.getEmittedBin());
+    compile.addFileArg(library);
     compile.addArg("-o");
     const executable = compile.addOutputFileArg("NativeCoreTests");
     const run = b.addSystemCommand(&.{"/usr/bin/env"});
