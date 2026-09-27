@@ -72,6 +72,18 @@ export function parseKeychains(stdout) {
   })
 }
 
+export function importedIdentityHash(stdout, name) {
+  const hashes = stdout.split('\n').map((line) => {
+    const match = line.match(/^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"(.*)"\s*$/)
+    return match?.[2] === name ? match[1].toUpperCase() : null
+  }).filter(Boolean)
+  const unique = [...new Set(hashes)]
+  if (unique.length !== 1) {
+    throw new Error('The imported .p12 must contain exactly one valid requested signing identity and private key')
+  }
+  return unique[0]
+}
+
 // Inspect actual code instead of relying on a list that can miss a new helper.
 export async function nestedCode(app) {
   const root = await realpath(app)
@@ -173,12 +185,12 @@ export async function prepareRelease({ app, output, version, checkOnly = false }
     await invoke('/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', password, keychain])
     await invoke('/usr/bin/security', ['list-keychains', '-d', 'user', '-s', keychain, ...originalKeychains])
     const identities = (await invoke('/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning', keychain])).stdout
-    if (!identities.includes(`"${env.RVW_SIGNING_IDENTITY}"`)) {
-      throw new Error('The imported .p12 does not contain the requested valid signing identity and private key')
-    }
+    const signingHash = importedIdentityHash(identities, env.RVW_SIGNING_IDENTITY)
     stage = 'Developer ID signing'
     for (const target of [...nested, stagedApp]) {
-      const result = await invoke('/usr/bin/codesign', ['--force', '--sign', env.RVW_SIGNING_IDENTITY, '--keychain', keychain, '--timestamp', '--options', 'runtime', target], { allowFailure: true })
+      // Use the certificate hash from the temporary keychain. The login
+      // keychain can contain an older Developer ID cert with the same name.
+      const result = await invoke('/usr/bin/codesign', ['--force', '--sign', signingHash, '--keychain', keychain, '--timestamp', '--options', 'runtime', target], { allowFailure: true })
       if (result.code !== 0) throw signingFailure(result, target, stagedApp, env)
     }
     await invoke('/usr/bin/codesign', ['--verify', '--deep', '--strict', stagedApp])

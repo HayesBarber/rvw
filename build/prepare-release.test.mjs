@@ -4,7 +4,7 @@ import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } 
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { nestedCode, parseKeychains, prepareRelease, runTool } from './prepare-release.mjs'
+import { importedIdentityHash, nestedCode, parseKeychains, prepareRelease, runTool } from './prepare-release.mjs'
 
 const env = {
   RVW_CERTIFICATE_BASE64: Buffer.from('test certificate').toString('base64'),
@@ -15,6 +15,7 @@ const env = {
   RVW_NOTARY_ISSUER_ID: '11111111-2222-3333-4444-555555555555',
 }
 const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+const signingHash = 'A'.repeat(40)
 const macho = Buffer.from('cffaedfe00000000', 'hex')
 
 async function fixture(t, { fail, rejected = false, abort } = {}) {
@@ -45,7 +46,7 @@ async function fixture(t, { fail, rejected = false, abort } = {}) {
       return { stdout: '    "/Users/test/Library/Keychains/login.keychain-db"\n    "/Library/Keychains/System.keychain"\n', code: 0 }
     }
     if (name === 'security' && args[0] === 'find-identity') {
-      return { stdout: `  1) ABCDEF "${env.RVW_SIGNING_IDENTITY}"\n     1 valid identities found\n`, code: 0 }
+      return { stdout: `  1) ${signingHash} "${env.RVW_SIGNING_IDENTITY}"\n     1 valid identities found\n`, code: 0 }
     }
     if (name === 'ditto') {
       if (args[0] === '-x') {
@@ -88,6 +89,7 @@ test('signs inside out, verifies the extracted final ZIP, hashes exact bytes, an
   const signed = f.calls.filter((call) => call[0] === 'codesign' && call.includes('--sign'))
   assert.deepEqual(signed.map((call) => path.basename(call.at(-1))), ['rvw-cli', 'Rvw.app'])
   for (const call of signed) {
+    assert.equal(call[call.indexOf('--sign') + 1], signingHash)
     assert.ok(call.includes('--timestamp'))
     assert.ok(call.includes('runtime'))
     assert.ok(!call.includes('--deep'))
@@ -217,7 +219,7 @@ test('an imported certificate without the requested identity fails before signin
   const run = (command, args, opts) => args[0] === 'find-identity'
     ? { stdout: '0 valid identities found\n', code: 0 }
     : f.run(command, args, opts)
-  await assert.rejects(prepareRelease(f.options, { env, platform: 'darwin', run }), /requested valid signing identity/)
+  await assert.rejects(prepareRelease(f.options, { env, platform: 'darwin', run }), /valid requested signing identity/)
   assert.ok(!f.calls.some((call) => call[0] === 'codesign'))
   await noArtifacts(f)
 })
@@ -234,6 +236,14 @@ test('signing failure names the code item and redacts secret text', async (t) =>
     return true
   })
   await noArtifacts(f)
+})
+
+test('selects the imported certificate hash when another certificate has the same name', () => {
+  const name = env.RVW_SIGNING_IDENTITY
+  const oldHash = 'B'.repeat(40)
+  const output = `  1) ${signingHash} "${name}"\n  2) ${oldHash} "Developer ID Application: Other (ZZZZZZZZZZ)"\n`
+  assert.equal(importedIdentityHash(output, name), signingHash)
+  assert.throws(() => importedIdentityHash(`  1) ${signingHash} "${name}"\n  2) ${oldHash} "${name}"\n`, name), /exactly one/)
 })
 
 for (const step of ['codesign', 'stapler']) test(`final extracted artifact ${step} failure removes output`, async (t) => {

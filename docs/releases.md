@@ -82,6 +82,8 @@ signing, notarization, validation, packaging, and cleanup. The script:
 2. Copies the complete app into a private working directory.
 3. Finds nested Mach-O code and signs it before its containing bundle. The
    current app contains `Contents/MacOS/rvw-cli` and `Contents/MacOS/Rvw`.
+   It selects the imported certificate by hash so that an older certificate
+   with the same name in the login keychain cannot make signing ambiguous.
 4. Signs with Developer ID, secure timestamps, and hardened runtime.
 5. Verifies the app and submits an intermediate ZIP with `notarytool --wait`.
    The wait has a 30-minute limit. A timeout fails the build; Apple can continue
