@@ -37,9 +37,7 @@ test('reopening diffs and unchanged files reuses content and parsed metadata', a
 
 test('hits update recency and both content types share the capacity', async () => {
   const { cache, calls } = fixture()
-  const stages = []
-  const timing = { stage: (stage) => stages.push(stage) }
-  const load = (path, changed = false) => cache.load(selection(path, changed), timing)
+  const load = (path, changed = false) => cache.load(selection(path, changed))
   const a = await load('a', true)
   await load('b')
   assert.equal((await load('a', true)).parsedDiff, a.parsedDiff)
@@ -47,7 +45,6 @@ test('hits update recency and both content types share the capacity', async () =
   await load('a', true)
   await load('b')
   assert.deepEqual(calls, { diff: 1, file: 3, parse: 1 })
-  assert.deepEqual(stages, ['cache_miss', 'cache_miss', 'cache_hit', 'cache_miss', 'cache_eviction', 'cache_hit', 'cache_miss', 'cache_eviction'])
 })
 
 test('snapshot, generation, and file kind prevent identity collisions', async () => {

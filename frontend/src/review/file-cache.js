@@ -81,7 +81,7 @@ export function createReviewFileCache({
       const key = keyFor(input)
       if (entries.has(key) || pending.has(key)) { pump(); return }
       warming = true
-      get(input, undefined, true).catch(() => {
+      get(input, true).catch(() => {
         // Speculative failures are silent. An active selection can retry.
       }).finally(() => { warming = false; pump() })
     })
@@ -96,17 +96,15 @@ export function createReviewFileCache({
     pump()
   }
 
-  async function get(input, timing, speculative = false) {
+  async function get(input, speculative = false) {
     const key = keyFor(input)
     if (!speculative) selectedKey = key
     if (entries.has(key)) {
       const file = entries.get(key)
       entries.delete(key)
       entries.set(key, file)
-      timing?.stage('cache_hit')
       return { ...file }
     }
-    timing?.stage('cache_miss')
     let job = pending.get(key)
     if (job) {
       if (!speculative) { job.active = true; job.resume?.() }
@@ -116,8 +114,8 @@ export function createReviewFileCache({
       const valid = () => epoch === currentEpoch && (job.active || wanted.has(key))
       job.promise = (async () => {
         const file = input.changed
-          ? await fetchDiff(input.diffId, input.path, timing)
-          : await fetchFile(input.path, timing)
+          ? await fetchDiff(input.diffId, input.path)
+          : await fetchFile(input.path)
         if (!valid()) return null
         if (!job.active && file.content.kind === 'diff') {
           await new Promise((resolve) => {
@@ -135,7 +133,6 @@ export function createReviewFileCache({
             // The selected entry is protected even while another load finishes.
             const victim = [...entries.keys()].find((candidate) => candidate !== selectedKey)
             entries.delete(victim)
-            timing?.stage('cache_eviction')
           }
         }
         return prepared
@@ -149,11 +146,11 @@ export function createReviewFileCache({
     return file ? { ...file } : null
   }
 
-  function load(input, timing) {
+  function load(input) {
     ensureSnapshot(input)
     // Cancel old queued work immediately, before the warming effect runs.
     if (selectedKey !== keyFor(input)) stopWarming()
-    return get(input, timing)
+    return get(input)
   }
 
   return { load, warm, stopWarming, invalidate }

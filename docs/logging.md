@@ -15,7 +15,6 @@ Frontend code uses `logError(message, context?, traceId?)`; the shared
 messages and selected diagnostic fields, never user content or raw exceptions.
 Delivery is fire-and-forget; failures are ignored and there are no retries.
 
-Application errors use error severity. Opt-in file-load timing uses debug
-severity. See [File-load performance](file-load-performance.md) for trace stages,
-privacy rules, and the benchmark command. `--log-level` overrides `LOG_LEVEL`, defaulting to `error`;
-supported values are `error`/`err`, `warning`/`warn`, `info`, and `debug`.
+Application errors use error severity. `--log-level` overrides `LOG_LEVEL`,
+defaulting to `error`; supported values are `error`/`err`, `warning`/`warn`,
+`info`, and `debug`.
