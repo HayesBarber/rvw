@@ -1,4 +1,3 @@
-import { startFileTiming } from './file-timing.js'
 import { useEffect, useMemo, useState } from 'react'
 
 import { createReviewFileCache } from './file-cache.js'
@@ -50,13 +49,11 @@ export function useReviewFile({ diffId, path, changed, generation, cache: provid
     if (!key) return undefined
 
     let active = true
-    const timing = startFileTiming(path, changed)
-    const pendingRequest = cache.load({ diffId, path, changed, generation }, timing)
+    const pendingRequest = cache.load({ diffId, path, changed, generation })
 
     pendingRequest
       .then((file) => {
         if (active && file) {
-          timing?.attach(file)
           setRequest({
             status: RequestStatus.SUCCESS,
             key,
@@ -67,7 +64,6 @@ export function useReviewFile({ diffId, path, changed, generation, cache: provid
         }
       })
       .catch((error) => {
-        timing?.finish('error')
         if (active) {
           setRequest({
             status: RequestStatus.ERROR,
@@ -81,7 +77,6 @@ export function useReviewFile({ diffId, path, changed, generation, cache: provid
 
     return () => {
       active = false
-      timing?.finish('superseded')
     }
   }, [cache, changed, diffId, generation, key, path])
 
