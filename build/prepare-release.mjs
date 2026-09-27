@@ -16,9 +16,9 @@ export function runTool(command, args, { signal, allowFailure = false } = {}) {
   const env = { ...process.env }
   for (const name of credentialNames) delete env[name]
   return new Promise((resolve, reject) => {
-    const child = execFile(command, args, { env, signal, maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
+    const child = execFile(command, args, { env, signal, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error && !allowFailure) reject(new Error(`${path.basename(command)} failed; check release configuration and tool availability`))
-      else resolve({ stdout, code: error ? error.code ?? 1 : 0 })
+      else resolve({ stdout, stderr, code: error ? error.code ?? 1 : 0 })
     })
     child.stdin.end()
   })
@@ -51,6 +51,15 @@ function configuration(env, version, platform) {
   const key = decodeBase64(env.RVW_NOTARY_KEY_BASE64, 'RVW_NOTARY_KEY_BASE64')
   if (!key.toString().includes('-----BEGIN PRIVATE KEY-----')) throw new Error('Notarization key must be a PEM private key')
   return { certificate, key }
+}
+
+function signingFailure(result, target, app, env) {
+  const secrets = credentialNames.map((name) => env[name]).filter(Boolean)
+  let detail = (result.stderr || '').trim()
+  for (const secret of secrets) detail = detail.split(secret).join('[REDACTED]')
+  detail = detail.replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 600)
+  const name = target === app ? 'Rvw.app' : path.relative(app, target)
+  return new Error(`codesign failed for ${name}${detail ? `: ${detail}` : ` (exit ${result.code})`}`)
 }
 
 export function parseKeychains(stdout) {
@@ -163,9 +172,14 @@ export async function prepareRelease({ app, output, version, checkOnly = false }
     await invoke('/usr/bin/security', ['import', certFile, '-k', keychain, '-P', env.RVW_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign'])
     await invoke('/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', password, keychain])
     await invoke('/usr/bin/security', ['list-keychains', '-d', 'user', '-s', keychain, ...originalKeychains])
+    const identities = (await invoke('/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning', keychain])).stdout
+    if (!identities.includes(`"${env.RVW_SIGNING_IDENTITY}"`)) {
+      throw new Error('The imported .p12 does not contain the requested valid signing identity and private key')
+    }
     stage = 'Developer ID signing'
     for (const target of [...nested, stagedApp]) {
-      await invoke('/usr/bin/codesign', ['--force', '--sign', env.RVW_SIGNING_IDENTITY, '--keychain', keychain, '--timestamp', '--options', 'runtime', target])
+      const result = await invoke('/usr/bin/codesign', ['--force', '--sign', env.RVW_SIGNING_IDENTITY, '--keychain', keychain, '--timestamp', '--options', 'runtime', target], { allowFailure: true })
+      if (result.code !== 0) throw signingFailure(result, target, stagedApp, env)
     }
     await invoke('/usr/bin/codesign', ['--verify', '--deep', '--strict', stagedApp])
     const auth = ['--key', keyFile, '--key-id', env.RVW_NOTARY_KEY_ID, '--issuer', env.RVW_NOTARY_ISSUER_ID]

@@ -44,6 +44,9 @@ async function fixture(t, { fail, rejected = false, abort } = {}) {
       securityCalls++
       return { stdout: '    "/Users/test/Library/Keychains/login.keychain-db"\n    "/Library/Keychains/System.keychain"\n', code: 0 }
     }
+    if (name === 'security' && args[0] === 'find-identity') {
+      return { stdout: `  1) ABCDEF "${env.RVW_SIGNING_IDENTITY}"\n     1 valid identities found\n`, code: 0 }
+    }
     if (name === 'ditto') {
       if (args[0] === '-x') {
         await cp(path.join(output, '.release-lock/Rvw.app'), path.join(args.at(-1), 'Rvw.app'), { recursive: true })
@@ -207,6 +210,30 @@ test('real command adapter never includes arguments or stderr in errors', async 
     assert.ok(!('stderr' in error))
     return true
   })
+})
+
+test('an imported certificate without the requested identity fails before signing', async (t) => {
+  const f = await fixture(t)
+  const run = (command, args, opts) => args[0] === 'find-identity'
+    ? { stdout: '0 valid identities found\n', code: 0 }
+    : f.run(command, args, opts)
+  await assert.rejects(prepareRelease(f.options, { env, platform: 'darwin', run }), /requested valid signing identity/)
+  assert.ok(!f.calls.some((call) => call[0] === 'codesign'))
+  await noArtifacts(f)
+})
+
+test('signing failure names the code item and redacts secret text', async (t) => {
+  const f = await fixture(t)
+  const run = (command, args, opts) => args.includes('--sign')
+    ? { stdout: '', stderr: `errSecInternalComponent: ${env.RVW_CERTIFICATE_PASSWORD}`, code: 1 }
+    : f.run(command, args, opts)
+  await assert.rejects(prepareRelease(f.options, { env, platform: 'darwin', run }), (error) => {
+    assert.match(error.message, /Contents\/MacOS\/rvw-cli/)
+    assert.match(error.message, /errSecInternalComponent/)
+    assert.ok(!error.message.includes(env.RVW_CERTIFICATE_PASSWORD))
+    return true
+  })
+  await noArtifacts(f)
 })
 
 for (const step of ['codesign', 'stapler']) test(`final extracted artifact ${step} failure removes output`, async (t) => {
