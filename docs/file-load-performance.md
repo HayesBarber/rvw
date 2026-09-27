@@ -34,7 +34,8 @@ Initial opens share one browser context. Thus, only the first file has a cold
 JavaScript highlighter. OS file caches are not cleared. Repeated opens retain the
 review generation, so the file cache can reuse data. The benchmark uses the same
 `useReviewFile` hook and `DiffSurface` as the application. It excludes the file
-tree, comments, startup, and development StrictMode.
+tree, comments, native startup, and development StrictMode. The page-ready
+measurement covers benchmark page loading only.
 
 The JSON output contains the environment, workload sizes, samples, frontend
 and correlated backend events, aggregate statistics, per-file statistics, and
@@ -255,7 +256,7 @@ run the parser, but would add worker startup, source/result cloning, and native
 WebView asset-loading requirements. This change retains the shared parser and
 measures frame gaps. One synchronous parse cannot be interrupted once started.
 The choice does not guarantee a maximum frame time for every repository.
-Highlighter preloading remains part of #192.
+Highlighter preloading is described below.
 
 The benchmark passes the fixed workload order into the production hook. Set
 `RVW_BENCH_WARM=0` to disable warming for a comparison run. Both settings use
@@ -295,6 +296,110 @@ The paired medians show no material active-load or frame-gap regression, but
 three runs do not establish a worst-case bound. Frame gaps are not an input
 latency measurement, and this benchmark excludes application startup.
 These results do not meet the parent issue's 50% rendering targets.
+
+## Highlighter preloading (#192)
+
+The review schedules the two renderer themes and the five most frequent detected
+languages. Both themes are needed because the renderer follows the system light
+or dark mode. Preloading and rendering share `REVIEW_THEME` and the library's
+shared highlighter. The review uses paths from the overview and any repository
+lists already loaded by the file tree or finder. It does not request another
+repository scan. New lists update the preload selection.
+
+Each unique path counts once. The renderer's filename resolver selects the
+language, including compound extensions. Unknown extensions and plain text do
+not consume a slot. Frequency ties use language name order. Languages outside
+the five selected languages load on demand through the renderer.
+
+Selection and resource loading start in an idle callback. Browsers without
+`requestIdleCallback`, including some WebKit versions, use a 50 ms timer. Each
+callback starts one resource; the next callback is scheduled after it finishes.
+An active file request cancels queued preloading. Preloading resumes after the
+request finishes. It never becomes a dependency of the selected file request.
+A load already submitted to the library cannot be cancelled. Its result remains
+useful to the shared highlighter. One grammar attachment is synchronous and
+cannot be interrupted; idle scheduling does not impose a maximum frame time.
+
+Pending and successful resource requests are shared across effects and reloads.
+A failed resource is removed from the request map. Other resources continue,
+and a later preload request can retry the failure. The renderer retains its
+on-demand path. A preload failure does not change the review request state.
+Unmount cancels queued work but keeps loaded highlighter resources for reuse.
+
+### Reproduce the comparison
+
+Set `RVW_BENCH_PRELOAD=0` to disable preloading. The default enables it. Both
+settings use a 250 ms interval before the first selection, which gives idle
+preloading a fixed opportunity to finish. This models a user reading before
+opening a file; it does not model the app's immediate automatic selection.
+Set `RVW_BENCH_PRELOAD_READ_MS=0` to check that case separately. The existing
+250 ms intervals between initial selections and nearby-file warming stay the
+same in both settings. Do not compare these runs directly with older runs
+that had no interval before the first selection.
+
+Each run also tests five languages versus all 20 detected languages in fresh
+browser contexts. A fixed list of 210 paths has decreasing frequencies for
+JavaScript, TypeScript, Python, CSS, JSON, TSX, JSX, HTML, Markdown, YAML, Zig,
+Swift, Rust, Go, C++, Java, Ruby, shell, SQL, and TOML. The report records elapsed
+preload time, resource count, decoded resource bytes, and maximum frame gap.
+Decoded bytes measure fetched asset size, not retained heap memory. Grammar
+imports can include dependencies, so resource count is not language count.
+
+### Recorded results
+
+[file-load-highlighter.json](file-load-highlighter.json) retains three paired
+runs with the reading interval and three paired runs with immediate selection.
+All runs used Apple M1, Chrome 154, the same source, and the same dependencies.
+Runs alternated disabled and enabled preloading, without concurrent builds or
+tests. The recorded revision is the base revision; the source changes are in
+the PR that contains this report.
+
+For the reading-interval runs, the table shows the median across three runs.
+Visible and frame-gap rows use each run's p95. The first-file rows have one
+sample per run.
+
+| Measurement | Disabled | Enabled |
+| --- | ---: | ---: |
+| First diff highlighting | 116.6 ms | 107.5 ms |
+| First diff visible | 98.8 ms | 139.8 ms |
+| Initial diff visible, p95 | 853.7 ms | 838.6 ms |
+| Initial unchanged visible, p95 | 427.8 ms | 424.5 ms |
+| Repeated diff visible, p95 | 790.2 ms | 783.2 ms |
+| Repeated unchanged visible, p95 | 389.3 ms | 381.3 ms |
+| Frame gap, p95 | 366.7 ms | 366.6 ms |
+
+First-open highlighting improved by 7.8%. The first visible marker became
+slower: a cold renderer can display plain text before highlighting, whereas
+the loaded highlighter can produce colored content in its first callback.
+Thus, the visible marker alone does not establish when highlighting is ready.
+Overall visible-content and frame-gap p95 did not regress. The larger rendering
+cost remains; these results do not meet the parent issue's 50% targets.
+
+With immediate selection, median first-file highlighting was 95.2 ms disabled
+and 95.0 ms enabled. Median first-file visible time was 97.0 ms and 95.9 ms.
+Frame-gap p95 was 366.7 ms and 383.3 ms, a 4.5% increase within the 10% comparison
+limit. These three pairs show no material active-load regression. They do not
+establish a worst-case bound. Page-ready time is recorded before configuration;
+it cannot measure preload work or full application startup.
+
+The six reading-interval runs also produced six cold profiles per strategy.
+Their medians were:
+
+| Strategy | Elapsed time | Resource count | Decoded bytes | Maximum frame gap |
+| --- | ---: | ---: | ---: | ---: |
+| Five most frequent languages | 123.5 ms | 12 | 539,067 | 16.8 ms |
+| All 20 detected languages | 374.5 ms | 48 | 2,236,126 | 16.8 ms |
+
+The five-language limit uses about 76% fewer decoded bytes and finishes about
+67% sooner on this list. Both strategies preserve short frame gaps in this
+small test. The limit bounds speculative resource use as repositories add
+languages. It is a policy choice, not a claim that five is optimal for every
+repository. On-demand loading preserves access to the remaining languages.
+
+Native WebKit startup and input latency were not measured. For a native smoke
+check, open a review with several languages, switch files rapidly, reload, and
+open a language outside the five most frequent. Check syntax colors in both
+system appearances and verify that an unknown extension still displays text.
 
 ## Cleanup after the targets are met
 

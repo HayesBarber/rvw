@@ -72,9 +72,12 @@ try {
   browser = await chromium.launch(process.env.RVW_BENCH_BROWSER === 'chromium' ? {} : { channel: 'chrome' })
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 })
   page.on('pageerror', (error) => { console.error(error); process.exitCode = 1 })
+  const pageStart = performance.now()
   await page.goto(`${web.resolvedUrls.local[0]}benchmark/index.html`)
   await page.waitForFunction(() => window.benchmark)
-  if (process.env.RVW_BENCH_WARM !== '0') await page.evaluate((files) => window.benchmark.configure(files), files)
+  const pageReadyMs = performance.now() - pageStart
+  const preloading = process.env.RVW_BENCH_PRELOAD !== '0'
+  await page.evaluate(({ files, warm, preload }) => window.benchmark.configure(files, { warm, preload }), { files, warm: process.env.RVW_BENCH_WARM !== '0', preload: preloading })
   await page.evaluate(() => {
     window.benchmark.frameGaps = []
     let previous = performance.now()
@@ -85,6 +88,8 @@ try {
     }
     window.benchmark.frameRequest = requestAnimationFrame(frame)
   })
+  const preloadReadMs = Number(process.env.RVW_BENCH_PRELOAD_READ_MS ?? 250)
+  await pause(preloadReadMs)
   const samples = []
   async function select(file, scenario, settle = true) {
     const offset = await page.evaluate(({ path, changed }) => {
@@ -150,7 +155,32 @@ try {
   const summary = Object.fromEntries([...groups].map(([key, values]) => [key, statistics(values)]))
   const byFile = Object.fromEntries([...fileGroups].map(([key, values]) => [key, statistics(values)]))
   const packages = Object.fromEntries(await Promise.all(['@pierre/diffs', 'react', 'vite', 'playwright'].map(async (name) => [name, JSON.parse(await readFile(resolve(root, 'frontend/node_modules', name, 'package.json'), 'utf8')).version])))
-  const result = { warming: process.env.RVW_BENCH_WARM !== '0', adjacentReadMs: 250, environment: { date: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), platform: platform(), release: release(), cpu: cpus()[0].model, node: process.version, zig: execFileSync('zig', ['version'], { encoding: 'utf8' }).trim(), browser: browser.version(), viewport: '1440x900', optimize: 'ReleaseFast', packages }, files, samples, events, backendEvents, summary, byFile, frameGaps: statistics(frameGaps) }
+  const preloadProfiles = []
+  // Fresh contexts keep each strategy cold. Frequencies select JS, TS, Python,
+  // CSS and JSON first; the remaining grammars represent a mixed repository.
+  const extensions = ['js', 'ts', 'py', 'css', 'json', 'tsx', 'jsx', 'html', 'md', 'yaml', 'zig', 'swift', 'rs', 'go', 'cpp', 'java', 'rb', 'sh', 'sql', 'toml']
+  const profilePaths = extensions.flatMap((ext, index) => Array.from({ length: extensions.length - index }, (_, n) => `file-${n}.${ext}`))
+  for (const limit of [5, Infinity]) {
+    const context = await browser.newContext()
+    const probe = await context.newPage()
+    await probe.goto(`${web.resolvedUrls.local[0]}benchmark/index.html`)
+    await probe.waitForFunction(() => window.benchmark)
+    const profile = await probe.evaluate(async ({ paths, limit }) => {
+      const gaps = []
+      let previous = performance.now(), frameId
+      const frame = (now) => { gaps.push(now - previous); previous = now; frameId = requestAnimationFrame(frame) }
+      frameId = requestAnimationFrame(frame)
+      const before = performance.getEntriesByType('resource').length
+      const result = await window.benchmark.profilePreload(paths, limit ?? Infinity)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      cancelAnimationFrame(frameId)
+      const resources = performance.getEntriesByType('resource').slice(before)
+      return { ...result, maxFrameGapMs: Math.max(0, ...gaps), resourceCount: resources.length, decodedBytes: resources.reduce((sum, item) => sum + item.decodedBodySize, 0) }
+    }, { paths: profilePaths, limit: Number.isFinite(limit) ? limit : null })
+    preloadProfiles.push({ strategy: Number.isFinite(limit) ? 'top-5' : 'all', ...profile })
+    await context.close()
+  }
+  const result = { preloading, preloadReadMs, pageReadyMs, preloadProfiles, warming: process.env.RVW_BENCH_WARM !== '0', adjacentReadMs: 250, environment: { date: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), platform: platform(), release: release(), cpu: cpus()[0].model, node: process.version, zig: execFileSync('zig', ['version'], { encoding: 'utf8' }).trim(), browser: browser.version(), viewport: '1440x900', optimize: 'ReleaseFast', packages }, files, samples, events, backendEvents, summary, byFile, frameGaps: statistics(frameGaps) }
   await writeFile(output, JSON.stringify(result, null, 2) + '\n')
   console.table(summary)
   console.log(`Results: ${output}`)
