@@ -6,10 +6,13 @@ an active Apple Developer Program account, and network access to Apple. Ordinary
 
 ## Configure credentials
 
-Create a Developer ID Application certificate. Export the certificate **with its
-private key** from Keychain Access as a password-protected `.p12` file. Create an
-App Store Connect **team API key** and download its `.p8` file. Record its key ID
-and issuer ID. Keep both files outside the repository.
+Follow Apple's [CSR instructions](https://developer.apple.com/help/account/certificates/create-a-certificate-signing-request)
+and [Developer ID instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates)
+to create a Developer ID Application certificate. Export the certificate **with
+its private key** from Keychain Access as a password-protected `.p12` file.
+Follow Apple's [API-key guide](https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api)
+to create an App Store Connect **team API key**. Download its `.p8` file and
+record its key ID and issuer ID. Keep both files outside the repository.
 
 Set these environment variables for a local build. Set GitHub repository secrets
 with the same names before pushing a release tag.
@@ -31,6 +34,9 @@ while loading them. The script selects the certificate imported from the `.p12`
 by hash, even if another certificate has the same name in the login keychain.
 
 ## Build and publish
+
+Run `npm ci` on a fresh checkout to install frontend dependencies. Zig builds
+the frontend assets, but it does not install those dependencies.
 
 ```sh
 npm ci --prefix frontend
