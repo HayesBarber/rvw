@@ -49,8 +49,14 @@ function configuredCommentSettings(comments) {
   if (!isObject(comments)) {
     throw new TypeError('User configuration comments must be a JSON object')
   }
-  if (!onlyFields(comments, ['types', 'defaultType'])) {
+  if (!onlyFields(comments, ['types', 'defaultType', 'intro', 'outro'])) {
     throw new TypeError('User configuration comments contains an unsupported field')
+  }
+  if (comments.intro !== undefined && typeof comments.intro !== 'string') {
+    throw new TypeError('User configuration comments.intro must be a string')
+  }
+  if (comments.outro !== undefined && typeof comments.outro !== 'string') {
+    throw new TypeError('User configuration comments.outro must be a string')
   }
 
   const types = comments.types ?? DEFAULT_COMMENT_TYPES

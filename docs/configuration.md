@@ -77,6 +77,8 @@ The default types are `ISSUE`, `QUESTION`, and `NITPICK`. An empty list disables
 Names must be unique, non-blank strings with no line breaks.
 Set `comments.defaultType` to `null` (the default) or a name from the list.
 In the comment editor, use `Tab`, `Shift+Tab`, or the dropdown to change the type.
+Set `comments.intro` and `comments.outro` to strings that appear before and after
+the copied Markdown comment list. Both default to empty strings.
 
 Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
 Names are case-sensitive. Press `<Esc>` to cancel.
@@ -105,7 +107,9 @@ It also sets the leader key, display options, comment types, and command aliases
   },
   "comments": {
     "types": ["ISSUE", "QUESTION", "NITPICK"],
-    "defaultType": null
+    "defaultType": null,
+    "intro": "Review this code.",
+    "outro": "Summarize your changes."
   },
   "commandLine": {
     "aliases": {
@@ -150,4 +154,3 @@ RVW_RIPGREP=/opt/homebrew/bin/rg rvw .
 
 The selected file must be executable. Search reports an error if Rvw cannot find or run it.
 Other review operations do not require ripgrep.
-

@@ -100,7 +100,12 @@ pub const Core = struct {
                 const comments = try self.comment_provider.getComments(self.io);
                 if (comments.len == 0) return error.NoComments;
 
-                const markdown = try output.markdown.serialize(self.allocator, comments);
+                const markdown = try output.markdown.serialize(
+                    self.allocator,
+                    comments,
+                    configuredCommentText(self.configuration, "intro"),
+                    configuredCommentText(self.configuration, "outro"),
+                );
                 defer self.allocator.free(markdown);
                 try self.clipboard.copy(self.io, markdown);
                 break :blk .{ .copy_comments_result = .{ .commentCount = comments.len } };
@@ -153,6 +158,21 @@ pub const Core = struct {
         };
     }
 };
+
+fn configuredCommentText(snapshot: config.Snapshot, field: []const u8) []const u8 {
+    const root = switch (snapshot.configuration) {
+        .object => |object| object,
+        else => return "",
+    };
+    const comments = switch (root.get("comments") orelse return "") {
+        .object => |object| object,
+        else => return "",
+    };
+    return switch (comments.get(field) orelse return "") {
+        .string => |value| value,
+        else => "",
+    };
+}
 
 fn operationName(request: model.Request) []const u8 {
     return switch (request) {
@@ -774,6 +794,85 @@ test "core copies validated file paths exactly without accessing the file" {
         .path = "README.md",
         .format = .relative,
     } }));
+}
+
+test "core copies configured comment text and still rejects an empty comment list" {
+    const TestDependencies = struct {
+        copied: ?[]u8 = null,
+
+        fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
+            return error.TestUnexpectedResult;
+        }
+        fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
+            return error.TestUnexpectedResult;
+        }
+        fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
+            return &.{};
+        }
+        fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
+            return error.TestUnexpectedResult;
+        }
+        fn copy(context: *anyopaque, _: Io, value: []const u8) !void {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            self.copied = try std.testing.allocator.dupe(u8, value);
+        }
+        fn reload(_: *anyopaque, _: Io) !void {}
+        fn repositoryRoot(_: *anyopaque) []const u8 {
+            return "/repository";
+        }
+        fn writeLog(_: *anyopaque, _: Io, _: log.Event) !void {}
+
+        const review_vtable: provider_module.review.ReviewProvider.VTable = .{
+            .getDiffOverview = getDiffOverview,
+            .getFileDiff = getFileDiff,
+            .getFiles = getFiles,
+            .getFilesNotIgnored = getFiles,
+            .getFile = getFile,
+            .reload = reload,
+            .repositoryRoot = repositoryRoot,
+        };
+        const clipboard_vtable: output.Clipboard.VTable = .{ .copy = copy };
+        const logger_vtable: log.Logger.VTable = .{ .write = writeLog };
+    };
+
+    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+    defer threaded.deinit();
+    var dependencies: TestDependencies = .{};
+    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+    defer comments.deinit();
+    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const configuration = try std.json.parseFromSliceLeaky(std.json.Value, arena.allocator(),
+        \\{"comments":{"intro":"Review first\nThen fix","outro":"Summarize"}}
+    , .{});
+    var core = Core.init(
+        std.testing.allocator,
+        threaded.io(),
+        .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
+        search_ignore_aware.interface(),
+        search_all_files.interface(),
+        comments.interface(),
+        .{ .context = &dependencies, .vtable = &TestDependencies.clipboard_vtable },
+        .{ .allocator = std.testing.allocator, .context = &dependencies, .vtable = &TestDependencies.logger_vtable },
+        .{ .configuration = configuration, .diagnostic = null },
+    );
+
+    try std.testing.expectError(error.NoComments, core.dispatch(.copy_comments_as_markdown));
+    try std.testing.expect(dependencies.copied == null);
+    _ = try core.dispatch(.{ .create_comment = .{
+        .body = "Handle expiry",
+        .comment_type = "ISSUE",
+        .target = .{ .line = .{ .path = "src/auth.zig", .side = .new, .startLine = 42, .endLine = 42 } },
+    } });
+    const result = (try core.dispatch(.copy_comments_as_markdown)).copy_comments_result;
+    defer std.testing.allocator.free(dependencies.copied.?);
+    try std.testing.expectEqual(@as(usize, 1), result.commentCount);
+    try std.testing.expectEqualStrings(
+        "Review first\nThen fix\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
+        dependencies.copied.?,
+    );
 }
 
 test "relay acknowledges filtered events and writes once without recursive instrumentation" {
