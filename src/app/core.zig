@@ -99,12 +99,16 @@ pub const Core = struct {
             .copy_comments_as_markdown => blk: {
                 const comments = try self.comment_provider.getComments(self.io);
                 if (comments.len == 0) return error.NoComments;
+                const show_source = configuredShowReviewSource(self.configuration);
+                const overview = if (show_source) try self.review_provider.getDiffOverview(self.io) else null;
 
                 const markdown = try output.markdown.serialize(
                     self.allocator,
                     comments,
                     configuredCommentText(self.configuration, "intro"),
                     configuredCommentText(self.configuration, "outro"),
+                    if (overview) |value| value.repository.name else "",
+                    if (overview) |value| value.sourceLabel else "",
                 );
                 defer self.allocator.free(markdown);
                 try self.clipboard.copy(self.io, markdown);
@@ -171,6 +175,21 @@ fn configuredCommentText(snapshot: config.Snapshot, field: []const u8) []const u
     return switch (comments.get(field) orelse return "") {
         .string => |value| value,
         else => "",
+    };
+}
+
+fn configuredShowReviewSource(snapshot: config.Snapshot) bool {
+    const root = switch (snapshot.configuration) {
+        .object => |object| object,
+        else => return true,
+    };
+    const comments = switch (root.get("comments") orelse return true) {
+        .object => |object| object,
+        else => return true,
+    };
+    return switch (comments.get("showReviewSource") orelse return true) {
+        .bool => |value| value,
+        else => true,
     };
 }
 
@@ -801,7 +820,15 @@ test "core copies configured comment text and still rejects an empty comment lis
         copied: ?[]u8 = null,
 
         fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
-            return error.TestUnexpectedResult;
+            return .{
+                .id = "review",
+                .repository = .{ .name = "rvw" },
+                .source = .{ .working_tree = .{ .base = "HEAD" } },
+                .sourceLabel = "working tree",
+                .compactSourceLabel = "working tree",
+                .initialPath = null,
+                .files = &.{},
+            };
         }
         fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
             return error.TestUnexpectedResult;
@@ -870,9 +897,18 @@ test "core copies configured comment text and still rejects an empty comment lis
     defer std.testing.allocator.free(dependencies.copied.?);
     try std.testing.expectEqual(@as(usize, 1), result.commentCount);
     try std.testing.expectEqualStrings(
-        "Review first\nThen fix\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
+        "Review first\nThen fix\n\nrvw: working tree\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
         dependencies.copied.?,
     );
+
+    const disabled = try std.json.parseFromSliceLeaky(std.json.Value, arena.allocator(),
+        \\{"comments":{"showReviewSource":false}}
+    , .{});
+    core.configuration = .{ .configuration = disabled, .diagnostic = null };
+    std.testing.allocator.free(dependencies.copied.?);
+    dependencies.copied = null;
+    _ = try core.dispatch(.copy_comments_as_markdown);
+    try std.testing.expectEqualStrings("- src/auth.zig:42 - [ISSUE] Handle expiry\n", dependencies.copied.?);
 }
 
 test "relay acknowledges filtered events and writes once without recursive instrumentation" {

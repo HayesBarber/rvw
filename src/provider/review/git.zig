@@ -259,6 +259,8 @@ test "PR source survives snapshot reload and serializes for transports" {
     for (0..2) |_| {
         const overview = try provider.interface().getDiffOverview(std.testing.io);
         try std.testing.expectEqual(@as(u32, 100), overview.source.pull_request.number);
+        try std.testing.expectEqualStrings("PR #100", overview.sourceLabel);
+        try std.testing.expectEqualStrings("PR #100", overview.compactSourceLabel);
         try std.testing.expectEqual(@as(usize, 1), overview.files.len);
         const json = try std.json.Stringify.valueAlloc(std.testing.allocator, overview.source, .{});
         defer std.testing.allocator.free(json);

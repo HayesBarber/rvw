@@ -46,10 +46,13 @@ pub const GitProvider = struct {
             .{ .commit_range = .{ .base = snapshot.base, .head = head } }
         else
             .{ .working_tree = .{ .base = snapshot.base } };
+        const labels = try model.formatSourceLabels(allocator, source);
         const overview: model.DiffOverview = .{
             .id = diff_id,
             .repository = .{ .name = std.fs.path.basename(root) },
             .source = source,
+            .sourceLabel = labels.full,
+            .compactSourceLabel = labels.compact,
             .initialPath = if (summaries.items.len == 0) null else summaries.items[0].path,
             .files = try summaries.toOwnedSlice(allocator),
         };
@@ -143,6 +146,8 @@ test "Git provider builds a deterministic working-tree review from a temporary r
 
     try std.testing.expect(std.mem.startsWith(u8, overview.id, "working-tree:"));
     try std.testing.expectEqualStrings(std.fs.path.basename(fixture.root), overview.repository.name);
+    try std.testing.expectEqualStrings("working tree", overview.sourceLabel);
+    try std.testing.expectEqualStrings("working tree", overview.compactSourceLabel);
     try std.testing.expectEqualStrings("deleted.txt", overview.initialPath.?);
     try std.testing.expectEqual(@as(usize, 3), overview.files.len);
     try expectSummary(overview.files[0], "deleted.txt", .deleted, 0, 1);
@@ -203,6 +208,10 @@ test "Git provider resolves explicit commit ranges independently of the working 
     try std.testing.expectEqualStrings(range, overview.id);
     try std.testing.expectEqualStrings(base, overview.source.commit_range.base);
     try std.testing.expectEqualStrings(head, overview.source.commit_range.head);
+    try std.testing.expectEqualStrings(range, overview.sourceLabel);
+    const compact_range = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base[0..7], head[0..7] });
+    defer std.testing.allocator.free(compact_range);
+    try std.testing.expectEqualStrings(compact_range, overview.compactSourceLabel);
     try std.testing.expectEqual(@as(usize, 1), overview.files.len);
     try std.testing.expectEqual(model.FileStatus.renamed, overview.files[0].status);
     try std.testing.expectEqualStrings("renamed.txt", overview.files[0].previousPath.?);

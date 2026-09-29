@@ -79,6 +79,8 @@ Set `comments.defaultType` to `null` (the default) or a name from the list.
 In the comment editor, use `Tab`, `Shift+Tab`, or the dropdown to change the type.
 Set `comments.intro` and `comments.outro` to strings that appear before and after
 the copied Markdown comment list. Both default to empty strings.
+Copied Markdown includes the repository name and review source after the intro.
+Set `comments.showReviewSource` to `false` to omit this header. It defaults to `true`.
 
 Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
 Names are case-sensitive. Press `<Esc>` to cancel.
@@ -108,6 +110,7 @@ It also sets the leader key, display options, comment types, and command aliases
   "comments": {
     "types": ["ISSUE", "QUESTION", "NITPICK"],
     "defaultType": null,
+    "showReviewSource": true,
     "intro": "Review this code.",
     "outro": "Summarize your changes."
   },

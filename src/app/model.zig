@@ -48,6 +48,56 @@ pub const DiffSource = union(enum) {
     }
 };
 
+pub const SourceLabels = struct {
+    full: []const u8,
+    compact: []const u8,
+};
+
+pub fn formatSourceLabels(allocator: std.mem.Allocator, source: DiffSource) !SourceLabels {
+    return switch (source) {
+        .working_tree => .{ .full = "working tree", .compact = "working tree" },
+        .pull_request => |value| blk: {
+            const label = try std.fmt.allocPrint(allocator, "PR #{d}", .{value.number});
+            break :blk .{ .full = label, .compact = label };
+        },
+        .commit_range => |value| .{
+            .full = try std.fmt.allocPrint(allocator, "{s}..{s}", .{ value.base, value.head }),
+            .compact = try std.fmt.allocPrint(allocator, "{s}..{s}", .{
+                compactRevision(value.base), compactRevision(value.head),
+            }),
+        },
+    };
+}
+
+fn compactRevision(revision: []const u8) []const u8 {
+    if (revision.len < 40 or revision.len > 64) return revision;
+    for (revision) |character| {
+        if (!std.ascii.isHex(character) or std.ascii.isUpper(character)) return revision;
+    }
+    return revision[0..7];
+}
+
+test "source labels cover working tree, full revisions, and pull requests" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    const working = try formatSourceLabels(allocator, .{ .working_tree = .{ .base = "HEAD" } });
+    try std.testing.expectEqualStrings("working tree", working.full);
+    try std.testing.expectEqualStrings("working tree", working.compact);
+
+    const base = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const range = try formatSourceLabels(allocator, .{ .commit_range = .{ .base = base, .head = head } });
+    try std.testing.expectEqualStrings(base ++ ".." ++ head, range.full);
+    try std.testing.expectEqualStrings("aaaaaaa..bbbbbbb", range.compact);
+    const symbolic = try formatSourceLabels(allocator, .{ .commit_range = .{ .base = "HEAD~1", .head = "HEAD" } });
+    try std.testing.expectEqualStrings("HEAD~1..HEAD", symbolic.compact);
+
+    const pr = try formatSourceLabels(allocator, .{ .pull_request = .{ .number = 100 } });
+    try std.testing.expectEqualStrings("PR #100", pr.full);
+    try std.testing.expectEqualStrings("PR #100", pr.compact);
+}
+
 pub const FileSummary = struct {
     path: []const u8,
     previousPath: ?[]const u8 = null,
@@ -122,6 +172,8 @@ pub const DiffOverview = struct {
     id: []const u8,
     repository: Repository,
     source: DiffSource,
+    sourceLabel: []const u8 = "",
+    compactSourceLabel: []const u8 = "",
     initialPath: ?[]const u8,
     files: []const FileSummary,
 };
