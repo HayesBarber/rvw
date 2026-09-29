@@ -136,6 +136,18 @@ test('configured comment types replace built-ins and preserve order and default'
   assert.equal(disabled.defaultCommentType, null)
 })
 
+test('comment export text accepts empty and multiline strings', () => {
+  for (const comments of [
+    { intro: '', outro: '' },
+    { intro: 'Review first\nThen fix' },
+    { outro: 'Summarize\nThe changes' },
+    { intro: 'Start', outro: 'Finish' },
+  ]) {
+    const result = resolveConfiguration({ configuration: { comments }, diagnostic: null })
+    assert.equal(result.diagnostic, null)
+  }
+})
+
 test('invalid comment type settings produce configuration diagnostics', () => {
   for (const configuration of [
     { comments: [] },
@@ -143,6 +155,10 @@ test('invalid comment type settings produce configuration diagnostics', () => {
     { comments: { types: [''] } },
     { comments: { types: ['BUG', 'BUG'] } },
     { comments: { types: ['BUG'], defaultType: 'IDEA' } },
+    { comments: { intro: null } },
+    { comments: { intro: [] } },
+    { comments: { outro: 42 } },
+    { comments: { outro: false } },
   ]) {
     const result = resolveConfiguration({ configuration, diagnostic: null })
     assert.equal(result.bindings, null)

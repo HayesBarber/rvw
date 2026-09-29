@@ -133,6 +133,8 @@ const SchemaError = error{
     duplicate_comment_type,
     default_comment_type_not_string_or_null,
     default_comment_type_not_configured,
+    comment_intro_not_string,
+    comment_outro_not_string,
 };
 
 fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!ParseResult {
@@ -178,7 +180,13 @@ fn validateConfiguration(value: std.json.Value, catalog: std.json.Value) SchemaE
             .object => |object| object,
             else => return error.comments_not_object,
         };
-        if (!onlyFields(comments, &.{ "types", "defaultType" })) return error.unknown_comments_field;
+        if (!onlyFields(comments, &.{ "types", "defaultType", "intro", "outro" })) return error.unknown_comments_field;
+        if (comments.get("intro")) |intro| {
+            if (intro != .string) return error.comment_intro_not_string;
+        }
+        if (comments.get("outro")) |outro| {
+            if (outro != .string) return error.comment_outro_not_string;
+        }
 
         const types = if (comments.get("types")) |types_value| switch (types_value) {
             .array => |array| array.items,
@@ -357,6 +365,8 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.duplicate_comment_type => "comments.types entries must be unique",
         error.default_comment_type_not_string_or_null => "user configuration comments.defaultType must be a string or null",
         error.default_comment_type_not_configured => "user configuration comments.defaultType must match a configured type",
+        error.comment_intro_not_string => "user configuration comments.intro must be a string",
+        error.comment_outro_not_string => "user configuration comments.outro must be a string",
     };
 }
 
@@ -561,7 +571,7 @@ test "comment types preserve order and validate defaults" {
     defer arena.deinit();
 
     const valid = try parseConfiguration(arena.allocator(),
-        \\{"comments":{"types":["BUG","IDEA"],"defaultType":"IDEA"}}
+        \\{"comments":{"types":["BUG","IDEA"],"defaultType":"IDEA","intro":"Review first\nThen fix","outro":"Summarize"}}
     );
     const configuration = switch (valid) {
         .configuration => |value| value,
@@ -570,6 +580,8 @@ test "comment types preserve order and validate defaults" {
     const comments = configuration.object.get("comments").?.object;
     try std.testing.expectEqualStrings("BUG", comments.get("types").?.array.items[0].string);
     try std.testing.expectEqualStrings("IDEA", comments.get("defaultType").?.string);
+    try std.testing.expectEqualStrings("Review first\nThen fix", comments.get("intro").?.string);
+    try std.testing.expectEqualStrings("Summarize", comments.get("outro").?.string);
 
     const built_in_default = try parseConfiguration(arena.allocator(),
         \\{"comments":{"defaultType":"ISSUE"}}
@@ -585,6 +597,8 @@ test "comment types preserve order and validate defaults" {
         .{ .input = "{\"comments\":{\"types\":[\"BUG\",\"BUG\"]}}", .expected = error.duplicate_comment_type },
         .{ .input = "{\"comments\":{\"types\":[\"BUG\"],\"defaultType\":\"IDEA\"}}", .expected = error.default_comment_type_not_configured },
         .{ .input = "{\"comments\":{\"defaultType\":\"OTHER\"}}", .expected = error.default_comment_type_not_configured },
+        .{ .input = "{\"comments\":{\"intro\":null}}", .expected = error.comment_intro_not_string },
+        .{ .input = "{\"comments\":{\"outro\":42}}", .expected = error.comment_outro_not_string },
     }) |case| {
         const parsed = try parseConfiguration(arena.allocator(), case.input);
         try std.testing.expect(parsed == .invalid_schema);
@@ -673,6 +687,16 @@ test "loader reports malformed JSON and invalid schema without failing" {
     defer invalid.deinit();
     try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, invalid.snapshot.diagnostic.?.code);
     try std.testing.expectEqual(@as(usize, 0), invalid.snapshot.configuration.object.count());
+
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = relative_configuration_path,
+        .data = "{\"comments\":{\"intro\":null}}",
+    });
+    var invalid_intro = try load(std.testing.allocator, std.testing.io, .{ .home = home });
+    defer invalid_intro.deinit();
+    try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, invalid_intro.snapshot.diagnostic.?.code);
+    try std.testing.expectEqualStrings("user configuration comments.intro must be a string", invalid_intro.snapshot.diagnostic.?.message);
+    try std.testing.expectEqual(@as(usize, 0), invalid_intro.snapshot.configuration.object.count());
 }
 
 test "missing configuration is empty while read failures are diagnosed" {

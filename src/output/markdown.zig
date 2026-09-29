@@ -7,16 +7,23 @@ const Allocator = std.mem.Allocator;
 ///
 /// The caller owns the returned memory. The input slice and the strings it
 /// references are never modified.
-pub fn serialize(allocator: Allocator, comments: []const model.Comment) ![]u8 {
+pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: []const u8, outro: []const u8) ![]u8 {
     const sorted = try allocator.dupe(model.Comment, comments);
     defer allocator.free(sorted);
     std.mem.sort(model.Comment, sorted, {}, commentLessThan);
 
     var output: std.Io.Writer.Allocating = .init(allocator);
     defer output.deinit();
+    const writer = &output.writer;
+    const intro_text = std.mem.trim(u8, intro, "\r\n");
+    const outro_text = std.mem.trim(u8, outro, "\r\n");
+
+    if (intro_text.len > 0) {
+        try writer.writeAll(intro_text);
+        try writer.writeAll("\n\n");
+    }
 
     for (sorted) |comment| {
-        const writer = &output.writer;
         try writer.writeAll("- ");
         switch (comment.target) {
             .file => |target| try writer.writeAll(target.path),
@@ -34,6 +41,12 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment) ![]u8 {
             try writer.writeAll("] ");
         }
         try writeCommentBody(writer, comment.body);
+        try writer.writeByte('\n');
+    }
+
+    if (outro_text.len > 0) {
+        try writer.writeByte('\n');
+        try writer.writeAll(outro_text);
         try writer.writeByte('\n');
     }
 
@@ -118,10 +131,28 @@ test "typed and untyped comments retain location and body formatting" {
             .endLine = 61,
         } } },
     };
-    const markdown = try serialize(std.testing.allocator, &comments);
+    const markdown = try serialize(std.testing.allocator, &comments, "", "");
     defer std.testing.allocator.free(markdown);
     try std.testing.expectEqualStrings(
         "- README.md - Plain\n- src/auth.zig:42 - [ISSUE] Handle expiry\n- src/auth.zig:58-61 - [A\\[B\\]\\\\C] Safe\n",
         markdown,
     );
+}
+
+test "intro and outro surround sorted comments with one blank line" {
+    const comments = [_]model.Comment{
+        .{ .id = "2", .body = "Second", .target = .{ .file = .{ .path = "b.txt" } } },
+        .{ .id = "1", .body = "First", .target = .{ .file = .{ .path = "a.txt" } } },
+    };
+    const cases = [_]struct { intro: []const u8, outro: []const u8, expected: []const u8 }{
+        .{ .intro = "", .outro = "", .expected = "- a.txt - First\n- b.txt - Second\n" },
+        .{ .intro = "Intro", .outro = "", .expected = "Intro\n\n- a.txt - First\n- b.txt - Second\n" },
+        .{ .intro = "", .outro = "Outro", .expected = "- a.txt - First\n- b.txt - Second\n\nOutro\n" },
+        .{ .intro = "First line\nSecond line\n", .outro = "\nLast line\nDone", .expected = "First line\nSecond line\n\n- a.txt - First\n- b.txt - Second\n\nLast line\nDone\n" },
+    };
+    for (cases) |case| {
+        const markdown = try serialize(std.testing.allocator, &comments, case.intro, case.outro);
+        defer std.testing.allocator.free(markdown);
+        try std.testing.expectEqualStrings(case.expected, markdown);
+    }
 }
