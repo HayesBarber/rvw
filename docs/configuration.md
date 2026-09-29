@@ -78,18 +78,7 @@ Names must be unique, non-blank strings with no line breaks.
 Set `comments.defaultType` to `null` (the default) or a name from the list.
 In the comment editor, use `Tab`, `Shift+Tab`, or the dropdown to change the type.
 Set `comments.intro` and `comments.outro` to strings that appear before and after
-the copied Markdown comment list. Both default to empty strings. Line breaks
-inside the strings remain in the copied text. Rvw puts one blank line between
-each nonempty section. For example:
-
-```json
-{
-  "comments": {
-    "intro": "Review this code and address the comments below.",
-    "outro": "Summarize the changes after you finish."
-  }
-}
-```
+the copied Markdown comment list. Both default to empty strings.
 
 Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
 Names are case-sensitive. Press `<Esc>` to cancel.
