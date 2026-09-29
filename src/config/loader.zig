@@ -135,6 +135,7 @@ const SchemaError = error{
     default_comment_type_not_configured,
     comment_intro_not_string,
     comment_outro_not_string,
+    show_review_source_not_boolean,
 };
 
 fn parseConfiguration(allocator: Allocator, input: []const u8) Allocator.Error!ParseResult {
@@ -180,7 +181,10 @@ fn validateConfiguration(value: std.json.Value, catalog: std.json.Value) SchemaE
             .object => |object| object,
             else => return error.comments_not_object,
         };
-        if (!onlyFields(comments, &.{ "types", "defaultType", "intro", "outro" })) return error.unknown_comments_field;
+        if (!onlyFields(comments, &.{ "types", "defaultType", "intro", "outro", "showReviewSource" })) return error.unknown_comments_field;
+        if (comments.get("showReviewSource")) |show_review_source| {
+            if (show_review_source != .bool) return error.show_review_source_not_boolean;
+        }
         if (comments.get("intro")) |intro| {
             if (intro != .string) return error.comment_intro_not_string;
         }
@@ -367,6 +371,7 @@ fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
         error.default_comment_type_not_configured => "user configuration comments.defaultType must match a configured type",
         error.comment_intro_not_string => "user configuration comments.intro must be a string",
         error.comment_outro_not_string => "user configuration comments.outro must be a string",
+        error.show_review_source_not_boolean => "user configuration comments.showReviewSource must be a boolean",
     };
 }
 
@@ -599,6 +604,7 @@ test "comment types preserve order and validate defaults" {
         .{ .input = "{\"comments\":{\"defaultType\":\"OTHER\"}}", .expected = error.default_comment_type_not_configured },
         .{ .input = "{\"comments\":{\"intro\":null}}", .expected = error.comment_intro_not_string },
         .{ .input = "{\"comments\":{\"outro\":42}}", .expected = error.comment_outro_not_string },
+        .{ .input = "{\"comments\":{\"showReviewSource\":null}}", .expected = error.show_review_source_not_boolean },
     }) |case| {
         const parsed = try parseConfiguration(arena.allocator(), case.input);
         try std.testing.expect(parsed == .invalid_schema);
@@ -697,6 +703,16 @@ test "loader reports malformed JSON and invalid schema without failing" {
     try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, invalid_intro.snapshot.diagnostic.?.code);
     try std.testing.expectEqualStrings("user configuration comments.intro must be a string", invalid_intro.snapshot.diagnostic.?.message);
     try std.testing.expectEqual(@as(usize, 0), invalid_intro.snapshot.configuration.object.count());
+
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = relative_configuration_path,
+        .data = "{\"comments\":{\"showReviewSource\":\"false\"}}",
+    });
+    var invalid_source = try load(std.testing.allocator, std.testing.io, .{ .home = home });
+    defer invalid_source.deinit();
+    try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, invalid_source.snapshot.diagnostic.?.code);
+    try std.testing.expectEqualStrings("user configuration comments.showReviewSource must be a boolean", invalid_source.snapshot.diagnostic.?.message);
+    try std.testing.expectEqual(@as(usize, 0), invalid_source.snapshot.configuration.object.count());
 }
 
 test "missing configuration is empty while read failures are diagnosed" {

@@ -115,6 +115,7 @@ test('wrapLines defaults to wrapping when the diff section is omitted', () => {
   assert.equal(result.relativeLineNumbers, false)
   assert.deepEqual(result.commentTypes, DEFAULT_COMMENT_TYPES)
   assert.equal(result.defaultCommentType, DEFAULT_COMMENT_TYPE)
+  assert.equal(result.showReviewSource, true)
 })
 
 test('configured comment types replace built-ins and preserve order and default', () => {
@@ -148,6 +149,14 @@ test('comment export text accepts empty and multiline strings', () => {
   }
 })
 
+test('review source header defaults on and accepts both boolean values', () => {
+  for (const value of [true, false]) {
+    const result = resolveConfiguration({ configuration: { comments: { showReviewSource: value } }, diagnostic: null })
+    assert.equal(result.diagnostic, null)
+    assert.equal(result.showReviewSource, value)
+  }
+})
+
 test('invalid comment type settings produce configuration diagnostics', () => {
   for (const configuration of [
     { comments: [] },
@@ -159,6 +168,7 @@ test('invalid comment type settings produce configuration diagnostics', () => {
     { comments: { intro: [] } },
     { comments: { outro: 42 } },
     { comments: { outro: false } },
+    { comments: { showReviewSource: null } },
   ]) {
     const result = resolveConfiguration({ configuration, diagnostic: null })
     assert.equal(result.bindings, null)

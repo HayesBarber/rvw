@@ -19,12 +19,12 @@ export default function ApplicationFooter({
   onCopyComments,
   onReload,
   onSearchText,
+  overview,
   reloadDisabled = false,
   reloadMessage,
   reloadMessageIsError = false,
   reloadStatus,
   repositoryName,
-  source,
   vimState,
 }) {
   const pending = vimState.pendingKeys.join(' ')
@@ -68,9 +68,9 @@ export default function ApplicationFooter({
       {repositoryName && (
         <span className="repository-context">
           <strong className="repository-name" title={repositoryName}>{repositoryName}</strong>
-          {source && (
-            <span className="review-source" title={reviewSourceLabel(source)}>
-              {reviewSourceLabel(source, true)}
+          {overview && (
+            <span className="review-source" title={reviewSourceLabel(overview)}>
+              {reviewSourceLabel(overview, true)}
             </span>
           )}
         </span>

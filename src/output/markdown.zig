@@ -7,7 +7,7 @@ const Allocator = std.mem.Allocator;
 ///
 /// The caller owns the returned memory. The input slice and the strings it
 /// references are never modified.
-pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: []const u8, outro: []const u8) ![]u8 {
+pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: []const u8, outro: []const u8, repository_name: []const u8, source_label: []const u8) ![]u8 {
     const sorted = try allocator.dupe(model.Comment, comments);
     defer allocator.free(sorted);
     std.mem.sort(model.Comment, sorted, {}, commentLessThan);
@@ -21,6 +21,10 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: [
     if (intro_text.len > 0) {
         try writer.writeAll(intro_text);
         try writer.writeAll("\n\n");
+    }
+
+    if (source_label.len > 0) {
+        try writer.print("{s}: {s}\n\n", .{ repository_name, source_label });
     }
 
     for (sorted) |comment| {
@@ -131,7 +135,7 @@ test "typed and untyped comments retain location and body formatting" {
             .endLine = 61,
         } } },
     };
-    const markdown = try serialize(std.testing.allocator, &comments, "", "");
+    const markdown = try serialize(std.testing.allocator, &comments, "", "", "", "");
     defer std.testing.allocator.free(markdown);
     try std.testing.expectEqualStrings(
         "- README.md - Plain\n- src/auth.zig:42 - [ISSUE] Handle expiry\n- src/auth.zig:58-61 - [A\\[B\\]\\\\C] Safe\n",
@@ -151,8 +155,21 @@ test "intro and outro surround sorted comments with one blank line" {
         .{ .intro = "First line\nSecond line\n", .outro = "\nLast line\nDone", .expected = "First line\nSecond line\n\n- a.txt - First\n- b.txt - Second\n\nLast line\nDone\n" },
     };
     for (cases) |case| {
-        const markdown = try serialize(std.testing.allocator, &comments, case.intro, case.outro);
+        const markdown = try serialize(std.testing.allocator, &comments, case.intro, case.outro, "", "");
         defer std.testing.allocator.free(markdown);
         try std.testing.expectEqualStrings(case.expected, markdown);
     }
+}
+
+test "review header follows intro and precedes sorted comments" {
+    const comments = [_]model.Comment{
+        .{ .id = "2", .body = "Second", .target = .{ .file = .{ .path = "b.txt" } } },
+        .{ .id = "1", .body = "First", .target = .{ .file = .{ .path = "a.txt" } } },
+    };
+    const markdown = try serialize(std.testing.allocator, &comments, "Intro", "Outro", "rvw", "PR #100");
+    defer std.testing.allocator.free(markdown);
+    try std.testing.expectEqualStrings(
+        "Intro\n\nrvw: PR #100\n\n- a.txt - First\n- b.txt - Second\n\nOutro\n",
+        markdown,
+    );
 }

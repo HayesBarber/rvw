@@ -12,6 +12,7 @@ export const DEFAULT_WRAP_LINES = true
 export const DEFAULT_RELATIVE_LINE_NUMBERS = false
 export const DEFAULT_COMMENT_TYPES = Object.freeze(['ISSUE', 'QUESTION', 'NITPICK'])
 export const DEFAULT_COMMENT_TYPE = null
+export const DEFAULT_SHOW_REVIEW_SOURCE = true
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -44,12 +45,13 @@ function configuredCommentSettings(comments) {
     return {
       commentTypes: DEFAULT_COMMENT_TYPES,
       defaultCommentType: DEFAULT_COMMENT_TYPE,
+      showReviewSource: DEFAULT_SHOW_REVIEW_SOURCE,
     }
   }
   if (!isObject(comments)) {
     throw new TypeError('User configuration comments must be a JSON object')
   }
-  if (!onlyFields(comments, ['types', 'defaultType', 'intro', 'outro'])) {
+  if (!onlyFields(comments, ['types', 'defaultType', 'intro', 'outro', 'showReviewSource'])) {
     throw new TypeError('User configuration comments contains an unsupported field')
   }
   if (comments.intro !== undefined && typeof comments.intro !== 'string') {
@@ -57,6 +59,12 @@ function configuredCommentSettings(comments) {
   }
   if (comments.outro !== undefined && typeof comments.outro !== 'string') {
     throw new TypeError('User configuration comments.outro must be a string')
+  }
+  const showReviewSource = comments.showReviewSource === undefined
+    ? DEFAULT_SHOW_REVIEW_SOURCE
+    : comments.showReviewSource
+  if (typeof showReviewSource !== 'boolean') {
+    throw new TypeError('User configuration comments.showReviewSource must be a boolean')
   }
 
   const types = comments.types ?? DEFAULT_COMMENT_TYPES
@@ -90,6 +98,7 @@ function configuredCommentSettings(comments) {
   return {
     commentTypes: Object.freeze([...types]),
     defaultCommentType: defaultType,
+    showReviewSource,
   }
 }
 
