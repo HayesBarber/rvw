@@ -50,12 +50,6 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-Use the Back and Forward buttons to move through file navigation history.
-Opening a different file after Back clears forward history. Opening the current
-file does not add an entry. History resets when the repository or review source
-changes. Reload preserves history and skips files that are no longer available.
-Both actions also accept counts and command-line action names.
-
 Press `?` to show the current bindings. Press `<Esc>` to close the reference.
 
 Press `V` in the diff pane to select lines, then press `c` to add a range comment.
