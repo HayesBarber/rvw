@@ -275,3 +275,24 @@ test('the active surface handles its respective focus command', () => {
   assert.equal(dispatch(focusActions), true)
   assert.deepEqual(calls, ['diff', 'tree'])
 })
+
+
+test('history actions dispatch from both surfaces, keyboards, and command names', () => {
+  let surface = ActiveSurface.FILE_TREE
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => surface,
+    getSurfaceActions: () => null,
+    globalActions: {
+      [ApplicationAction.FILE_HISTORY_BACK]: (count) => { calls.push(['back', count]); return true },
+      [ApplicationAction.FILE_HISTORY_FORWARD]: (count) => { calls.push(['forward', count]); return true },
+    },
+  })
+  const controller = new VimController({ bindings: defaultApplicationBindings })
+  controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+  assert.equal(controller.dispatch({ type: 'key', key: '<C-o>' }).handled, true)
+  surface = ActiveSurface.DIFF_PANE
+  assert.equal(controller.dispatch({ type: 'key', key: '<C-i>' }).handled, true)
+  assert.equal(dispatch('file.history.back', 2), true)
+  assert.deepEqual(calls, [['back', 1], ['forward', 1], ['back', 2]])
+})

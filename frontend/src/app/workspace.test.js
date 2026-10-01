@@ -269,3 +269,60 @@ test('keyboard reference visibility is idempotent and preserves workspace contex
     type: 'keymap_reference_closed',
   }), closed)
 })
+
+const openHistoryFiles = (...paths) => paths.reduce((state, path) => workspaceReducer(state, {
+  type: 'file_selected', path,
+}), initialWorkspaceState)
+const moveHistory = (state, direction, extra = {}) => workspaceReducer(state, {
+  type: 'file_history_moved', direction, changedPaths: ['A', 'B', 'C', 'D'], ...extra,
+})
+
+test('history follows opens, traverses without appending, and stops at boundaries', () => {
+  const opened = openHistoryFiles('A', 'B', 'C')
+  assert.deepEqual(opened.fileHistory, ['A', 'B', 'C'])
+  assert.equal(moveHistory(opened, 1), opened)
+  const back = moveHistory(opened, -1)
+  assert.equal(back.selectedPath, 'B')
+  assert.deepEqual(back.fileHistory, opened.fileHistory)
+  const first = moveHistory(back, -1)
+  assert.equal(first.selectedPath, 'A')
+  assert.equal(moveHistory(first, -1), first)
+  assert.equal(moveHistory(moveHistory(first, 1), 1).selectedPath, 'C')
+  assert.equal(moveHistory(opened, -1, { count: 20 }).selectedPath, 'A')
+})
+
+test('history branches only for a different file, including finder and search opens', () => {
+  const back = moveHistory(openHistoryFiles('A', 'B', 'C'), -1)
+  const duplicate = workspaceReducer(back, { type: 'finder_file_opened', path: 'B', changed: true })
+  assert.deepEqual(duplicate.fileHistory, ['A', 'B', 'C'])
+  const branch = workspaceReducer(duplicate, {
+    type: 'search_result_opened', path: 'D', changed: false, lineNumber: 12,
+  })
+  assert.deepEqual(branch.fileHistory, ['A', 'B', 'D'])
+  assert.equal(moveHistory(branch, 1), branch)
+  assert.equal(moveHistory(branch, -1).lineNavigation, null)
+})
+
+test('history skips missing and failed files and can leave an unavailable current file', () => {
+  const opened = openHistoryFiles('A', 'B', 'C', 'D')
+  const missing = workspaceReducer(opened, { type: 'file_unavailable', path: 'C' })
+  const back = moveHistory(missing, -1)
+  assert.equal(back.selectedPath, 'B')
+  assert.equal(moveHistory(back, 1).selectedPath, 'D')
+  assert.equal(moveHistory(opened, -1, { availablePaths: ['A', 'D'] }).selectedPath, 'A')
+  const failedCurrent = workspaceReducer(opened, { type: 'file_unavailable', path: 'D' })
+  assert.equal(moveHistory(failedCurrent, -1).selectedPath, 'C')
+  assert.deepEqual(workspaceReducer(missing, { type: 'file_availability_reset' }).unavailablePaths, [])
+})
+
+test('history restores unchanged files in Files mode and resets for a new session', () => {
+  const opened = openHistoryFiles('unchanged', 'A')
+  assert.equal(moveHistory(opened, -1).treeMode, TreeMode.FILES)
+  const reset = workspaceReducer(opened, { type: 'review_loaded', initialPath: 'new' })
+  assert.deepEqual(reset.fileHistory, ['new'])
+  assert.equal(reset.fileHistoryIndex, 0)
+  assert.equal(moveHistory(reset, -1), reset)
+  const empty = workspaceReducer(reset, { type: 'review_loaded', initialPath: null })
+  assert.deepEqual(empty.fileHistory, [])
+  assert.equal(empty.fileHistoryIndex, -1)
+})

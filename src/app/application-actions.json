@@ -168,6 +168,20 @@
     "description": "Open the previous file in the active file-tree mode."
   },
   {
+    "name": "FILE_HISTORY_BACK",
+    "id": "file.history.back",
+    "scope": "global",
+    "group": "navigation",
+    "description": "Open the previous file in navigation history."
+  },
+  {
+    "name": "FILE_HISTORY_FORWARD",
+    "id": "file.history.forward",
+    "scope": "global",
+    "group": "navigation",
+    "description": "Open the next file in navigation history."
+  },
+  {
     "name": "OPEN_FILE_FINDER",
     "id": "file_finder.open",
     "scope": "global",

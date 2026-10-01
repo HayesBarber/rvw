@@ -72,6 +72,9 @@ export default function App() {
     activePath,
     allFilesRequest,
     canCommentOnFile,
+    canNavigateBack,
+    canNavigateForward,
+    navigateHistory,
     clearComments: handleClearComments,
     clearRequest,
     closeFileFinder,
@@ -134,6 +137,7 @@ export default function App() {
     copyComments: handleCopyComments,
     clearComments: handleClearComments,
     navigateFile,
+    navigateHistory,
     openFileFinder,
     openFileFinderAll,
     openKeymapReference,
@@ -190,6 +194,22 @@ export default function App() {
       >
         <header className="pane-header">
           <div className="tree-navigation-actions">
+            <button
+              className="file-history-button"
+              type="button"
+              title="Back"
+              aria-label="Back"
+              disabled={!canNavigateBack}
+              onClick={() => dispatchApplicationAction(ApplicationAction.FILE_HISTORY_BACK)}
+            >←</button>
+            <button
+              className="file-history-button"
+              type="button"
+              title="Forward"
+              aria-label="Forward"
+              disabled={!canNavigateForward}
+              onClick={() => dispatchApplicationAction(ApplicationAction.FILE_HISTORY_FORWARD)}
+            >→</button>
             <div className="tree-mode-toggle" role="group" aria-label="File tree mode">
               <button
                 type="button"

@@ -239,3 +239,15 @@ test('ambiguous binding prefixes produce a deterministic error', () => {
     { name: 'TypeError', message: 'Ambiguous Vim binding prefix in normal' },
   )
 })
+
+test('history bindings dispatch configurable semantic actions', () => {
+  for (const [action, key] of [
+    [ApplicationAction.FILE_HISTORY_BACK, '<C-o>'],
+    [ApplicationAction.FILE_HISTORY_FORWARD, '<C-i>'],
+  ]) {
+    assert.deepEqual(defaultNormalKeymap[action], [[key]])
+    assert.equal(applicationActionCatalog[action].scope, ActionScope.GLOBAL)
+    const bindings = compileApplicationKeymap({ ...defaultNormalKeymap, [action]: [['<M-Left>']] })
+    assert(bindings.some((binding) => binding.keys[0] === '<M-Left>' && binding.args.actions.includes(action)))
+  }
+})

@@ -2,7 +2,7 @@ import { useHighlighterPreload } from './use-highlighter-preload.js'
 import { createReviewFileCache } from './file-cache.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { FinderMode, TreeMode } from '../app/workspace.js'
+import { fileHistoryTarget, FinderMode, TreeMode } from '../app/workspace.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
 import {
   orderedFilePaths,
@@ -53,9 +53,9 @@ export function selectVisibleFiles(overview, filesModeEntries, treeMode) {
     : (overview?.files ?? [])
 }
 
-export function selectActivePath(visibleFiles, selectedPath, initialPath) {
+export function selectActivePath(visibleFiles, selectedPath, initialPath, retainSelection = false) {
   const visiblePaths = new Set(visibleFiles.map((file) => file.path))
-  if (selectedPath && visiblePaths.has(selectedPath)) return selectedPath
+  if (selectedPath && (retainSelection || visiblePaths.has(selectedPath))) return selectedPath
   if (initialPath && visiblePaths.has(initialPath)) return initialPath
   return visibleFiles[0]?.path ?? null
 }
@@ -75,17 +75,18 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   const copyRequest = useCopyComments()
   const clearRequest = useClearComments()
   const overview = overviewRequest.data
-  const loadedReview = useRef(false)
+  const loadedReview = useRef(null)
+  const sessionKey = overview ? JSON.stringify([overview.repository, overview.source]) : null
 
   useEffect(() => {
     if (!overview) return
-    if (loadedReview.current) return
-    loadedReview.current = true
+    if (loadedReview.current === sessionKey) return
+    loadedReview.current = sessionKey
     dispatchWorkspace({
       type: 'review_loaded',
       initialPath: overview.initialPath,
     })
-  }, [dispatchWorkspace, overview])
+  }, [dispatchWorkspace, overview, sessionKey])
 
   const changedPaths = useMemo(
     () => new Set(overview?.files.map((file) => file.path) ?? []),
@@ -113,8 +114,9 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       visibleFiles,
       workspace.selectedPath,
       overview?.initialPath,
+      workspace.treeMode === TreeMode.FILES && workspace.fileHistoryIndex >= 0,
     ),
-    [overview, visibleFiles, workspace.selectedPath],
+    [overview, visibleFiles, workspace.selectedPath, workspace.treeMode, workspace.fileHistoryIndex],
   )
   const visibleFilePaths = useMemo(
     () => orderedFilePaths(visibleFiles),
@@ -137,13 +139,14 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
 
   const handleReloaded = useCallback((result) => {
     fileCache.invalidate()
+    dispatchWorkspace({ type: 'file_availability_reset' })
     setGeneration(result.generation)
     return Promise.all([
       overviewRequest.load(),
       allFilesRequest.load(),
       notIgnoredFilesRequest.load(),
     ])
-  }, [allFilesRequest, fileCache, notIgnoredFilesRequest, overviewRequest])
+  }, [allFilesRequest, dispatchWorkspace, fileCache, notIgnoredFilesRequest, overviewRequest])
   const reloadRequest = useReloadReview({
     hasUnsavedDraft,
     onReloaded: handleReloaded,
@@ -215,6 +218,28 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     visibleFilePaths,
     workspace.treeMode,
   ])
+
+  const availableHistoryPaths = allFilesRequest.status === RequestStatus.SUCCESS
+    ? [...changedPaths, ...allFilesRequest.data]
+    : null
+  const canNavigateBack = Boolean(overview) && fileHistoryTarget(workspace, -1, 1, availableHistoryPaths) !== null
+  const canNavigateForward = Boolean(overview) && fileHistoryTarget(workspace, 1, 1, availableHistoryPaths) !== null
+  const navigateHistory = (direction, count) => {
+    if (!overview || fileHistoryTarget(workspace, direction, count, availableHistoryPaths) === null) return false
+    dispatchWorkspace({
+      type: 'file_history_moved', direction, count,
+      availablePaths: availableHistoryPaths,
+      changedPaths: [...changedPaths],
+    })
+    if (allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
+    return true
+  }
+
+  useEffect(() => {
+    if (fileRequest.status === RequestStatus.ERROR && fileRequest.path) {
+      dispatchWorkspace({ type: 'file_unavailable', path: fileRequest.path })
+    }
+  }, [dispatchWorkspace, fileRequest.path, fileRequest.status])
 
   const openFinderFile = useCallback((path, lineNumber) => {
     const changed = changedPaths.has(path)
@@ -319,6 +344,9 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   return {
     activePath,
     allFilesRequest,
+    canNavigateBack,
+    canNavigateForward,
+    navigateHistory,
     canCommentOnFile: Boolean(openFileCommentTarget(fileRequest.data)),
     clearComments,
     clearRequest,

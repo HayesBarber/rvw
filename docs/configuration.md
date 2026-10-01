@@ -30,6 +30,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `tree_mode.files` | `f` | Show all repository files. |
 | `file.open.next` | `] b` | Open the next file in the current tree mode. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
+| `file.history.back` | `<C-o>` | Open the previous available file in navigation history. |
+| `file.history.forward` | `<C-i>` | Open the next available file in navigation history. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
 | `codebase_search.open` | `<leader> /` | Codebase text search across the opened directory, including unchanged files, with ignore rules applied. |

@@ -22,6 +22,9 @@ export const FILE_TREE_WIDTH = Object.freeze({
 
 export const initialWorkspaceState = Object.freeze({
   selectedPath: null,
+  fileHistory: [],
+  fileHistoryIndex: -1,
+  unavailablePaths: [],
   lineNavigation: null,
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
@@ -40,10 +43,34 @@ function validPath(selectedPath, visiblePaths, initialPath) {
   return visiblePaths[0] ?? null
 }
 
-export function workspaceReducer(state, action) {
+function reduceWorkspace(state, action) {
   switch (action.type) {
     case 'review_loaded':
-      return { ...state, selectedPath: action.initialPath }
+      return {
+        ...state,
+        selectedPath: action.initialPath,
+        lineNavigation: null,
+        fileHistory: action.initialPath ? [action.initialPath] : [],
+        fileHistoryIndex: action.initialPath ? 0 : -1,
+        unavailablePaths: [],
+      }
+    case 'file_unavailable':
+      return state.unavailablePaths.includes(action.path)
+        ? state
+        : { ...state, unavailablePaths: [...state.unavailablePaths, action.path] }
+    case 'file_availability_reset':
+      return { ...state, unavailablePaths: [] }
+    case 'file_history_moved': {
+      const index = fileHistoryTarget(state, action.direction, action.count, action.availablePaths)
+      if (index === null) return state
+      return {
+        ...state,
+        fileHistoryIndex: index,
+        selectedPath: state.fileHistory[index],
+        lineNavigation: null,
+        treeMode: action.changedPaths.includes(state.fileHistory[index]) ? state.treeMode : TreeMode.FILES,
+      }
+    }
     case 'surface_activated':
       return state.activeSurface === action.surface
         ? state
@@ -137,4 +164,28 @@ export function workspaceReducer(state, action) {
     default:
       return state
   }
+}
+
+/** Find a reachable entry without changing history or stopping at missing files. */
+export function fileHistoryTarget(state, direction, count = 1, availablePaths = null) {
+  if (direction !== -1 && direction !== 1) return null
+  let remaining = Number.isSafeInteger(count) && count > 0 ? count : 1
+  let target = null
+  for (let index = state.fileHistoryIndex + direction;
+    index >= 0 && index < state.fileHistory.length; index += direction) {
+    const path = state.fileHistory[index]
+    if (path === state.selectedPath || state.unavailablePaths.includes(path)) continue
+    if (availablePaths && !availablePaths.includes(path)) continue
+    target = index
+    if (--remaining === 0) break
+  }
+  return target
+}
+
+export function workspaceReducer(state, action) {
+  const next = reduceWorkspace(state, action)
+  if (action.type === 'review_loaded' || action.type === 'file_history_moved' ||
+    !next.selectedPath || next.selectedPath === state.selectedPath) return next
+  const fileHistory = [...state.fileHistory.slice(0, state.fileHistoryIndex + 1), next.selectedPath]
+  return { ...next, fileHistory, fileHistoryIndex: fileHistory.length - 1 }
 }
