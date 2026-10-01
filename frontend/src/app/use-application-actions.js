@@ -24,6 +24,7 @@ export function useApplicationActions({
   copyComments,
   clearComments,
   navigateFile,
+  navigateHistory,
   openFileFinder,
   openFileFinderAll,
   openKeymapReference,
@@ -107,6 +108,8 @@ export function useApplicationActions({
     },
     [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
     [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => navigateFile(-1, count),
+    [ApplicationAction.FILE_HISTORY_BACK]: (count) => navigateHistory(-1, count),
+    [ApplicationAction.FILE_HISTORY_FORWARD]: (count) => navigateHistory(1, count),
     [ApplicationAction.OPEN_FILE_FINDER]: () => {
       if (!reviewAvailable) return false
       openFileFinder()
@@ -138,6 +141,7 @@ export function useApplicationActions({
     copyComments,
     dispatchWorkspace,
     navigateFile,
+    navigateHistory,
     openFileFinder,
     openFileFinderAll,
     openKeymapReference,

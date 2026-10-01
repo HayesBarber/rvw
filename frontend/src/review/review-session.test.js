@@ -114,3 +114,10 @@ test('active paths retain valid selection and fall back deterministically', () =
   assert.equal(selectActivePath(visibleFiles, 'missing.js', 'missing-too.js'), 'a.js')
   assert.equal(selectActivePath([], 'a.js', 'a.js'), null)
 })
+
+
+test('history selections remain active while a missing file reports its error', () => {
+  const files = [{ path: 'A' }, { path: 'C' }]
+  assert.equal(selectActivePath(files, 'B', 'A', true), 'B')
+  assert.equal(selectActivePath(files, null, 'A', true), 'A')
+})

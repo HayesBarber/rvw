@@ -30,6 +30,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `tree_mode.files` | `f` | Show all repository files. |
 | `file.open.next` | `] b` | Open the next file in the current tree mode. |
 | `file.open.previous` | `[ b` | Open the previous file in the current tree mode. |
+| `file.history.back` | `<C-o>` | Open the previous available file in navigation history. |
+| `file.history.forward` | `<C-i>` | Open the next available file in navigation history. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
 | `file_finder.open.all` | `<leader> F` | Open the file finder listing every file, including git-ignored ones. |
 | `codebase_search.open` | `<leader> /` | Codebase text search across the opened directory, including unchanged files, with ignore rules applied. |
@@ -47,6 +49,12 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `comments.clear` | `d a` | Clear all review comments in the current session. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
+
+Use the Back and Forward buttons to move through file navigation history.
+Opening a different file after Back clears forward history. Opening the current
+file does not add an entry. History resets when the repository or review source
+changes. Reload preserves history and skips files that are no longer available.
+Both actions also accept counts and command-line action names.
 
 Press `?` to show the current bindings. Press `<Esc>` to close the reference.
 
