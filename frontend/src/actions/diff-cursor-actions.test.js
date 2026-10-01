@@ -796,3 +796,50 @@ test('switch action activates the mapped cursor for comment creation and existin
     assert.equal(commentAtCursor(comments, 'example.txt', cursor).id, side)
   }
 })
+
+test('cursor scrolling ignores a stale active marker and the opposite diff side', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1, scrollTop: 2000, clientHeight: 500,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: options => scrolls.push(options),
+  }
+  const node = {
+    getBoundingClientRect: () => ({ top: -2000 }),
+    shadowRoot: {
+      querySelectorAll(selector) {
+        if (selector === '[data-editor-active-line]') {
+          return [{ getBoundingClientRect: () => ({ top: -2000, bottom: -1980 }) }]
+        }
+        assert.equal(selector, '[data-line="801"]')
+        return [{
+          closest: () => ({ hasAttribute: name => name === 'data-deletions' }),
+          getBoundingClientRect: () => ({ top: -2000, bottom: -1980 }),
+        }]
+      },
+    },
+  }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 2400, height: 20 }),
+  }
+  scrollDiffCursorIntoView(instance, node, { lineNumber: 801, side: 'additions' })
+  assert.deepEqual(scrolls, [])
+})
+
+test('an unrendered row with a tall comment does not scroll its code above the viewport', () => {
+  const scrolls = []
+  const viewport = {
+    nodeType: 1, scrollTop: 1000, clientHeight: 500,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: options => scrolls.push(options),
+  }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 2000, height: 1200 }),
+  }
+  scrollDiffCursorIntoView(instance, {
+    getBoundingClientRect: () => ({ top: -1000 }),
+  }, { lineNumber: 801, side: 'additions' })
+  assert.deepEqual(scrolls, [{ top: 2000 }])
+})
