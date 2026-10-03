@@ -53,3 +53,52 @@ jobs:
             gh release create "$GITHUB_REF_NAME" "zig-out/release/Rvw-${{ env.version }}.zip" "zig-out/release/Rvw-${{ env.version }}.zip.sha256" \
               --title "$GITHUB_REF_NAME" --generate-notes --latest
           fi
+
+  update-homebrew:
+    name: Update Homebrew tap
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check the latest release asset
+        id: release-asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
+          latest_tag=$(jq -er '.tag_name' <<< "$release")
+          if [[ "$latest_tag" != "$GITHUB_REF_NAME" ]]; then
+            echo "This release is no longer Latest. Skip the Homebrew update."
+            exit 0
+          fi
+          asset_name="Rvw-${GITHUB_REF_NAME#v}.zip"
+          if ! jq -e --arg name "$asset_name" '
+            .assets | map(select(.name == $name)) |
+            length == 1 and (.[0].digest // "" | test("^sha256:[0-9a-fA-F]{64}$"))
+          ' <<< "$release" > /dev/null; then
+            echo "Release must contain one $asset_name asset with a valid SHA-256 digest." >&2
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create the tap App token
+        if: steps.release-asset.outputs.ready == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RVW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RVW_APP_PRIVATE_KEY }}
+          owner: HayesBarber
+          repositories: homebrew-tap
+          permission-contents: write
+
+      - name: Dispatch the Homebrew update
+        if: steps.release-asset.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api --method POST repos/HayesBarber/homebrew-tap/dispatches \
+            -f event_type=update_rvw

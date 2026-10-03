@@ -62,6 +62,40 @@ before writing its checksum. A failed step removes the ZIP and checksum.
 Release steps run on every release build; old assets do not count as a new
 release. Run builds that use the same output prefix and macOS user serially.
 
+## Automatic Homebrew updates
+
+After the build-and-publish job succeeds, the release workflow starts a separate
+Homebrew update job. The job checks that the current tag is GitHub's Latest
+release and that its ZIP asset has a valid SHA-256 digest. Older release tags
+skip the update. Missing or invalid assets or digests fail the job.
+
+Configure these settings in the **rvw** repository under Settings > Secrets and
+variables > Actions. Use the existing tap GitHub App's values:
+
+| Setting | Name | Value |
+| --- | --- | --- |
+| Variable | `RVW_APP_CLIENT_ID` | The App's Client ID. |
+| Secret | `RVW_APP_PRIVATE_KEY` | The full private key PEM text, including the BEGIN and END lines. Do not base64 encode it. |
+
+Keep the App installed on `HayesBarber/homebrew-tap` only, with Contents write
+permission and Always allow bypass access for the tap's `main` ruleset. The App
+does not need an installation on rvw. The workflow creates a short-lived token
+limited to the tap and sends a repository dispatch with event type `update_rvw`.
+No payload is required.
+
+The tap workflow retrieves Latest, updates the cask version and digest, commits
+and pushes changes, and creates a tap tag and release. An unchanged cask creates
+no additional commit or release. A successful dispatch means GitHub accepted
+the event; inspect the tap workflow to verify that its update and release succeed.
+
+If authentication, release metadata retrieval, or dispatch fails, rerun the
+failed Homebrew job from the Actions run page after correcting the cause. This
+does not rebuild the signed app or upload its assets again. The tap reports its
+own failures in its Actions run.
+
+Run the dispatch tests with `node --test build/homebrew-dispatch.test.mjs`.
+The tests require Bash and jq. They use mocked GitHub API calls.
+
 ## Verify an artifact
 
 The release script checks the signature, stapled ticket, and Gatekeeper result
