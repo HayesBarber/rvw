@@ -497,7 +497,7 @@ textarea {
 
 .keymap-reference-dialog {
   display: flex;
-  width: min(920px, calc(100vw - 64px));
+  width: min(640px, calc(100vw - 64px));
   max-height: min(780px, calc(100vh - 64px));
   flex-direction: column;
   overflow: hidden;
@@ -553,7 +553,7 @@ textarea {
 
 .keymap-reference-body {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   padding: 20px;
   overflow: auto;

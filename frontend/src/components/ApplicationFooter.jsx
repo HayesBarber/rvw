@@ -5,7 +5,7 @@ import { RequestStatus } from '../review/request-state.js'
 
 function diagnosticText(diagnostic) {
   if (!diagnostic) return null
-  return `Configuration: ${diagnostic.message}. Fix ${diagnostic.path}, then restart rvw. The current configuration remains active.`
+  return `Configuration: ${diagnostic.message}. Fix ${diagnostic.path}, then restart Rvw. The current configuration remains active.`
 }
 
 export default function ApplicationFooter({
