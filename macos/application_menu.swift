@@ -7,7 +7,7 @@ enum ApplicationMenu {
         let applicationMenuItem = NSMenuItem()
         let applicationMenu = NSMenu(title: "Application")
         applicationMenu.addItem(
-            withTitle: "Quit rvw",
+            withTitle: "Quit Rvw",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
