@@ -947,9 +947,20 @@ textarea {
   outline-offset: 2px;
 }
 
-.command-line [role="alert"] {
+.command-line input[aria-invalid="true"]:focus-visible {
+  outline: 2px solid #ff9c99;
+}
+
+.application-status:has(.command-line-error) {
+  flex-wrap: wrap;
+}
+
+.command-line-error {
+  flex: 0 0 100%;
+  min-width: 0;
   color: #ff9c99;
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .text-search-location { color: #adadb1; font-size: 0.8rem; margin-bottom: 4px; }

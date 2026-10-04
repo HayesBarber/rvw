@@ -24,7 +24,6 @@ export default function CommandLine({ controller, aliases, dispatch, error }) {
           submit: () => controller.submit(value, aliases, dispatch, () => inputRef.current?.focus()),
         })}
       />
-      {error && <span id="command-line-error" role="alert">{error}</span>}
     </div>
   )
 }
