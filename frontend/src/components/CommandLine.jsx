@@ -21,6 +21,7 @@ export default function CommandLine({ controller, aliases, dispatch, error }) {
         onBlur={() => controller.cancel()}
         onKeyDown={(event) => handleCommandLineKey(event, {
           cancel: controller.cancel,
+          recallPrevious: () => setValue(controller.recallPrevious(value)),
           submit: () => controller.submit(value, aliases, dispatch, () => inputRef.current?.focus()),
         })}
       />

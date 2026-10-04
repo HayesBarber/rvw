@@ -87,6 +87,77 @@ test('actions that move focus or enter a mode retain their intended outcome', ()
   assert.equal(f.vim.getSnapshot().mode, 'visual')
 })
 
+test('history survives closing, recalls submissions in reverse order, and allows edited submission', () => {
+  const f = fixture()
+  const calls = []
+  const dispatch = (action) => { calls.push(action); return true }
+  for (const input of ['  clear  ', 'cursor.down', 'diff.wrap.toggle']) {
+    f.controller.open()
+    f.controller.submit(input, { clear: 'comments.clear' }, dispatch)
+  }
+  f.controller.open(); f.focusInput()
+  assert.equal(f.controller.recallPrevious('draft'), 'diff.wrap.toggle')
+  assert.equal(f.controller.recallPrevious('diff.wrap.toggle'), 'cursor.down')
+  assert.equal(f.controller.recallPrevious('cursor.down'), '  clear  ')
+  assert.equal(f.controller.recallPrevious('  clear  '), '  clear  ')
+  assert.equal(f.focus(), 'input')
+  assert.equal(f.vim.getSnapshot().mode, 'command')
+  assert.equal(calls.length, 3)
+  f.controller.submit('cursor.up', {}, dispatch)
+  assert.equal(calls.at(-1), 'cursor.up')
+  f.controller.open()
+  assert.equal(f.controller.recallPrevious(''), 'cursor.up')
+  f.controller.cancel()
+  assert.equal(f.controller.recallPrevious('closed'), 'closed')
+  f.controller.open()
+  assert.equal(f.controller.recallPrevious(''), 'cursor.up')
+})
+
+test('empty history and blank submissions preserve input; failed submissions enter history', () => {
+  const f = fixture()
+  f.controller.open()
+  assert.equal(f.controller.recallPrevious('draft'), 'draft')
+  f.controller.submit('  ', {}, () => assert.fail('must not dispatch'))
+  f.controller.open()
+  assert.equal(f.controller.recallPrevious('draft'), 'draft')
+  f.controller.submit('unknown', {}, () => assert.fail('must not dispatch'))
+  assert.equal(f.controller.recallPrevious('draft'), 'unknown')
+  f.controller.submit('comments.clear', {}, () => false, f.focusInput)
+  assert.equal(f.controller.recallPrevious('draft'), 'comments.clear')
+  assert.equal(f.controller.recallPrevious(''), 'unknown')
+  assert.equal(fixture().controller.recallPrevious('new session'), 'new session')
+})
+
+test('history retains only the latest 1,000 submissions, including duplicates', () => {
+  const f = fixture()
+  f.controller.open()
+  for (let i = 0; i < 1002; i++) f.controller.submit(`unknown-${i}`, {}, () => false)
+  f.controller.submit('unknown-1001', {}, () => false)
+  assert.equal(f.controller.recallPrevious(''), 'unknown-1001')
+  assert.equal(f.controller.recallPrevious(''), 'unknown-1001')
+  for (let i = 1000; i >= 3; i--) assert.equal(f.controller.recallPrevious(''), `unknown-${i}`)
+  assert.equal(f.controller.recallPrevious(''), 'unknown-3')
+})
+
+test('Up Arrow recalls without submission, supports repeat, and respects IME and modifiers', () => {
+  let recalls = 0
+  const handlers = {
+    recallPrevious: () => recalls++,
+    submit: () => assert.fail('must not submit'),
+    cancel: () => assert.fail('must not cancel'),
+  }
+  for (const extra of [{}, { repeat: true }, { isComposing: true },
+    { nativeEvent: { isComposing: true } }, { altKey: true }, { ctrlKey: true },
+    { metaKey: true }, { shiftKey: true }]) {
+    let stopped = false; let prevented = false
+    handleCommandLineKey({ key: 'ArrowUp', stopPropagation: () => { stopped = true },
+      preventDefault: () => { prevented = true }, ...extra }, handlers)
+    assert(stopped)
+    assert.equal(prevented, Object.keys(extra).length === 0 || Boolean(extra.repeat))
+  }
+  assert.equal(recalls, 2)
+})
+
 test('colon opens through the keyboard dispatcher, overlays block it, command mode has no workspace bindings', () => {
   const f = fixture()
   let overlay = null
