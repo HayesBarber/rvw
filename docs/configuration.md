@@ -86,6 +86,7 @@ Set `comments.showReviewSource` to `false` to omit this header. It defaults to `
 
 Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
 Names are case-sensitive. Press `<Esc>` to cancel.
+In the command input, use Up Arrow and Down Arrow to move through command history.
 Use `commandLine.aliases` to map aliases to action identifiers from the table above.
 Alias names must be non-empty, contain no whitespace, and differ from all action identifiers.
 Configure the opening key with `command_line.open`.
