@@ -360,6 +360,7 @@ export default function App() {
         <KeymapReference
           keymap={keyboardConfiguration.keymap}
           leader={keyboardConfiguration.leader}
+          aliases={keyboardConfiguration.commandAliases}
           onClose={closeKeymapReference}
         />
       )}
