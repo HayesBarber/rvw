@@ -364,6 +364,7 @@ export default function App() {
         />
       )}
       <ApplicationFooter
+        commandError={commandState.error}
         commandLine={commandState.open && (
           <CommandLine
             controller={commandLine}

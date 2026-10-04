@@ -9,6 +9,7 @@ function diagnosticText(diagnostic) {
 }
 
 export default function ApplicationFooter({
+  commandError,
   commandLine,
   clearMessage,
   clearStatus,
@@ -42,6 +43,11 @@ export default function ApplicationFooter({
           {!vimState.count && !pending && <span>ready</span>}
         </span>
         <span className="application-status">
+          {commandError && (
+            <span id="command-line-error" className="command-line-error" role="alert">
+              {commandError}
+            </span>
+          )}
           {problem && (
             <span className="keyboard-diagnostic" role="alert" title={problem}>
               {problem}
