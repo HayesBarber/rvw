@@ -19,13 +19,18 @@ export function keymapReferenceScrollDelta(key) {
 }
 
 /** Builds the reference model from the effective map and action catalog. */
-export function createKeymapReference(keymap, leader = DEFAULT_LEADER_KEY) {
+export function createKeymapReference(keymap, leader = DEFAULT_LEADER_KEY, aliases = {}) {
+  const aliasEntries = Object.entries(aliases)
   return applicationActionGroups.map((group) => Object.freeze({
     ...group,
     actions: Object.freeze(Object.values(applicationActionCatalog)
       .filter((action) => action.group === group.id)
       .map((action) => Object.freeze({
         ...action,
+        aliases: Object.freeze(aliasEntries
+          .filter(([, target]) => target === action.id)
+          .map(([name]) => name)
+          .sort()),
         sequences: Object.freeze((keymap[action.id] ?? [])
           .map((keys) => Object.freeze(effectiveSequence(keys, leader)))),
       }))),

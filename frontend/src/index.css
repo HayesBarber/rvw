@@ -616,6 +616,11 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.keymap-reference-action dd .keymap-reference-aliases {
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
 .keymap-reference-disabled {
   color: #77777d;
   font-size: 0.7rem;
