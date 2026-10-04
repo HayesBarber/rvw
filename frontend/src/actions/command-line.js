@@ -18,6 +18,7 @@ export function createCommandLine({ getFocus, setMode, onChange }) {
   let previousFocus = null
   const history = []
   let historyIndex = 0
+  let historyDraft = ''
   const close = (restore = true) => {
     open = false
     setMode('normal')
@@ -39,8 +40,14 @@ export function createCommandLine({ getFocus, setMode, onChange }) {
     },
     recallPrevious(input) {
       if (!open || submitting || history.length === 0) return input
+      if (historyIndex === history.length) historyDraft = input
       historyIndex = Math.max(0, historyIndex - 1)
       return history[historyIndex]
+    },
+    recallNext(input) {
+      if (!open || submitting || historyIndex === history.length) return input
+      historyIndex++
+      return historyIndex === history.length ? historyDraft : history[historyIndex]
     },
     submit(input, aliases, dispatch, focusInput) {
       if (!open || submitting) return false
@@ -75,12 +82,13 @@ export function createCommandLine({ getFocus, setMode, onChange }) {
   }
 }
 
-export function handleCommandLineKey(event, { submit, cancel, recallPrevious }) {
+export function handleCommandLineKey(event, { submit, cancel, recallPrevious, recallNext }) {
   event.stopPropagation()
   if (event.isComposing || event.nativeEvent?.isComposing) return
-  if (event.key === 'ArrowUp' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+  if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
     event.preventDefault()
-    recallPrevious()
+    if (event.key === 'ArrowUp') recallPrevious()
+    else recallNext()
     return
   }
   if (event.key === 'Enter' || event.key === 'Escape' || event.key === 'Tab') {

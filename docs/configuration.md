@@ -88,6 +88,7 @@ Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` 
 Names are case-sensitive. Press `<Esc>` to cancel.
 With focus in the command input, press Up Arrow to recall the most recent command.
 Press Up Arrow again to recall each older command. At the oldest command, the input stays unchanged.
+Press Down Arrow to recall each newer command. After the newest command, the input restores your text from before recall.
 You can edit a recalled command. Press `<Enter>` to run it.
 The input keeps the latest 1,000 non-empty submissions, including commands that fail.
 History is cleared when the application restarts.

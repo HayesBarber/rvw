@@ -139,24 +139,57 @@ test('history retains only the latest 1,000 submissions, including duplicates', 
   assert.equal(f.controller.recallPrevious(''), 'unknown-3')
 })
 
-test('Up Arrow recalls without submission, supports repeat, and respects IME and modifiers', () => {
-  let recalls = 0
-  const handlers = {
-    recallPrevious: () => recalls++,
-    submit: () => assert.fail('must not submit'),
-    cancel: () => assert.fail('must not cancel'),
-  }
-  for (const extra of [{}, { repeat: true }, { isComposing: true },
-    { nativeEvent: { isComposing: true } }, { altKey: true }, { ctrlKey: true },
-    { metaKey: true }, { shiftKey: true }]) {
-    let stopped = false; let prevented = false
-    handleCommandLineKey({ key: 'ArrowUp', stopPropagation: () => { stopped = true },
-      preventDefault: () => { prevented = true }, ...extra }, handlers)
-    assert(stopped)
-    assert.equal(prevented, Object.keys(extra).length === 0 || Boolean(extra.repeat))
-  }
-  assert.equal(recalls, 2)
+test('Down Arrow recalls newer commands and restores the draft without submission or focus changes', () => {
+  const f = fixture()
+  f.controller.open(); f.focusInput()
+  assert.equal(f.controller.recallNext('empty history'), 'empty history')
+  for (const input of ['first', 'second', 'third']) f.controller.submit(input, {}, () => assert.fail('must not dispatch'))
+  assert.equal(f.controller.recallNext('draft'), 'draft')
+  assert.equal(f.controller.recallPrevious('draft'), 'third')
+  assert.equal(f.controller.recallPrevious('third'), 'second')
+  assert.equal(f.controller.recallPrevious('second'), 'first')
+  assert.equal(f.controller.recallNext('first'), 'second')
+  assert.equal(f.controller.recallNext('second'), 'third')
+  assert.equal(f.controller.recallNext('third edited'), 'draft')
+  assert.equal(f.controller.recallNext('draft edited'), 'draft edited')
+  assert.equal(f.controller.recallPrevious('draft edited'), 'third')
+  assert.equal(f.controller.recallNext('third'), 'draft edited')
+  assert.equal(f.focus(), 'input')
+  assert.equal(f.vim.getSnapshot().mode, 'command')
+  f.controller.cancel()
+  assert.equal(f.controller.recallNext('closed'), 'closed')
+  f.controller.open()
+  assert.equal(f.controller.recallNext('new draft'), 'new draft')
+  assert.equal(f.controller.recallPrevious(''), 'third')
+  assert.equal(f.controller.recallNext('third'), '')
+  f.controller.recallPrevious('old draft')
+  f.controller.submit('fourth', {}, () => assert.fail('must not dispatch'))
+  assert.equal(f.controller.recallNext('fourth'), 'fourth')
+  assert.equal(f.controller.recallPrevious('new draft'), 'fourth')
+  assert.equal(f.controller.recallNext('fourth'), 'new draft')
 })
+
+for (const key of ['ArrowUp', 'ArrowDown']) {
+  test(`${key} recalls without submission, supports repeat, and respects IME and modifiers`, () => {
+    let recalls = 0
+    const handlers = {
+      recallPrevious: () => recalls++,
+      recallNext: () => recalls++,
+      submit: () => assert.fail('must not submit'),
+      cancel: () => assert.fail('must not cancel'),
+    }
+    for (const extra of [{}, { repeat: true }, { isComposing: true },
+      { nativeEvent: { isComposing: true } }, { altKey: true }, { ctrlKey: true },
+      { metaKey: true }, { shiftKey: true }]) {
+      let stopped = false; let prevented = false
+      handleCommandLineKey({ key, stopPropagation: () => { stopped = true },
+        preventDefault: () => { prevented = true }, ...extra }, handlers)
+      assert(stopped)
+      assert.equal(prevented, Object.keys(extra).length === 0 || Boolean(extra.repeat))
+    }
+    assert.equal(recalls, 2)
+  })
+}
 
 test('colon opens through the keyboard dispatcher, overlays block it, command mode has no workspace bindings', () => {
   const f = fixture()
