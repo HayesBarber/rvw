@@ -50,7 +50,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-Press `?` to show the current bindings. Press `<Esc>` to close the reference.
+Press `?` to show/search the current bindings.
 
 Press `V` in the diff pane to select lines, then press `c` to add a range comment.
 Visual-mode bindings are fixed. You can change the entry key with `diff.visual_line`.

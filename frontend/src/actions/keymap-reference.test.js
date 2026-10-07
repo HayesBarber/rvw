@@ -8,6 +8,7 @@ import {
 import {
   KEYMAP_REFERENCE_SCROLL_STEP,
   createKeymapReference,
+  filterKeymapReference,
   keymapReferenceScrollDelta,
 } from './keymap-reference.js'
 
@@ -73,4 +74,35 @@ test('plain j and k map to one reference scroll step', () => {
   assert.equal(keymapReferenceScrollDelta('k'), -KEYMAP_REFERENCE_SCROLL_STEP)
   assert.equal(keymapReferenceScrollDelta('J'), null)
   assert.equal(keymapReferenceScrollDelta('<Down>'), null)
+})
+
+test('search matches descriptions, IDs, aliases, and displayed bindings without changing order', () => {
+  const groups = createKeymapReference({
+    ...defaultNormalKeymap,
+    [ApplicationAction.COPY_COMMENTS]: [],
+  }, undefined, {
+    yank: ApplicationAction.COPY_COMMENTS,
+    duplicate: ApplicationAction.COPY_COMMENTS,
+  })
+  for (const [query, expected] of [
+    ['active cursor UP.', [ApplicationAction.CURSOR_UP]],
+    [ApplicationAction.CURSOR_UP.toUpperCase(), [ApplicationAction.CURSOR_UP]],
+    ['YaNk', [ApplicationAction.COPY_COMMENTS]],
+    ['DuPlicate', [ApplicationAction.COPY_COMMENTS]],
+    ['<sPaCe> o', [ApplicationAction.FOCUS_FILE_TREE, ApplicationAction.FOCUS_DIFF_PANE]],
+  ]) {
+    const result = filterKeymapReference(groups, query)
+    assert.deepEqual(result.flatMap((group) => group.actions.map((action) => action.id)), expected)
+    assert(result.every((group) => group.actions.length > 0))
+    assert.deepEqual(result.map((group) => group.id),
+      groups.filter((group) => group.actions.some((action) => expected.includes(action.id)))
+        .map((group) => group.id))
+  }
+  const unbound = filterKeymapReference(groups, 'yank').flatMap((group) => group.actions)
+  assert.equal(unbound[0].id, ApplicationAction.COPY_COMMENTS)
+  assert.deepEqual(unbound[0].sequences, [])
+  assert.deepEqual(unbound[0].aliases, ['duplicate', 'yank'])
+  assert.equal(filterKeymapReference(groups, ''), groups)
+  assert.deepEqual(filterKeymapReference(groups, 'no-such-action'), [])
+  assert.deepEqual(filterKeymapReference(groups, ' '), groups)
 })

@@ -484,21 +484,20 @@ textarea {
   border: 0;
 }
 
-.keymap-reference-backdrop {
-  position: fixed;
-  z-index: 110;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
+.keymap-reference-dialog::backdrop {
   background: rgb(0 0 0 / 74%);
 }
 
 .keymap-reference-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  max-width: none;
+  max-height: none;
   display: flex;
   width: min(640px, calc(100vw - 64px));
-  max-height: min(780px, calc(100vh - 64px));
+  height: min(780px, calc(100vh - 64px));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid #414145;
@@ -510,12 +509,58 @@ textarea {
 }
 
 .keymap-reference-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
   padding: 18px 20px;
+  flex-shrink: 0;
   border-bottom: 1px solid #303033;
+}
+
+.keymap-reference-controls {
+  display: flex;
+  justify-self: end;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .keymap-reference-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .keymap-reference-controls {
+    grid-row: 1;
+  }
+}
+
+.keymap-reference-search {
+  display: grid;
+  gap: 6px;
+  padding: 12px 20px;
+  flex-shrink: 0;
+}
+
+.keymap-reference-search label {
+  font-size: 0.75rem;
+}
+
+.keymap-reference-search input {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #4c65a4;
+  border-radius: 6px;
+  outline: none;
+  background: #0a0a0a;
+  color: #fafafa;
+}
+
+.keymap-reference-search input:focus {
+  border-color: #6686d5;
+  box-shadow: 0 0 0 2px rgb(102 134 213 / 24%);
 }
 
 .keymap-reference-header h2,
@@ -553,6 +598,9 @@ textarea {
 
 .keymap-reference-body {
   display: grid;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   padding: 20px;
@@ -610,10 +658,9 @@ textarea {
 
 .keymap-reference-action dd span {
   margin-top: 3px;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: #77777d;
   font: 0.65rem ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-overflow: ellipsis;
 }
 
 .keymap-reference-action dd .keymap-reference-aliases {
