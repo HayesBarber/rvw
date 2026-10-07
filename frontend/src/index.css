@@ -540,22 +540,27 @@ textarea {
   gap: 6px;
   padding: 12px 20px;
   flex-shrink: 0;
+}
+
+.keymap-reference-search label {
   font-size: 0.75rem;
 }
 
 .keymap-reference-search input {
+  display: block;
   min-width: 0;
   width: 100%;
-  padding: 8px;
-  border: 1px solid #414145;
-  border-radius: 5px;
-  background: #202022;
+  padding: 10px 12px;
+  border: 1px solid #4c65a4;
+  border-radius: 6px;
+  outline: none;
+  background: #0a0a0a;
   color: #fafafa;
 }
 
-.keymap-reference-search input:focus-visible {
-  outline: 2px solid #6686d5;
-  outline-offset: 2px;
+.keymap-reference-search input:focus {
+  border-color: #6686d5;
+  box-shadow: 0 0 0 2px rgb(102 134 213 / 24%);
 }
 
 .keymap-reference-header h2,
