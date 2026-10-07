@@ -24,20 +24,11 @@ function FooterActions({ onReload, onSearchText, reloadDisabled }) {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
 
-  function handleKeyDown(event) {
-    if (!open || event.key !== 'Escape' || event.isComposing) return
-    event.preventDefault()
-    event.stopPropagation()
-    setOpen(false)
-    triggerRef.current?.focus({ preventScroll: true })
-  }
-
   return (
     <span
       ref={containerRef}
       className="footer-actions"
       data-vim-ignore
-      onKeyDown={handleKeyDown}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
