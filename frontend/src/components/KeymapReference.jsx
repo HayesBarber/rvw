@@ -53,17 +53,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
       onClose()
       return
     }
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      const controls = [searchButtonRef.current, closeRef.current, searchRef.current].filter(Boolean)
-      const index = controls.indexOf(document.activeElement)
-      const next = index === -1
-        ? (event.shiftKey ? controls.length - 1 : 0)
-        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length
-      controls[next]?.focus()
-      return
-    }
-    if (event.target === searchRef.current) return
+    if (event.target === searchRef.current || event.key === 'Tab') return
     if (event.key === '/' && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       openSearch()
@@ -105,7 +95,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
         <header className="keymap-reference-header">
           <div>
             <h2 id="keymap-reference-title">Keyboard reference</h2>
-            <p>Press / to search or j/k to scroll. Esc leaves the input; Esc outside it closes the reference.</p>
+            <p>Press / to search or j/k to scroll</p>
           </div>
           <div className="keymap-reference-controls">
             <button
