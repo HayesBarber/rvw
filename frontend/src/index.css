@@ -510,11 +510,10 @@ textarea {
 }
 
 .keymap-reference-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
   padding: 18px 20px;
   flex-shrink: 0;
   border-bottom: 1px solid #303033;
@@ -522,8 +521,19 @@ textarea {
 
 .keymap-reference-controls {
   display: flex;
+  justify-self: end;
   flex-shrink: 0;
   gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .keymap-reference-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .keymap-reference-controls {
+    grid-row: 1;
+  }
 }
 
 .keymap-reference-search {
