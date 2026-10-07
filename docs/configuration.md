@@ -50,7 +50,9 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
-Press `?` to show the current bindings. Press `<Esc>` to close the reference.
+Press `?` to show the current bindings. Press `<Esc>` outside the search input
+to close the reference. In the input, press `<Esc>` to move focus to the
+reference. Press `<Esc>` again to close it. The first Escape keeps the query.
 Select Search or press `/` in the reference to show and focus the search input.
 The input is hidden when you open the reference. Search by description,
 action ID, command alias, or displayed binding. The search ignores letter case.

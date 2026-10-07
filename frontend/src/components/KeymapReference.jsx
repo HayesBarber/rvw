@@ -45,6 +45,11 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
+      if (event.target === searchRef.current) {
+        dialogRef.current?.focus({ preventScroll: true })
+        return
+      }
+      if (event.repeat) return
       onClose()
       return
     }
@@ -100,7 +105,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
         <header className="keymap-reference-header">
           <div>
             <h2 id="keymap-reference-title">Keyboard reference</h2>
-            <p>Press / to search, j/k to scroll, or Esc to close.</p>
+            <p>Press / to search or j/k to scroll. Esc leaves the input; Esc outside it closes the reference.</p>
           </div>
           <div className="keymap-reference-controls">
             <button
