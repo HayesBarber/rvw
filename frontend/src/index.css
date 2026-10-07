@@ -98,7 +98,6 @@ textarea {
   overflow: hidden;
 }
 
-.footer-reload-action,
 .footer-copy-action {
   display: flex;
   min-width: 0;
@@ -367,7 +366,7 @@ textarea {
   cursor: pointer;
 }
 
-.reload-button,
+.footer-actions-trigger,
 .file-comment-button {
   padding: 5px 10px;
   border: 1px solid #414145;
@@ -377,7 +376,7 @@ textarea {
   cursor: pointer;
 }
 
-.reload-button:hover:not(:disabled),
+.footer-actions-trigger:hover,
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
 }
@@ -415,9 +414,55 @@ textarea {
   opacity: 0.7;
 }
 
-.reload-button:disabled {
+.footer-actions-item:disabled {
   color: #737378;
   cursor: default;
+}
+
+.footer-actions {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.footer-actions-trigger {
+  min-width: 28px;
+}
+
+.footer-actions-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  z-index: 20;
+  display: flex;
+  min-width: 140px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  background: #202022;
+  box-shadow: 0 4px 16px #0006;
+}
+
+.footer-actions-item {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #fafafa;
+  text-align: left;
+  cursor: pointer;
+}
+
+.footer-actions-item:hover:not(:disabled) {
+  background: #303033;
+}
+
+.footer-actions-trigger:focus-visible,
+.footer-actions-item:focus-visible {
+  outline: 2px solid #adadb1;
+  outline-offset: 2px;
 }
 
 .copy-markdown-button:hover:not(:disabled) {
