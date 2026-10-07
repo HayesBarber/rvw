@@ -13,7 +13,9 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
   const dialogRef = useRef(null)
   const bodyRef = useRef(null)
   const searchRef = useRef(null)
+  const searchButtonRef = useRef(null)
   const closeRef = useRef(null)
+  const [searchVisible, setSearchVisible] = useState(false)
   const [query, setQuery] = useState('')
   const previousFocusRef = useRef(null)
   const groups = useMemo(
@@ -28,6 +30,15 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
     return () => previousFocusRef.current?.focus({ preventScroll: true })
   }, [])
 
+  useEffect(() => {
+    if (searchVisible) searchRef.current?.focus({ preventScroll: true })
+  }, [searchVisible])
+
+  function openSearch() {
+    setSearchVisible(true)
+    searchRef.current?.focus({ preventScroll: true })
+  }
+
   function handleKeyDown(event) {
     event.stopPropagation()
     if (event.isComposing) return
@@ -39,7 +50,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
     }
     if (event.key === 'Tab') {
       event.preventDefault()
-      const controls = [closeRef.current, searchRef.current]
+      const controls = [searchButtonRef.current, closeRef.current, searchRef.current].filter(Boolean)
       const index = controls.indexOf(document.activeElement)
       const next = index === -1
         ? (event.shiftKey ? controls.length - 1 : 0)
@@ -50,7 +61,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
     if (event.target === searchRef.current) return
     if (event.key === '/' && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
-      searchRef.current?.focus()
+      openSearch()
       return
     }
     const scrollDelta = event.altKey || event.ctrlKey || event.metaKey
@@ -62,8 +73,9 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
       bodyRef.current?.scrollBy({ top: scrollDelta })
       return
     }
-    // Keep the Close button's keyboard activation available.
-    if (event.target === closeRef.current && (event.key === 'Enter' || event.key === ' ')) return
+    // Keep the header buttons' keyboard activation available.
+    if ([searchButtonRef.current, closeRef.current].includes(event.target) &&
+      (event.key === 'Enter' || event.key === ' ')) return
     event.preventDefault()
     event.stopPropagation()
   }
@@ -90,11 +102,22 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
             <h2 id="keymap-reference-title">Keyboard reference</h2>
             <p>Press / to search, j/k to scroll, or Esc to close.</p>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close keyboard reference">
-            Close
-          </button>
+          <div className="keymap-reference-controls">
+            <button
+              ref={searchButtonRef}
+              type="button"
+              onClick={openSearch}
+              aria-expanded={searchVisible}
+              aria-controls={searchVisible ? 'keymap-reference-search-panel' : undefined}
+            >
+              Search
+            </button>
+            <button ref={closeRef} type="button" onClick={onClose} aria-label="Close keyboard reference">
+              Close
+            </button>
+          </div>
         </header>
-        <div className="keymap-reference-search">
+        {searchVisible && <div id="keymap-reference-search-panel" className="keymap-reference-search">
           <label htmlFor="keymap-reference-search">Search keyboard reference</label>
           <input
             ref={searchRef}
@@ -106,7 +129,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
               bodyRef.current?.scrollTo({ top: 0 })
             }}
           />
-        </div>
+        </div>}
         <div ref={bodyRef} className="keymap-reference-body">
           {filteredGroups.length === 0 && <p role="status">No matching actions.</p>}
           {filteredGroups.map((group) => (

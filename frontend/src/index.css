@@ -511,12 +511,19 @@ textarea {
 
 .keymap-reference-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   padding: 18px 20px;
   flex-shrink: 0;
   border-bottom: 1px solid #303033;
+}
+
+.keymap-reference-controls {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .keymap-reference-search {
