@@ -484,18 +484,17 @@ textarea {
   border: 0;
 }
 
-.keymap-reference-backdrop {
-  position: fixed;
-  z-index: 110;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
+.keymap-reference-dialog::backdrop {
   background: rgb(0 0 0 / 74%);
 }
 
 .keymap-reference-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  max-width: none;
+  max-height: none;
   display: flex;
   width: min(640px, calc(100vw - 64px));
   height: min(780px, calc(100vh - 64px));
