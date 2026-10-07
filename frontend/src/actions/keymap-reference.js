@@ -18,6 +18,21 @@ export function keymapReferenceScrollDelta(key) {
   return null
 }
 
+/** Filters actions by the text shown in the reference. Keeps catalog order. */
+export function filterKeymapReference(groups, query) {
+  const needle = query.toLowerCase()
+  if (!needle) return groups
+  return groups.map((group) => ({
+    ...group,
+    actions: group.actions.filter((action) => [
+      action.description,
+      action.id,
+      ...action.aliases,
+      ...action.sequences.map((sequence) => sequence.join(' ')),
+    ].some((text) => text.toLowerCase().includes(needle))),
+  })).filter((group) => group.actions.length > 0)
+}
+
 /** Builds the reference model from the effective map and action catalog. */
 export function createKeymapReference(keymap, leader = DEFAULT_LEADER_KEY, aliases = {}) {
   const aliasEntries = Object.entries(aliases)

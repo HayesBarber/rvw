@@ -515,7 +515,31 @@ textarea {
   justify-content: space-between;
   gap: 20px;
   padding: 18px 20px;
+  flex-shrink: 0;
   border-bottom: 1px solid #303033;
+}
+
+.keymap-reference-search {
+  display: grid;
+  gap: 6px;
+  padding: 12px 20px;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.keymap-reference-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #414145;
+  border-radius: 5px;
+  background: #202022;
+  color: #fafafa;
+}
+
+.keymap-reference-search input:focus-visible {
+  outline: 2px solid #6686d5;
+  outline-offset: 2px;
 }
 
 .keymap-reference-header h2,
@@ -610,10 +634,9 @@ textarea {
 
 .keymap-reference-action dd span {
   margin-top: 3px;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: #77777d;
   font: 0.65rem ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-overflow: ellipsis;
 }
 
 .keymap-reference-action dd .keymap-reference-aliases {

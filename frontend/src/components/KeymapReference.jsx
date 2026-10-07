@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createKeymapReference,
+  filterKeymapReference,
   keymapReferenceScrollDelta,
 } from '../actions/keymap-reference.js'
 
@@ -11,11 +12,15 @@ function sequenceLabel(sequence) {
 export default function KeymapReference({ keymap, leader, aliases, onClose }) {
   const dialogRef = useRef(null)
   const bodyRef = useRef(null)
+  const searchRef = useRef(null)
+  const closeRef = useRef(null)
+  const [query, setQuery] = useState('')
   const previousFocusRef = useRef(null)
   const groups = useMemo(
     () => createKeymapReference(keymap, leader, aliases),
     [keymap, leader, aliases],
   )
+  const filteredGroups = useMemo(() => filterKeymapReference(groups, query), [groups, query])
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement
@@ -24,10 +29,28 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
   }, [])
 
   function handleKeyDown(event) {
+    event.stopPropagation()
+    if (event.isComposing) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
       onClose()
+      return
+    }
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      const controls = [closeRef.current, searchRef.current]
+      const index = controls.indexOf(document.activeElement)
+      const next = index === -1
+        ? (event.shiftKey ? controls.length - 1 : 0)
+        : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length
+      controls[next]?.focus()
+      return
+    }
+    if (event.target === searchRef.current) return
+    if (event.key === '/' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault()
+      searchRef.current?.focus()
       return
     }
     const scrollDelta = event.altKey || event.ctrlKey || event.metaKey
@@ -39,14 +62,8 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
       bodyRef.current?.scrollBy({ top: scrollDelta })
       return
     }
-    if (event.key === 'Tab') {
-      const button = dialogRef.current?.querySelector('button')
-      if (button) {
-        event.preventDefault()
-        button.focus()
-      }
-      return
-    }
+    // Keep the Close button's keyboard activation available.
+    if (event.target === closeRef.current && (event.key === 'Enter' || event.key === ' ')) return
     event.preventDefault()
     event.stopPropagation()
   }
@@ -71,14 +88,28 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
         <header className="keymap-reference-header">
           <div>
             <h2 id="keymap-reference-title">Keyboard reference</h2>
-            <p>Bindings currently in effect. Press j/k to scroll or Esc to close.</p>
+            <p>Press / to search, j/k to scroll, or Esc to close.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close keyboard reference">
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close keyboard reference">
             Close
           </button>
         </header>
+        <div className="keymap-reference-search">
+          <label htmlFor="keymap-reference-search">Search keyboard reference</label>
+          <input
+            ref={searchRef}
+            id="keymap-reference-search"
+            type="text"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              bodyRef.current?.scrollTo({ top: 0 })
+            }}
+          />
+        </div>
         <div ref={bodyRef} className="keymap-reference-body">
-          {groups.map((group) => (
+          {filteredGroups.length === 0 && <p role="status">No matching actions.</p>}
+          {filteredGroups.map((group) => (
             <section className="keymap-reference-group" key={group.id}>
               <h3>{group.label}</h3>
               <dl>
