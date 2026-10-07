@@ -38,6 +38,7 @@ function FooterActions({ onReload, onSearchText, reloadDisabled }) {
         className="footer-actions-trigger"
         type="button"
         aria-label="More actions"
+        title="More actions"
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
         onClick={() => setOpen((value) => !value)}
