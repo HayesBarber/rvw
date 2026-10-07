@@ -366,7 +366,6 @@ textarea {
   cursor: pointer;
 }
 
-.footer-actions-trigger,
 .file-comment-button {
   padding: 5px 10px;
   border: 1px solid #414145;
@@ -376,7 +375,6 @@ textarea {
   cursor: pointer;
 }
 
-.footer-actions-trigger:hover,
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
 }
@@ -426,7 +424,28 @@ textarea {
 }
 
 .footer-actions-trigger {
-  min-width: 28px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #adadb1;
+  cursor: pointer;
+}
+
+.footer-actions-trigger svg {
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
+}
+
+.footer-actions-trigger:hover,
+.footer-actions-trigger[aria-expanded="true"] {
+  background: #202022;
+  color: #fafafa;
 }
 
 .footer-actions-popover {

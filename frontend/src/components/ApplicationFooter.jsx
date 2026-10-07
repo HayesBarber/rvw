@@ -51,7 +51,11 @@ function FooterActions({ onReload, onSearchText, reloadDisabled }) {
         aria-controls={open ? popoverId : undefined}
         onClick={() => setOpen((value) => !value)}
       >
-        …
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="5" cy="12" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="19" cy="12" r="2" />
+        </svg>
       </button>
       {open && (
         <span id={popoverId} className="footer-actions-popover" role="group" aria-label="More actions">
