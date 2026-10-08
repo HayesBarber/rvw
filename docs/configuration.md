@@ -53,8 +53,6 @@ A decimal count before a supported command repeats or scales that command. For e
 Press `?` to show/search the current bindings.
 
 For range comments, use `diff.visual_line` to select lines, then `comments.add` to add a comment.
-Visual mode uses the configured motion, comment, and selection keys.
-Press `<Esc>` to return to Normal mode.
 
 ## User configuration
 
