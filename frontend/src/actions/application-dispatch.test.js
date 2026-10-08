@@ -38,6 +38,93 @@ test('global actions receive counts and must explicitly report handled', () => {
   assert.equal(dispatch('unknown.action'), false)
 })
 
+test('surface handlers take priority over global handlers regardless of scope', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({
+      [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
+        calls.push(['surface', count])
+        return true
+      },
+      [ApplicationAction.ADD_FILE_COMMENT]: () => {
+        calls.push('comment')
+        return true
+      },
+    }),
+    globalActions: {
+      [ApplicationAction.OPEN_FILE_FINDER]: () => assert.fail('Global handler must not run'),
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER, 3), true)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), true)
+  assert.deepEqual(calls, [['surface', 3], 'comment'])
+})
+
+test('missing surface handlers fall back to global handlers regardless of scope', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: null }),
+    globalActions: {
+      [ApplicationAction.CURSOR_DOWN]: (count) => {
+        calls.push(['down', count])
+        return true
+      },
+      [ApplicationAction.ADD_FILE_COMMENT]: () => {
+        calls.push('comment')
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 4), true)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), true)
+  assert.deepEqual(calls, [['down', 4], 'comment'])
+})
+
+test('unhandled surface actions do not fall back to global handlers', () => {
+  for (const result of [false, undefined]) {
+    const dispatch = createApplicationDispatcher({
+      getActiveSurface: () => ActiveSurface.FILE_TREE,
+      getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: () => result }),
+      globalActions: {
+        [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Global handler must not run'),
+      },
+    })
+    assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
+  }
+})
+
+test('grouped actions continue after an unhandled surface action', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({
+      [ApplicationAction.CURSOR_DOWN]: (count) => {
+        calls.push(['surface', count])
+        return false
+      },
+    }),
+    globalActions: {
+      [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Global handler must not run'),
+      [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
+        calls.push(['global', count])
+        return true
+      },
+      [ApplicationAction.CLOSE_APPLICATION]: () => assert.fail('Dispatch must stop when handled'),
+    },
+  })
+
+  assert.equal(dispatch([
+    ApplicationAction.CURSOR_DOWN,
+    ApplicationAction.OPEN_FILE_FINDER,
+    ApplicationAction.CLOSE_APPLICATION,
+  ], 2), true)
+  assert.deepEqual(calls, [['surface', 2], ['global', 2]])
+})
+
 test('file-tree resize actions remain global on either review surface', () => {
   let activeSurface = ActiveSurface.FILE_TREE
   const calls = []

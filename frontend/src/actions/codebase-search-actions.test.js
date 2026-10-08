@@ -38,7 +38,7 @@ test('configured keys dispatch each mode to its separate handler on either surfa
   for (const surface of ['file_tree', 'diff_pane']) {
     const dispatch = createApplicationDispatcher({
       getActiveSurface: () => surface,
-      getSurfaceActions: () => assert.fail('Search must not reach a surface adapter'),
+      getSurfaceActions: () => ({}),
       globalActions: { [search]: ignoreAware, [searchAll]: allFiles },
     })
     const controller = new VimController({ bindings: result.bindings })

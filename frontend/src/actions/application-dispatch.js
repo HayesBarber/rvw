@@ -1,8 +1,3 @@
-import {
-  ActionScope,
-  applicationActionCatalog,
-} from './application-actions.js'
-
 // Routes semantic actions to the currently active application surface.
 
 function invokeAction(actions, action, count) {
@@ -42,8 +37,8 @@ export function createSurfaceActionRegistry() {
  * Creates the single application-level semantic action dispatcher.
  *
  * An active overlay receives all actions first so commands cannot leak to the
- * workspace behind it. Otherwise, each semantic action is offered to its
- * declared scope, with surface actions handled by the active surface adapter.
+ * workspace behind it. Otherwise, the active surface handler takes priority.
+ * A global handler is used only when the surface handler is absent.
  */
 export function createApplicationDispatcher({
   getActiveSurface,
@@ -73,20 +68,12 @@ export function createApplicationDispatcher({
     }
 
     const activeSurface = getActiveSurface()
+    const surfaceActions = getSurfaceActions(activeSurface)
     for (const action of actions) {
-      const definition = applicationActionCatalog[action]
-      if (!definition) continue
-      if (definition.scope === ActionScope.GLOBAL) {
-        if (invokeAction(globalActions, action, count)) return true
-        continue
-      }
-      if (
-        definition.scope !== ActionScope.ACTIVE_SURFACE &&
-        definition.scope !== activeSurface
-      ) {
-        continue
-      }
-      if (invokeAction(getSurfaceActions(activeSurface), action, count)) return true
+      const adapter = typeof surfaceActions?.[action] === 'function'
+        ? surfaceActions
+        : globalActions
+      if (invokeAction(adapter, action, count)) return true
     }
     return false
   }
