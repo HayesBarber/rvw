@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createKeymapReference,
   filterKeymapReference,
-  keymapReferenceScrollDelta,
+  createKeymapReferenceActionAdapter,
 } from '../actions/keymap-reference.js'
+import { OverlayKind } from '../actions/overlay-actions.js'
+import Overlay from './Overlay.jsx'
 
 function sequenceLabel(sequence) {
   return sequence.join(' ')
 }
 
-export default function KeymapReference({ keymap, leader, aliases, onClose }) {
+export default function KeymapReference({ keymap, leader, aliases, onClose, registerActionAdapter }) {
   const dialogRef = useRef(null)
   const bodyRef = useRef(null)
   const searchRef = useRef(null)
@@ -17,23 +19,18 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
   const closeRef = useRef(null)
   const [searchVisible, setSearchVisible] = useState(false)
   const [query, setQuery] = useState('')
-  const previousFocusRef = useRef(null)
   const groups = useMemo(
     () => createKeymapReference(keymap, leader, aliases),
     [keymap, leader, aliases],
   )
   const filteredGroups = useMemo(() => filterKeymapReference(groups, query), [groups, query])
 
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement
-    const dialog = dialogRef.current
-    dialog.showModal()
-    dialog.focus({ preventScroll: true })
-    return () => {
-      dialog.close()
-      previousFocusRef.current?.focus({ preventScroll: true })
-    }
-  }, [])
+  const scrollReference = useCallback((options) => bodyRef.current?.scrollBy(options), [])
+  // The factory stores this callback in handlers; it does not call it during render.
+  // eslint-disable-next-line react-hooks/refs
+  const actionAdapter = useMemo(() => createKeymapReferenceActionAdapter({
+    scrollBy: scrollReference,
+  }), [scrollReference])
 
   useEffect(() => {
     if (searchVisible) searchRef.current?.focus({ preventScroll: true })
@@ -46,31 +43,19 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
 
   function handleKeyDown(event) {
     event.stopPropagation()
-    if (event.isComposing) return
+    if (event.nativeEvent.isComposing) return
     if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
       if (event.target === searchRef.current) {
+        event.preventDefault()
         dialogRef.current?.focus({ preventScroll: true })
         return
       }
-      if (event.repeat) return
-      onClose()
       return
     }
     if (event.target === searchRef.current || event.key === 'Tab') return
     if (event.key === '/' && !event.altKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       openSearch()
-      return
-    }
-    const scrollDelta = event.altKey || event.ctrlKey || event.metaKey
-      ? null
-      : keymapReferenceScrollDelta(event.key)
-    if (scrollDelta !== null) {
-      event.preventDefault()
-      event.stopPropagation()
-      bodyRef.current?.scrollBy({ top: scrollDelta })
       return
     }
     // Keep the header buttons' keyboard activation available.
@@ -81,32 +66,24 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
   }
 
   return (
-    <dialog
-      ref={dialogRef}
+    <Overlay
+      kind={OverlayKind.KEYMAP_REFERENCE}
+      actions={actionAdapter}
+      registerActionAdapter={registerActionAdapter}
+      dialogRef={dialogRef}
+      initialFocusRef={dialogRef}
+      nativeDialog
       className="keymap-reference-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="keymap-reference-title"
-      tabIndex={-1}
-      data-vim-ignore
+      labelledBy="keymap-reference-title"
+      onClose={onClose}
       onKeyDown={handleKeyDown}
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onMouseDown={(event) => {
-        if (event.target !== event.currentTarget) return
-        const bounds = event.currentTarget.getBoundingClientRect()
-        if (event.clientX < bounds.left || event.clientX > bounds.right ||
-          event.clientY < bounds.top || event.clientY > bounds.bottom) onClose()
-      }}
     >
       <header className="keymap-reference-header">
         <div>
           <h2 id="keymap-reference-title">Keyboard reference</h2>
-          <p>Press / to search or j/k to scroll</p>
+          <p>Press / to search</p>
         </div>
-        <div className="keymap-reference-controls">
+        <div className="keymap-reference-controls" data-vim-ignore>
           <button
             ref={searchButtonRef}
             type="button"
@@ -164,6 +141,6 @@ export default function KeymapReference({ keymap, leader, aliases, onClose }) {
           </section>
         ))}
       </div>
-    </dialog>
+    </Overlay>
   )
 }

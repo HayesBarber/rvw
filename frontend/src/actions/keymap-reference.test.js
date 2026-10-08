@@ -8,9 +8,28 @@ import {
 import {
   KEYMAP_REFERENCE_SCROLL_STEP,
   createKeymapReference,
+  createKeymapReferenceActionAdapter,
   filterKeymapReference,
-  keymapReferenceScrollDelta,
 } from './keymap-reference.js'
+import { resolveConfiguration } from '../app/configuration.js'
+import { createApplicationDispatcher } from './application-dispatch.js'
+import { VimController } from '../vim/machine.js'
+import { attachVimKeyboardCapture } from '../vim/keyboard.js'
+
+function referenceController(normal = {}, leader) {
+  const configuration = resolveConfiguration({ configuration: { keybindings: { normal, ...(leader ? { leader } : {}) } } })
+  assert.equal(configuration.diagnostic, null)
+  const scrolls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => assert.fail('Reference must block the workspace'),
+    getSurfaceActions: () => assert.fail('Reference must block the workspace'),
+    getOverlayActions: () => createKeymapReferenceActionAdapter({ scrollBy: (options) => scrolls.push(options.top) }),
+    globalActions: { [ApplicationAction.CLOSE_APPLICATION]: () => assert.fail('Reference must block global actions') },
+  })
+  const controller = new VimController({ bindings: configuration.bindings })
+  controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+  return { controller, scrolls, configuration }
+}
 
 test('the keymap reference groups catalog descriptions and effective bindings', () => {
   const keymap = {
@@ -69,11 +88,69 @@ test('the keymap reference sorts aliases by name and maps them to their target a
   assert.deepEqual(Object.keys(aliases), ['yank', 'up', 'copy'])
 })
 
-test('plain j and k map to one reference scroll step', () => {
-  assert.equal(keymapReferenceScrollDelta('j'), KEYMAP_REFERENCE_SCROLL_STEP)
-  assert.equal(keymapReferenceScrollDelta('k'), -KEYMAP_REFERENCE_SCROLL_STEP)
-  assert.equal(keymapReferenceScrollDelta('J'), null)
-  assert.equal(keymapReferenceScrollDelta('<Down>'), null)
+test('default reference motions scroll with Vim counts and arrow keys', () => {
+  const { controller, scrolls } = referenceController()
+  for (const key of ['j', 'k', '<Down>', '<Up>', '3', 'j']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, true)
+  }
+  assert.deepEqual(scrolls, [56, -56, 56, -56, 3 * KEYMAP_REFERENCE_SCROLL_STEP])
+  assert.equal(controller.dispatch({ type: 'key', key: 'q' }).handled, false)
+})
+
+test('custom reference motions replace defaults and support counts and multi-key sequences', () => {
+  const { controller, scrolls } = referenceController({
+    [ApplicationAction.CURSOR_DOWN]: [['n'], ['<leader>', 'd']],
+    [ApplicationAction.CURSOR_UP]: [['z', 'u']],
+  }, ',')
+  for (const key of ['j', 'k', '<Down>', '<Up>']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
+  }
+  assert.deepEqual(scrolls, [])
+  for (const key of ['n', '3', ',', 'd', '2', 'z', 'u']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, true)
+  }
+  assert.deepEqual(scrolls, [56, 168, -112])
+})
+
+test('disabled reference motions do not scroll', () => {
+  const { controller, scrolls } = referenceController({
+    [ApplicationAction.CURSOR_DOWN]: [],
+    [ApplicationAction.CURSOR_UP]: [],
+  })
+  for (const key of ['j', 'k', '<Down>', '<Up>']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
+  }
+  assert.deepEqual(scrolls, [])
+})
+
+test('reference capture leaves search input and header controls native', () => {
+  const { controller, scrolls } = referenceController({ [ApplicationAction.CURSOR_DOWN]: [['n']] })
+  let listener
+  const document = {
+    addEventListener: (_type, callback) => { listener = callback },
+    removeEventListener: () => {},
+  }
+  const dispose = attachVimKeyboardCapture({ target: document, dispatch: controller.dispatch })
+  const dialog = { tagName: 'DIALOG', hasAttribute: (name) => name === 'data-vim-capture' }
+  const controls = { tagName: 'DIV', hasAttribute: (name) => name === 'data-vim-ignore', parentElement: dialog }
+  const input = { tagName: 'INPUT', parentElement: dialog }
+  const button = { tagName: 'BUTTON', parentElement: controls }
+  for (const [target, key] of [[input, 'n'], [input, 'j'], [input, '/'], [button, 'Enter'], [button, ' ']]) {
+    listener({
+      target, key, defaultPrevented: false, isComposing: false, repeat: false,
+      preventDefault: () => assert.fail('Search and controls must remain native'),
+      stopPropagation: () => assert.fail('Search and controls must remain native'),
+    })
+  }
+  assert.deepEqual(scrolls, [])
+  let prevented = false
+  listener({
+    target: dialog, key: 'n', defaultPrevented: false, isComposing: false, repeat: false,
+    preventDefault: () => { prevented = true }, stopPropagation: () => {},
+  })
+  assert.equal(prevented, true)
+  assert.deepEqual(scrolls, [56])
+  dispose()
 })
 
 test('search matches descriptions, IDs, aliases, and displayed bindings without changing order', () => {

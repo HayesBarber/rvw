@@ -1,5 +1,6 @@
 import {
   DEFAULT_LEADER_KEY,
+  ApplicationAction,
   LEADER_KEY,
   applicationActionCatalog,
   applicationActionGroups,
@@ -11,11 +12,17 @@ function effectiveSequence(keys, leader) {
 
 export const KEYMAP_REFERENCE_SCROLL_STEP = 56
 
-/** Maps the reference's plain Vim scroll keys to a vertical pixel delta. */
-export function keymapReferenceScrollDelta(key) {
-  if (key === 'j') return KEYMAP_REFERENCE_SCROLL_STEP
-  if (key === 'k') return -KEYMAP_REFERENCE_SCROLL_STEP
-  return null
+export function createKeymapReferenceActionAdapter({ scrollBy }) {
+  return {
+    [ApplicationAction.CURSOR_UP]: (count = 1) => {
+      scrollBy({ top: -KEYMAP_REFERENCE_SCROLL_STEP * count })
+      return true
+    },
+    [ApplicationAction.CURSOR_DOWN]: (count = 1) => {
+      scrollBy({ top: KEYMAP_REFERENCE_SCROLL_STEP * count })
+      return true
+    },
+  }
 }
 
 /** Filters actions by the text shown in the reference. Keeps catalog order. */

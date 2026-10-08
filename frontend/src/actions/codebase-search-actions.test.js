@@ -9,13 +9,13 @@ import { VimController } from '../vim/machine.js'
 const search = ApplicationAction.OPEN_CODEBASE_SEARCH
 const searchAll = ApplicationAction.OPEN_CODEBASE_SEARCH_ALL
 
-test('both codebase search modes are global with distinct default bindings', () => {
+test('both codebase search modes omit scope and have distinct default bindings', () => {
   assert.equal(search, 'codebase_search.open')
   assert.equal(searchAll, 'codebase_search.open.all')
   const result = resolveConfiguration({ configuration: {} })
   assert.equal(result.diagnostic, null)
   for (const [action, key] of [[search, '/'], [searchAll, '?']]) {
-    assert.equal(applicationActionCatalog[action].scope, 'global')
+    assert.equal(Object.hasOwn(applicationActionCatalog[action], 'scope'), false)
     assert.deepEqual(result.keymap[action], [['<leader>', key]])
     const controller = new VimController({ bindings: result.bindings })
     assert.equal(controller.dispatch({ type: 'key', key: '<Space>' }).command, null)
@@ -38,7 +38,7 @@ test('configured keys dispatch each mode to its separate handler on either surfa
   for (const surface of ['file_tree', 'diff_pane']) {
     const dispatch = createApplicationDispatcher({
       getActiveSurface: () => surface,
-      getSurfaceActions: () => assert.fail('Search must not reach a surface adapter'),
+      getSurfaceActions: () => ({}),
       globalActions: { [search]: ignoreAware, [searchAll]: allFiles },
     })
     const controller = new VimController({ bindings: result.bindings })

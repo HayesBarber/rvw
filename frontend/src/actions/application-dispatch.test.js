@@ -7,6 +7,7 @@ import {
 import { ApplicationAction, defaultApplicationBindings } from './application-actions.js'
 import { VimController } from '../vim/machine.js'
 import { ActiveSurface } from '../app/workspace.js'
+import { blockingOverlayActions, createOverlayActionRegistry, OverlayKind } from './overlay-actions.js'
 
 test('global actions receive counts and must explicitly report handled', () => {
   const calls = []
@@ -36,6 +37,93 @@ test('global actions receive counts and must explicitly report handled', () => {
   assert.deepEqual(calls, ['close', ['finder', 3], ['finder-all', 2]])
   assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
   assert.equal(dispatch('unknown.action'), false)
+})
+
+test('surface handlers take priority over global handlers regardless of scope', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({
+      [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
+        calls.push(['surface', count])
+        return true
+      },
+      [ApplicationAction.ADD_FILE_COMMENT]: () => {
+        calls.push('comment')
+        return true
+      },
+    }),
+    globalActions: {
+      [ApplicationAction.OPEN_FILE_FINDER]: () => assert.fail('Global handler must not run'),
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.OPEN_FILE_FINDER, 3), true)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), true)
+  assert.deepEqual(calls, [['surface', 3], 'comment'])
+})
+
+test('missing surface handlers fall back to global handlers regardless of scope', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: null }),
+    globalActions: {
+      [ApplicationAction.CURSOR_DOWN]: (count) => {
+        calls.push(['down', count])
+        return true
+      },
+      [ApplicationAction.ADD_FILE_COMMENT]: () => {
+        calls.push('comment')
+        return true
+      },
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 4), true)
+  assert.equal(dispatch(ApplicationAction.ADD_FILE_COMMENT), true)
+  assert.deepEqual(calls, [['down', 4], 'comment'])
+})
+
+test('unhandled surface actions do not fall back to global handlers', () => {
+  for (const result of [false, undefined]) {
+    const dispatch = createApplicationDispatcher({
+      getActiveSurface: () => ActiveSurface.FILE_TREE,
+      getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: () => result }),
+      globalActions: {
+        [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Global handler must not run'),
+      },
+    })
+    assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
+  }
+})
+
+test('grouped actions continue after an unhandled surface action', () => {
+  const calls = []
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => ActiveSurface.FILE_TREE,
+    getSurfaceActions: () => ({
+      [ApplicationAction.CURSOR_DOWN]: (count) => {
+        calls.push(['surface', count])
+        return false
+      },
+    }),
+    globalActions: {
+      [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Global handler must not run'),
+      [ApplicationAction.OPEN_FILE_FINDER]: (count) => {
+        calls.push(['global', count])
+        return true
+      },
+      [ApplicationAction.CLOSE_APPLICATION]: () => assert.fail('Dispatch must stop when handled'),
+    },
+  })
+
+  assert.equal(dispatch([
+    ApplicationAction.CURSOR_DOWN,
+    ApplicationAction.OPEN_FILE_FINDER,
+    ApplicationAction.CLOSE_APPLICATION,
+  ], 2), true)
+  assert.deepEqual(calls, [['surface', 2], ['global', 2]])
 })
 
 test('file-tree resize actions remain global on either review surface', () => {
@@ -195,6 +283,51 @@ test('surface registrations clean up without removing a newer adapter', () => {
   assert.equal(registry.get(ActiveSurface.FILE_TREE), second)
   unregisterSecond()
   assert.equal(registry.get(ActiveSurface.FILE_TREE), null)
+})
+
+test('the last opened overlay blocks the workspace and preserves priority during updates', () => {
+  const registry = createOverlayActionRegistry()
+  const calls = []
+  const finder = registry.register(OverlayKind.FILE_FINDER)
+  finder.update({
+    [ApplicationAction.CURSOR_DOWN]: (count) => { calls.push(count); return true },
+  })
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => assert.fail('Overlay must block workspace dispatch'),
+    getSurfaceActions: () => assert.fail('Overlay must block workspace dispatch'),
+    getOverlayActions: registry.get,
+    globalActions: {
+      [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Overlay must block global dispatch'),
+    },
+  })
+
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 2), true)
+  const reference = registry.register(OverlayKind.KEYMAP_REFERENCE)
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
+  finder.update({ [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Covered overlay must not run') })
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
+  const restored = { [ApplicationAction.CURSOR_DOWN]: () => { calls.push(1); return true } }
+  finder.update(restored)
+  reference.unregister()
+  assert.equal(registry.get(), restored)
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), true)
+  reference.unregister()
+  assert.equal(registry.get(), restored)
+  finder.unregister()
+  assert.equal(registry.get(), null)
+  assert.deepEqual(calls, [2, 1])
+})
+
+test('overlay registration can restart after Strict Mode cleanup without stale cleanup removing it', () => {
+  const registry = createOverlayActionRegistry()
+  const first = registry.register(OverlayKind.CODEBASE_SEARCH)
+  first.unregister()
+  assert.equal(registry.get(), null)
+  const second = registry.register(OverlayKind.CODEBASE_SEARCH)
+  first.unregister()
+  assert.equal(registry.get(), blockingOverlayActions)
+  second.unregister()
+  assert.equal(registry.get(), null)
 })
 
 test('Vim commands consume keys only when application dispatch handles them', () => {

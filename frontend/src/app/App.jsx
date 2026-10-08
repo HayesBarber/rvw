@@ -122,7 +122,7 @@ export default function App() {
     focusFileTree,
     registerDiffPaneActions,
     registerFileTreeActions,
-    registerFinderActions,
+    registerOverlayActions,
     selectTreeFile: handleTreeFileSelect,
     showChanges,
     showFiles,
@@ -331,7 +331,7 @@ export default function App() {
             requestAnimationFrame(focusDiffPane)
           }}
           onClose={() => dispatchWorkspace({ type: 'search_closed' })}
-          registerActionAdapter={registerFinderActions}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       {workspace.finderOpen && (
@@ -353,7 +353,7 @@ export default function App() {
             : 'Find a file'}
           onOpen={handleFinderOpen}
           onClose={closeFileFinder}
-          registerActionAdapter={registerFinderActions}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       {workspace.keymapReferenceOpen && (
@@ -362,6 +362,7 @@ export default function App() {
           leader={keyboardConfiguration.leader}
           aliases={keyboardConfiguration.commandAliases}
           onClose={closeKeymapReference}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       <ApplicationFooter
