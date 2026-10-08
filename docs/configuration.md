@@ -52,18 +52,9 @@ A decimal count before a supported command repeats or scales that command. For e
 
 Press `?` to show/search the current bindings.
 
-Press `V` in the diff pane to select lines, then press `c` to add a range comment.
-Visual mode uses the same motion keys as Normal mode for `cursor.up`,
-`cursor.down`, `cursor.page.up`, `cursor.page.down`, `cursor.first`, and `cursor.last`.
-Changes in `keybindings.normal` replace or disable these keys in both modes.
-Counts, key sequences, and the configured leader also work in Visual mode.
-Motion extends the selection from its anchor on the same diff side.
-
-The `comments.add` binding adds a range comment in Visual mode.
-The `diff.visual_line` binding starts or ends the selection.
-Both actions use their configured Normal-mode keys, including key sequences
-and the leader. Replaced or disabled bindings apply in both modes.
-Their default keys are `c` and `V`. Press `<Esc>` to return to Normal mode.
+For range comments, use `diff.visual_line` to select lines, then `comments.add` to add a comment.
+Visual mode uses the configured motion, comment, and selection keys.
+Press `<Esc>` to return to Normal mode.
 
 ## User configuration
 
