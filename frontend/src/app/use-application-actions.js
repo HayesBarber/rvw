@@ -9,10 +9,9 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from '../actions/codebase-search-actions.js'
+import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { closeApplication } from '../review/api.js'
 import { ActiveSurface, TreeMode } from './workspace.js'
-
-const blockingOverlayActions = Object.freeze({})
 
 export function useApplicationActions({
   workspace,
@@ -35,6 +34,7 @@ export function useApplicationActions({
   const diffPaneRef = useRef(null)
   const finderActionsRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
+  const [overlayActions] = useState(createSurfaceActionRegistry)
 
   const activateSurface = useCallback((surface) => {
     dispatchWorkspace({ type: 'surface_activated', surface })
@@ -153,14 +153,23 @@ export function useApplicationActions({
     getActiveSurface: () => workspace.activeSurface,
     getSurfaceActions: surfaceActions.get,
     getOverlayActions: () => {
-      if (workspace.keymapReferenceOpen) return blockingOverlayActions
-      return workspace.finderOpen || workspace.searchMode
-        ? finderActionsRef.current ?? blockingOverlayActions
-        : null
+      if (workspace.keymapReferenceOpen) {
+        return overlayActions.get(OverlayKind.KEYMAP_REFERENCE) ?? blockingOverlayActions
+      }
+      if (workspace.finderOpen) {
+        return overlayActions.get(OverlayKind.FILE_FINDER)
+          ?? finderActionsRef.current ?? blockingOverlayActions
+      }
+      if (workspace.searchMode) {
+        return overlayActions.get(OverlayKind.CODEBASE_SEARCH)
+          ?? finderActionsRef.current ?? blockingOverlayActions
+      }
+      return null
     },
     globalActions,
   }), [
     globalActions,
+    overlayActions,
     surfaceActions,
     workspace.activeSurface,
     workspace.finderOpen,
@@ -186,6 +195,7 @@ export function useApplicationActions({
     registerDiffPaneActions,
     registerFileTreeActions,
     registerFinderActions,
+    registerOverlayActions: overlayActions.register,
     selectTreeFile,
     showChanges,
     showFiles,
