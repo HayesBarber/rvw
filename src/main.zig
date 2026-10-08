@@ -1,17 +1,27 @@
 const std = @import("std");
+const last_commit = @import("util/last_commit.zig");
 const pull_request = @import("util/pull_request.zig");
 const build_options = @import("build_options");
 
 const usage =
-    \\usage: rvw [DIR] [-r RANGE | --range RANGE | --pr NUMBER] [--log-level LEVEL]
+    \\usage: rvw [DIR] [-r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [--log-level LEVEL]
     \\       rvw -h | --help
     \\       rvw -v | --version
+    \\
+    \\  -l, --last-commit  Review HEAD against its first parent.
+    \\                     Exclude staged and unstaged changes.
+    \\
+    \\examples: rvw -l
+    \\          rvw --last-commit
+    \\          rvw /path/to/repository -l
+    \\          rvw /path/to/repository --last-commit
     \\
 ;
 
 const Options = struct {
     directory: []const u8 = ".",
     range: ?[]const u8 = null,
+    last_commit: bool = false,
     log_level: ?[]const u8 = null,
     pr: ?u32 = null,
 };
@@ -24,6 +34,7 @@ const Command = union(enum) {
 
 const ParseError = error{
     DuplicateTarget,
+    DuplicateLastCommit,
     MissingPr,
     InvalidPr,
     DuplicateDirectory,
@@ -78,6 +89,9 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("{s}", .{pull_request.errorMessage(err)});
         std.Io.File.stderr().writeStreamingAll(init.io, usage) catch {};
         return 2;
+    } else if (options.last_commit) last_commit.resolveRange(init.io, allocator, directory) catch |err| {
+        std.log.err("{s}", .{last_commit.errorMessage(err)});
+        return 2;
     } else options.range;
     launch(init.io, allocator, directory, range, options.pr, options.log_level orelse init.environ_map.get("LOG_LEVEL")) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
@@ -112,7 +126,7 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
         if (!positional_only and
             (std.mem.eql(u8, argument, "-r") or std.mem.eql(u8, argument, "--range")))
         {
-            if (options.pr != null) return error.DuplicateTarget;
+            if (options.pr != null or options.last_commit) return error.DuplicateTarget;
             if (has_range) return error.DuplicateRange;
             index += 1;
             if (index == args.len) return error.MissingRange;
@@ -121,8 +135,16 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
             has_range = true;
             continue;
         }
-        if (!positional_only and std.mem.eql(u8, argument, "--pr")) {
+        if (!positional_only and
+            (std.mem.eql(u8, argument, "-l") or std.mem.eql(u8, argument, "--last-commit")))
+        {
+            if (options.last_commit) return error.DuplicateLastCommit;
             if (has_range or options.pr != null) return error.DuplicateTarget;
+            options.last_commit = true;
+            continue;
+        }
+        if (!positional_only and std.mem.eql(u8, argument, "--pr")) {
+            if (has_range or options.pr != null or options.last_commit) return error.DuplicateTarget;
             index += 1;
             if (index == args.len) return error.MissingPr;
             options.pr = try pull_request.parseNumber(args[index]);
@@ -148,7 +170,8 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
 
 fn parseErrorMessage(err: ParseError) []const u8 {
     return switch (err) {
-        error.DuplicateTarget => "provide only one of --range or --pr",
+        error.DuplicateTarget => "provide only one of --range, --last-commit (-l), or --pr",
+        error.DuplicateLastCommit => "--last-commit (-l) may only be provided once",
         error.MissingPr => "missing value for --pr",
         error.InvalidPr => pull_request.errorMessage(error.InvalidPr),
         error.DuplicateDirectory => "only one directory may be provided",
@@ -412,4 +435,60 @@ test "CLI accepts PR targets and rejects ambiguous or invalid targets" {
         try std.testing.expectEqualStrings("100", args[10]);
         try std.testing.expectEqual(@as(usize, if (level != null) 13 else 11), args.len);
     }
+}
+
+test "CLI last-commit forms accept directories and forward the same resolved range" {
+    const Repository = @import("testing/repository.zig").Repository;
+    var repo = try Repository.init(std.testing.allocator);
+    defer repo.deinit();
+    try repo.write("file.txt", "base\n");
+    try repo.commit("base");
+    const base = try repo.revision("HEAD");
+    defer std.testing.allocator.free(base);
+    try repo.write("file.txt", "head\n");
+    try repo.commit("head");
+    const head = try repo.revision("HEAD");
+    defer std.testing.allocator.free(head);
+    const expected = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, head });
+    defer std.testing.allocator.free(expected);
+
+    for ([_][]const u8{ "-l", "--last-commit" }) |flag| {
+        const defaults = (try parseArgs(&.{ "rvw", flag })).launch;
+        try std.testing.expect(defaults.last_commit);
+        try std.testing.expectEqualStrings(".", defaults.directory);
+        for ([_][]const []const u8{
+            &.{ "rvw", repo.root, flag },
+            &.{ "rvw", flag, repo.root },
+        }) |args| {
+            const options = (try parseArgs(args)).launch;
+            try std.testing.expect(options.last_commit);
+            try std.testing.expect(options.range == null);
+            try std.testing.expectEqualStrings(repo.root, options.directory);
+            const range = try last_commit.resolveRange(std.testing.io, std.testing.allocator, options.directory);
+            defer std.testing.allocator.free(range);
+            var buffer: [13][]const u8 = undefined;
+            try expectArguments(&.{
+                "/usr/bin/open",    "-n",          "/Applications/Rvw.app", "--args",
+                "--rvw-cli-launch", "--directory", repo.root,               "--range",
+                expected,
+            }, launchArguments(&buffer, "/Applications/Rvw.app", options.directory, range, null, null));
+        }
+    }
+    const positional = (try parseArgs(&.{ "rvw", "--", "-l" })).launch;
+    try std.testing.expect(!positional.last_commit);
+    try std.testing.expectEqualStrings("-l", positional.directory);
+}
+
+test "CLI rejects repeated last-commit forms and conflicting targets in either order" {
+    for ([_][]const u8{ "-l", "--last-commit" }) |flag| {
+        for ([_][]const u8{ "-l", "--last-commit" }) |repeat| {
+            try std.testing.expectError(error.DuplicateLastCommit, parseArgs(&.{ "rvw", flag, repeat }));
+        }
+        for ([_][]const u8{ "-r", "--range", "--pr" }) |target| {
+            const value = if (std.mem.eql(u8, target, "--pr")) "100" else "base..head";
+            try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "rvw", flag, target, value }));
+            try std.testing.expectError(error.DuplicateTarget, parseArgs(&.{ "rvw", target, value, flag }));
+        }
+    }
+    try std.testing.expect(std.mem.indexOf(u8, parseErrorMessage(error.DuplicateLastCommit), "once") != null);
 }
