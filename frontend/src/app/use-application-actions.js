@@ -32,7 +32,6 @@ export function useApplicationActions({
 }) {
   const fileTreePaneRef = useRef(null)
   const diffPaneRef = useRef(null)
-  const finderActionsRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
   const [overlayActions] = useState(createSurfaceActionRegistry)
 
@@ -81,13 +80,6 @@ export function useApplicationActions({
     (adapter) => surfaceActions.register(ActiveSurface.DIFF_PANE, adapter),
     [surfaceActions],
   )
-  const registerFinderActions = useCallback((adapter) => {
-    finderActionsRef.current = adapter
-    return () => {
-      if (finderActionsRef.current === adapter) finderActionsRef.current = null
-    }
-  }, [])
-
   const addFileComment = useCallback(() => {
     const action = surfaceActions
       .get(ActiveSurface.DIFF_PANE)?.[ApplicationAction.ADD_FILE_COMMENT]
@@ -160,8 +152,7 @@ export function useApplicationActions({
         return overlayActions.get(OverlayKind.FILE_FINDER) ?? blockingOverlayActions
       }
       if (workspace.searchMode) {
-        return overlayActions.get(OverlayKind.CODEBASE_SEARCH)
-          ?? finderActionsRef.current ?? blockingOverlayActions
+        return overlayActions.get(OverlayKind.CODEBASE_SEARCH) ?? blockingOverlayActions
       }
       return null
     },
@@ -193,7 +184,6 @@ export function useApplicationActions({
     focusFileTree,
     registerDiffPaneActions,
     registerFileTreeActions,
-    registerFinderActions,
     registerOverlayActions: overlayActions.register,
     selectTreeFile,
     showChanges,

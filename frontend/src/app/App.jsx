@@ -122,7 +122,6 @@ export default function App() {
     focusFileTree,
     registerDiffPaneActions,
     registerFileTreeActions,
-    registerFinderActions,
     registerOverlayActions,
     selectTreeFile: handleTreeFileSelect,
     showChanges,
@@ -332,7 +331,7 @@ export default function App() {
             requestAnimationFrame(focusDiffPane)
           }}
           onClose={() => dispatchWorkspace({ type: 'search_closed' })}
-          registerActionAdapter={registerFinderActions}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       {workspace.finderOpen && (
