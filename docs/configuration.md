@@ -59,10 +59,11 @@ Changes in `keybindings.normal` replace or disable these keys in both modes.
 Counts, key sequences, and the configured leader also work in Visual mode.
 Motion extends the selection from its anchor on the same diff side.
 
-You can change the entry key with `diff.visual_line`.
-In Visual mode, `c` adds a range comment, `V` ends the selection, and `<Esc>`
-returns to Normal mode. These controls are fixed. Motion keys must not conflict
-with `c` or `V`, or use either control as a sequence prefix.
+The `comments.add` binding adds a range comment in Visual mode.
+The `diff.visual_line` binding starts or ends the selection.
+Both actions use their configured Normal-mode keys, including key sequences
+and the leader. Replaced or disabled bindings apply in both modes.
+Their default keys are `c` and `V`. Press `<Esc>` to return to Normal mode.
 
 ## User configuration
 

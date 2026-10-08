@@ -120,19 +120,16 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
 })
 
-const visualMotionActions = new Set([
+const visualActions = new Set([
   ApplicationAction.CURSOR_UP,
   ApplicationAction.CURSOR_DOWN,
   ApplicationAction.CURSOR_PAGE_UP,
   ApplicationAction.CURSOR_PAGE_DOWN,
   ApplicationAction.CURSOR_FIRST,
   ApplicationAction.CURSOR_LAST,
+  ApplicationAction.ADD_COMMENT,
+  ApplicationAction.VISUAL_LINE,
 ])
-
-const fixedVisualKeymap = Object.freeze({
-  [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
-  [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
-})
 
 const workspaceSurfaces = Object.freeze([
   ActionScope.FILE_TREE,
@@ -227,20 +224,18 @@ export function compileApplicationKeymap(
     })
   })
 
-  // Share effective motion keys, including leader expansion and disabled actions.
-  const visualMotions = bindings.filter((binding) => (
-    binding.args.actions.some((action) => visualMotionActions.has(action))
-  )).map((binding) => Object.freeze({ ...binding, mode: VimMode.VISUAL }))
-  bindings.push(...visualMotions)
-
-  for (const [action, sequences] of Object.entries(fixedVisualKeymap)) {
-    for (const keys of sequences) bindings.push(Object.freeze({
+  // Share effective keys and keep only actions supported in Visual mode.
+  const visualBindings = bindings.flatMap((binding) => {
+    const actions = binding.args.actions.filter((action) => visualActions.has(action))
+    if (actions.length === 0) return []
+    return [Object.freeze({
+      ...binding,
       mode: VimMode.VISUAL,
-      keys,
-      command: APPLICATION_DISPATCH_COMMAND,
-      args: Object.freeze({ actions: Object.freeze([action]) }),
-    }))
-  }
+      args: Object.freeze({ actions: Object.freeze(actions) }),
+    })]
+  })
+  bindings.push(...visualBindings)
+
   compileBindings(bindings)
   return Object.freeze(bindings)
 }
