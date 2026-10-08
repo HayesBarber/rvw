@@ -2,9 +2,9 @@ import actionDefinitions from '../../../src/app/application-actions.json' with {
 import { compileBindings, VimMode } from '../vim/machine.js'
 import { isNormalizedVimKey } from '../vim/keyboard.js'
 
+/** Binding scopes identify conflicts during keymap compilation, not dispatch. */
 export const ActionScope = Object.freeze({
-  GLOBAL: 'global',
-  ACTIVE_SURFACE: 'active_surface',
+  ANY: 'any',
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
 })
@@ -29,7 +29,7 @@ export const ApplicationAction = Object.freeze(Object.fromEntries(
   actionDefinitions.map(({ name, id }) => [name, id]),
 ))
 
-/** Shared with backend configuration validation; behaviors live in the dispatcher. */
+/** Shared with backend configuration validation; scope controls binding conflicts. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
   actionDefinitions.map(({ id, scope, group, description }) => [
     id, Object.freeze({ id, scope, group, description }),

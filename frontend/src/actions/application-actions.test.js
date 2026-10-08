@@ -230,6 +230,21 @@ test('duplicate bindings produce a deterministic error', () => {
   )
 })
 
+test('any-scope bindings conflict with each workspace surface', () => {
+  for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP]) {
+    assert.equal(applicationActionCatalog[unrestricted].scope, ActionScope.ANY)
+    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT]) {
+      assert.throws(
+        () => compileApplicationKeymap({
+          [unrestricted]: [['x']],
+          [contextual]: [['x']],
+        }),
+        { name: 'TypeError', message: 'Duplicate Vim binding for normal: x' },
+      )
+    }
+  }
+})
+
 test('ambiguous binding prefixes produce a deterministic error', () => {
   assert.throws(
     () => compileApplicationKeymap({
@@ -246,7 +261,7 @@ test('history bindings dispatch configurable semantic actions', () => {
     [ApplicationAction.FILE_HISTORY_FORWARD, '<C-i>'],
   ]) {
     assert.deepEqual(defaultNormalKeymap[action], [[key]])
-    assert.equal(applicationActionCatalog[action].scope, ActionScope.GLOBAL)
+    assert.equal(applicationActionCatalog[action].scope, ActionScope.ANY)
     const bindings = compileApplicationKeymap({ ...defaultNormalKeymap, [action]: [['<M-Left>']] })
     assert(bindings.some((binding) => binding.keys[0] === '<M-Left>' && binding.args.actions.includes(action)))
   }
