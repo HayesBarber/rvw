@@ -25,7 +25,7 @@ test('the action catalog is frozen, enumerable, and documented', () => {
     const definition = applicationActionCatalog[action]
     assert(Object.isFrozen(definition))
     assert.equal(definition.id, action)
-    assert(Object.values(ActionScope).includes(definition.scope))
+    assert(!Object.hasOwn(definition, 'scope') || Object.values(ActionScope).includes(definition.scope))
     assert(Object.values(ActionGroup).includes(definition.group))
     assert.match(definition.description, /\S/)
   }
@@ -230,9 +230,9 @@ test('duplicate bindings produce a deterministic error', () => {
   )
 })
 
-test('any-scope bindings conflict with each workspace surface', () => {
+test('bindings without a scope conflict with each workspace surface', () => {
   for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP]) {
-    assert.equal(applicationActionCatalog[unrestricted].scope, ActionScope.ANY)
+    assert.equal(Object.hasOwn(applicationActionCatalog[unrestricted], 'scope'), false)
     for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT]) {
       assert.throws(
         () => compileApplicationKeymap({
@@ -261,7 +261,7 @@ test('history bindings dispatch configurable semantic actions', () => {
     [ApplicationAction.FILE_HISTORY_FORWARD, '<C-i>'],
   ]) {
     assert.deepEqual(defaultNormalKeymap[action], [[key]])
-    assert.equal(applicationActionCatalog[action].scope, ActionScope.ANY)
+    assert.equal(Object.hasOwn(applicationActionCatalog[action], 'scope'), false)
     const bindings = compileApplicationKeymap({ ...defaultNormalKeymap, [action]: [['<M-Left>']] })
     assert(bindings.some((binding) => binding.keys[0] === '<M-Left>' && binding.args.actions.includes(action)))
   }

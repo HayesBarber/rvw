@@ -2,9 +2,10 @@ import actionDefinitions from '../../../src/app/application-actions.json' with {
 import { compileBindings, VimMode } from '../vim/machine.js'
 import { isNormalizedVimKey } from '../vim/keyboard.js'
 
-/** Binding scopes identify conflicts during keymap compilation, not dispatch. */
+/** Binding scopes identify conflicts during keymap compilation, not dispatch.
+ * An omitted scope applies to all workspace surfaces.
+ */
 export const ActionScope = Object.freeze({
-  ANY: 'any',
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
 })
@@ -31,9 +32,17 @@ export const ApplicationAction = Object.freeze(Object.fromEntries(
 
 /** Shared with backend configuration validation; scope controls binding conflicts. */
 export const applicationActionCatalog = Object.freeze(Object.fromEntries(
-  actionDefinitions.map(({ id, scope, group, description }) => [
-    id, Object.freeze({ id, scope, group, description }),
-  ]),
+  actionDefinitions.map(({ id, scope, group, description }) => {
+    if (scope !== undefined && !Object.values(ActionScope).includes(scope)) {
+      throw new TypeError(`Unknown binding scope for application action ${id}: ${scope}`)
+    }
+    return [id, Object.freeze({
+      id,
+      ...(scope === undefined ? {} : { scope }),
+      group,
+      description,
+    })]
+  }),
 ))
 
 const keySequence = (...keys) => Object.freeze(keys)

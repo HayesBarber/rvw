@@ -2,77 +2,66 @@
   {
     "name": "CLOSE_APPLICATION",
     "id": "application.close",
-    "scope": "any",
     "group": "application",
     "description": "Close the application."
   },
   {
     "name": "RELOAD_REVIEW",
     "id": "review.reload",
-    "scope": "any",
     "group": "application",
     "description": "Reload repository files and changes."
   },
   {
     "name": "OPEN_KEYMAP_REFERENCE",
     "id": "keymap_reference.open",
-    "scope": "any",
     "group": "application",
     "description": "Show the effective keyboard bindings."
   },
   {
     "name": "OPEN_COMMAND_LINE",
     "id": "command_line.open",
-    "scope": "any",
     "group": "application",
     "description": "Open the command line to run an application action."
   },
   {
     "name": "CURSOR_UP",
     "id": "cursor.up",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor up."
   },
   {
     "name": "CURSOR_DOWN",
     "id": "cursor.down",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor down."
   },
   {
     "name": "CURSOR_PAGE_UP",
     "id": "cursor.page.up",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor up by half a viewport."
   },
   {
     "name": "CURSOR_PAGE_DOWN",
     "id": "cursor.page.down",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor down by half a viewport."
   },
   {
     "name": "CURSOR_FIRST",
     "id": "cursor.first",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor to the first item."
   },
   {
     "name": "CURSOR_LAST",
     "id": "cursor.last",
-    "scope": "any",
     "group": "navigation",
     "description": "Move the active cursor to the last item."
   },
   {
     "name": "CURSOR_CENTER",
     "id": "cursor.center",
-    "scope": "any",
     "group": "navigation",
     "description": "Center the active cursor in its viewport."
   },
@@ -114,14 +103,12 @@
   {
     "name": "TREE_SIZE_INCREASE",
     "id": "tree.size.increase",
-    "scope": "any",
     "group": "file_tree",
     "description": "Widen the file-tree pane."
   },
   {
     "name": "TREE_SIZE_DECREASE",
     "id": "tree.size.decrease",
-    "scope": "any",
     "group": "file_tree",
     "description": "Narrow the file-tree pane."
   },
@@ -156,56 +143,48 @@
   {
     "name": "OPEN_NEXT_FILE",
     "id": "file.open.next",
-    "scope": "any",
     "group": "file_tree",
     "description": "Open the next file in the active file-tree mode."
   },
   {
     "name": "OPEN_PREVIOUS_FILE",
     "id": "file.open.previous",
-    "scope": "any",
     "group": "file_tree",
     "description": "Open the previous file in the active file-tree mode."
   },
   {
     "name": "FILE_HISTORY_BACK",
     "id": "file.history.back",
-    "scope": "any",
     "group": "navigation",
     "description": "Open the previous file in navigation history."
   },
   {
     "name": "FILE_HISTORY_FORWARD",
     "id": "file.history.forward",
-    "scope": "any",
     "group": "navigation",
     "description": "Open the next file in navigation history."
   },
   {
     "name": "OPEN_FILE_FINDER",
     "id": "file_finder.open",
-    "scope": "any",
     "group": "application",
     "description": "Open the file finder."
   },
   {
     "name": "OPEN_FILE_FINDER_ALL",
     "id": "file_finder.open.all",
-    "scope": "any",
     "group": "application",
     "description": "Open the file finder including git-ignored files."
   },
   {
     "name": "OPEN_CODEBASE_SEARCH",
     "id": "codebase_search.open",
-    "scope": "any",
     "group": "application",
     "description": "Codebase text search with ignore rules."
   },
   {
     "name": "OPEN_CODEBASE_SEARCH_ALL",
     "id": "codebase_search.open.all",
-    "scope": "any",
     "group": "application",
     "description": "Codebase text search including ignored files."
   },
@@ -233,21 +212,18 @@
   {
     "name": "COPY_FILE_PATH_RELATIVE",
     "id": "file.path.copy_relative",
-    "scope": "any",
     "group": "file",
     "description": "Copy the active file repository-relative path."
   },
   {
     "name": "COPY_FILE_PATH_ABSOLUTE",
     "id": "file.path.copy_absolute",
-    "scope": "any",
     "group": "file",
     "description": "Copy the active file absolute path."
   },
   {
     "name": "COPY_COMMENTS",
     "id": "comments.copy",
-    "scope": "any",
     "group": "review",
     "description": "Copy all review comments as Markdown."
   },
@@ -268,21 +244,18 @@
   {
     "name": "EDIT_COMMENT",
     "id": "comments.edit",
-    "scope": "any",
     "group": "review",
     "description": "Edit the comment in the active context."
   },
   {
     "name": "DELETE_COMMENT",
     "id": "comments.delete",
-    "scope": "any",
     "group": "review",
     "description": "Delete the comment in the active context."
   },
   {
     "name": "CLEAR_COMMENTS",
     "id": "comments.clear",
-    "scope": "any",
     "group": "review",
     "description": "Clear all review comments."
   }

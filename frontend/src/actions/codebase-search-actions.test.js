@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ActionScope, ApplicationAction, applicationActionCatalog } from './application-actions.js'
+import { ApplicationAction, applicationActionCatalog } from './application-actions.js'
 import { createApplicationDispatcher } from './application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from './codebase-search-actions.js'
 import { resolveConfiguration } from '../app/configuration.js'
@@ -9,13 +9,13 @@ import { VimController } from '../vim/machine.js'
 const search = ApplicationAction.OPEN_CODEBASE_SEARCH
 const searchAll = ApplicationAction.OPEN_CODEBASE_SEARCH_ALL
 
-test('both codebase search modes use any scope with distinct default bindings', () => {
+test('both codebase search modes omit scope and have distinct default bindings', () => {
   assert.equal(search, 'codebase_search.open')
   assert.equal(searchAll, 'codebase_search.open.all')
   const result = resolveConfiguration({ configuration: {} })
   assert.equal(result.diagnostic, null)
   for (const [action, key] of [[search, '/'], [searchAll, '?']]) {
-    assert.equal(applicationActionCatalog[action].scope, ActionScope.ANY)
+    assert.equal(Object.hasOwn(applicationActionCatalog[action], 'scope'), false)
     assert.deepEqual(result.keymap[action], [['<leader>', key]])
     const controller = new VimController({ bindings: result.bindings })
     assert.equal(controller.dispatch({ type: 'key', key: '<Space>' }).command, null)
