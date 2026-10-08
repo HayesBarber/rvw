@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createVisualSelection } from './visual-selection.js'
 import { createDiffCursorActionAdapter } from './diff-cursor-actions.js'
-import { ApplicationAction, defaultApplicationBindings } from './application-actions.js'
+import { ApplicationAction, compileApplicationKeymap, defaultApplicationBindings, defaultNormalKeymap } from './application-actions.js'
 import { VimController, VimMode } from '../vim/machine.js'
 import { normalizeCommentRange } from '../components/diff-pane/comment-annotations.js'
 
@@ -90,3 +90,31 @@ test('visual page movement uses wrapped row heights and clamps on the anchored s
   adapter[ApplicationAction.CURSOR_PAGE_UP](99)
   assert.equal(cursor.lineNumber, 1)
 })
+
+for (const side of ['additions', 'deletions']) {
+  test(`custom counted sequences extend and reverse the selection on ${side}`, () => {
+    const opposite = side === 'additions' ? 'deletions' : 'additions'
+    const rows = [{ index: 0, [side]: 1 }, { index: 1, [side]: 3 },
+      { index: 2, [opposite]: 4 }, { index: 3, [side]: 20 }]
+    let cursor = { lineNumber: 3, side }
+    const selection = createVisualSelection()
+    let range = selection.begin(rows, cursor)
+    const adapter = createDiffCursorActionAdapter({
+      getRows: () => selection.rows(rows), getCursor: () => cursor,
+      getPreferredSide: () => selection.side,
+      activateCursor: (next) => { cursor = next; range = selection.extend(next); return true },
+    })
+    const controller = new VimController({ initialMode: VimMode.VISUAL,
+      bindings: compileApplicationKeymap({ ...defaultNormalKeymap,
+        [ApplicationAction.CURSOR_DOWN]: [['n']],
+        [ApplicationAction.CURSOR_UP]: [['<leader>', 'u']],
+      }, { leader: '\\' }),
+    })
+    controller.subscribeCommands((command) => adapter[command.args.actions[0]]?.(command.count))
+    for (const key of ['2', 'n']) controller.dispatch({ type: 'key', key })
+    assert.deepEqual(range, { start: 3, end: 20, side, endSide: side })
+    for (const key of ['2', '\\', 'u']) controller.dispatch({ type: 'key', key })
+    assert.deepEqual(range, { start: 1, end: 3, side, endSide: side })
+    assert.deepEqual(cursor, { lineNumber: 1, side })
+  })
+}

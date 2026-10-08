@@ -326,7 +326,7 @@ test('Vim binding replacement is atomic when a later map is invalid', () => {
   )
 })
 
-test('visual entry is configurable while visual movement remains independent', () => {
+test('visual entry is configurable and visual movement uses the configured keys', () => {
   const result = resolveConfiguration({ configuration: { keybindings: { normal: {
     [ApplicationAction.VISUAL_LINE]: [['s']],
     [ApplicationAction.CURSOR_DOWN]: [['n']],
@@ -336,6 +336,123 @@ test('visual entry is configurable while visual movement remains independent', (
   const controller = new VimController({ bindings: result.bindings })
   assert.deepEqual(controller.dispatch({ type: 'key', key: 's' }).command.args.actions, [ApplicationAction.VISUAL_LINE])
   controller.dispatch({ type: 'set_mode', mode: 'visual' })
-  assert.deepEqual(controller.dispatch({ type: 'key', key: 'j' }).command.args.actions, [ApplicationAction.CURSOR_DOWN])
-  assert.equal(controller.dispatch({ type: 'key', key: 'n' }).command, null)
+  assert.equal(controller.dispatch({ type: 'key', key: 'j' }).command, null)
+  assert.deepEqual(controller.dispatch({ type: 'key', key: 'n' }).command.args.actions, [ApplicationAction.CURSOR_DOWN])
+})
+
+const visualMotions = [
+  ApplicationAction.CURSOR_UP,
+  ApplicationAction.CURSOR_DOWN,
+  ApplicationAction.CURSOR_PAGE_UP,
+  ApplicationAction.CURSOR_PAGE_DOWN,
+  ApplicationAction.CURSOR_FIRST,
+  ApplicationAction.CURSOR_LAST,
+]
+
+for (const configured of [false, true]) {
+  test(`motion bindings match in Normal and Visual modes with ${configured ? 'custom' : 'default'} keys`, () => {
+    const normal = {
+      [ApplicationAction.CURSOR_UP]: [['<leader>', 'u']],
+      [ApplicationAction.CURSOR_DOWN]: [['n']],
+      [ApplicationAction.CURSOR_PAGE_UP]: [['<PageUp>']],
+      [ApplicationAction.CURSOR_PAGE_DOWN]: [['<PageDown>']],
+      [ApplicationAction.CURSOR_FIRST]: [['a', 'a']],
+      [ApplicationAction.CURSOR_LAST]: [['<leader>', 'l']],
+    }
+    const result = resolveConfiguration({ configuration: configured
+      ? { keybindings: { leader: '\\', normal } } : {} })
+    assert.equal(result.diagnostic, null)
+    for (const action of visualMotions) {
+      const normalKeys = bindingKeys(result.bindings, action)
+      const visualKeys = result.bindings
+        .filter((binding) => binding.mode === 'visual' && binding.args.actions.includes(action))
+        .map((binding) => binding.keys)
+      assert.deepEqual(visualKeys, normalKeys)
+      for (const mode of ['normal', 'visual']) {
+        for (const keys of normalKeys) {
+          const controller = new VimController({ bindings: result.bindings, initialMode: mode })
+          controller.dispatch({ type: 'key', key: '2' })
+          controller.dispatch({ type: 'key', key: '0' })
+          for (const key of keys.slice(0, -1)) {
+            assert.equal(controller.dispatch({ type: 'key', key }).command, null)
+          }
+          const command = controller.dispatch({ type: 'key', key: keys.at(-1) }).command
+          assert.deepEqual(command.args.actions, [action])
+          assert.equal(command.count, 20)
+          assert.equal(command.mode, mode)
+          assert.deepEqual(controller.getSnapshot(), { mode, count: '', pendingKeys: [] })
+        }
+      }
+    }
+    if (configured) {
+      const controller = new VimController({ bindings: result.bindings, initialMode: 'visual' })
+      for (const key of ['j', '<Down>', 'k', '<Up>', '<C-u>', '<C-d>', 'g', 'G']) {
+        assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
+      }
+    }
+  })
+}
+
+test('disabled motions have no fallback in Visual mode and selection controls use configured keys', () => {
+  const result = resolveConfiguration({ configuration: { keybindings: { normal: {
+    ...Object.fromEntries(visualMotions.map((action) => [action, []])),
+    [ApplicationAction.ADD_COMMENT]: [['a']],
+    [ApplicationAction.VISUAL_LINE]: [['v']],
+  } } } })
+  assert.equal(result.diagnostic, null)
+  const controller = new VimController({ bindings: result.bindings, initialMode: 'visual' })
+  for (const key of ['j', '<Down>', 'k', '<Up>', '<C-u>', '<C-d>', '<PageUp>', '<PageDown>', 'g', 'G', 'c', 'V']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
+  }
+  for (const [key, action] of [['a', ApplicationAction.ADD_COMMENT], ['v', ApplicationAction.VISUAL_LINE]]) {
+    assert.deepEqual(controller.dispatch({ type: 'key', key }).command.args.actions, [action])
+  }
+  controller.dispatch({ type: 'key', key: '<Esc>' })
+  assert.equal(controller.getSnapshot().mode, 'normal')
+})
+
+test('motion keys can use former Visual controls when those bindings are disabled', () => {
+  for (const keys of [['c'], ['V'], ['c', 'n'], ['V', 'n']]) {
+    const result = resolveConfiguration({ configuration: { keybindings: { normal: {
+      [ApplicationAction.CURSOR_DOWN]: [keys],
+      [ApplicationAction.ADD_COMMENT]: [],
+      [ApplicationAction.SHOW_CHANGES]: [],
+      [ApplicationAction.VISUAL_LINE]: [],
+    } } } })
+    assert.equal(result.diagnostic, null)
+    const controller = new VimController({ bindings: result.bindings, initialMode: 'visual' })
+    for (const key of keys.slice(0, -1)) controller.dispatch({ type: 'key', key })
+    assert.deepEqual(controller.dispatch({ type: 'key', key: keys.at(-1) }).command.args.actions,
+      [ApplicationAction.CURSOR_DOWN])
+  }
+})
+
+test('Visual comment and selection controls support leader sequences and disabled bindings', () => {
+  const controls = [ApplicationAction.ADD_COMMENT, ApplicationAction.VISUAL_LINE]
+  const result = resolveConfiguration({ configuration: { keybindings: { leader: '\\', normal: {
+    [ApplicationAction.ADD_COMMENT]: [['<leader>', 'c']],
+    [ApplicationAction.VISUAL_LINE]: [['v', 'v']],
+  } } } })
+  assert.equal(result.diagnostic, null)
+  for (const action of controls) {
+    for (const mode of ['normal', 'visual']) {
+      const controller = new VimController({ bindings: result.bindings, initialMode: mode })
+      const keys = bindingKeys(result.bindings, action)[0]
+      for (const key of keys.slice(0, -1)) {
+        assert.equal(controller.dispatch({ type: 'key', key }).command, null)
+      }
+      assert.deepEqual(controller.dispatch({ type: 'key', key: keys.at(-1) }).command.args.actions, [action])
+    }
+  }
+  const disabled = resolveConfiguration({ configuration: { keybindings: { normal: {
+    [ApplicationAction.ADD_COMMENT]: [],
+    [ApplicationAction.VISUAL_LINE]: [],
+  } } } })
+  assert.equal(disabled.diagnostic, null)
+  const controller = new VimController({ bindings: disabled.bindings, initialMode: 'visual' })
+  for (const key of ['c', 'V']) {
+    assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
+  }
+  controller.dispatch({ type: 'key', key: '<Esc>' })
+  assert.equal(controller.getSnapshot().mode, 'normal')
 })

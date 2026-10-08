@@ -120,16 +120,16 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
 })
 
-export const visualKeymap = Object.freeze({
-  [ApplicationAction.CURSOR_UP]: actionBindings(keySequence('k'), keySequence('<Up>')),
-  [ApplicationAction.CURSOR_DOWN]: actionBindings(keySequence('j'), keySequence('<Down>')),
-  [ApplicationAction.CURSOR_PAGE_UP]: actionBindings(keySequence('<C-u>'), keySequence('<PageUp>')),
-  [ApplicationAction.CURSOR_PAGE_DOWN]: actionBindings(keySequence('<C-d>'), keySequence('<PageDown>')),
-  [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
-  [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
-  [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
-  [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
-})
+const visualActions = new Set([
+  ApplicationAction.CURSOR_UP,
+  ApplicationAction.CURSOR_DOWN,
+  ApplicationAction.CURSOR_PAGE_UP,
+  ApplicationAction.CURSOR_PAGE_DOWN,
+  ApplicationAction.CURSOR_FIRST,
+  ApplicationAction.CURSOR_LAST,
+  ApplicationAction.ADD_COMMENT,
+  ApplicationAction.VISUAL_LINE,
+])
 
 const workspaceSurfaces = Object.freeze([
   ActionScope.FILE_TREE,
@@ -224,15 +224,18 @@ export function compileApplicationKeymap(
     })
   })
 
-  // Visual bindings are fixed and separate from configurable Normal bindings.
-  for (const [action, sequences] of Object.entries(visualKeymap)) {
-    for (const keys of sequences) bindings.push(Object.freeze({
+  // Share effective keys and keep only actions supported in Visual mode.
+  const visualBindings = bindings.flatMap((binding) => {
+    const actions = binding.args.actions.filter((action) => visualActions.has(action))
+    if (actions.length === 0) return []
+    return [Object.freeze({
+      ...binding,
       mode: VimMode.VISUAL,
-      keys,
-      command: APPLICATION_DISPATCH_COMMAND,
-      args: Object.freeze({ actions: Object.freeze([action]) }),
-    }))
-  }
+      args: Object.freeze({ actions: Object.freeze(actions) }),
+    })]
+  })
+  bindings.push(...visualBindings)
+
   compileBindings(bindings)
   return Object.freeze(bindings)
 }
