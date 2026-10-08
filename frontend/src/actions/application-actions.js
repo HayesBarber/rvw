@@ -120,13 +120,16 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLEAR_COMMENTS]: actionBindings(keySequence('d', 'a')),
 })
 
-export const visualKeymap = Object.freeze({
-  [ApplicationAction.CURSOR_UP]: actionBindings(keySequence('k'), keySequence('<Up>')),
-  [ApplicationAction.CURSOR_DOWN]: actionBindings(keySequence('j'), keySequence('<Down>')),
-  [ApplicationAction.CURSOR_PAGE_UP]: actionBindings(keySequence('<C-u>'), keySequence('<PageUp>')),
-  [ApplicationAction.CURSOR_PAGE_DOWN]: actionBindings(keySequence('<C-d>'), keySequence('<PageDown>')),
-  [ApplicationAction.CURSOR_FIRST]: actionBindings(keySequence('g', 'g')),
-  [ApplicationAction.CURSOR_LAST]: actionBindings(keySequence('G')),
+const visualMotionActions = new Set([
+  ApplicationAction.CURSOR_UP,
+  ApplicationAction.CURSOR_DOWN,
+  ApplicationAction.CURSOR_PAGE_UP,
+  ApplicationAction.CURSOR_PAGE_DOWN,
+  ApplicationAction.CURSOR_FIRST,
+  ApplicationAction.CURSOR_LAST,
+])
+
+const fixedVisualKeymap = Object.freeze({
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
 })
@@ -224,8 +227,13 @@ export function compileApplicationKeymap(
     })
   })
 
-  // Visual bindings are fixed and separate from configurable Normal bindings.
-  for (const [action, sequences] of Object.entries(visualKeymap)) {
+  // Share effective motion keys, including leader expansion and disabled actions.
+  const visualMotions = bindings.filter((binding) => (
+    binding.args.actions.some((action) => visualMotionActions.has(action))
+  )).map((binding) => Object.freeze({ ...binding, mode: VimMode.VISUAL }))
+  bindings.push(...visualMotions)
+
+  for (const [action, sequences] of Object.entries(fixedVisualKeymap)) {
     for (const keys of sequences) bindings.push(Object.freeze({
       mode: VimMode.VISUAL,
       keys,
