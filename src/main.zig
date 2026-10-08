@@ -8,14 +8,6 @@ const usage =
     \\       rvw -h | --help
     \\       rvw -v | --version
     \\
-    \\  -l, --last-commit  Review HEAD against its first parent.
-    \\                     Exclude staged and unstaged changes.
-    \\
-    \\examples: rvw -l
-    \\          rvw --last-commit
-    \\          rvw /path/to/repository -l
-    \\          rvw /path/to/repository --last-commit
-    \\
 ;
 
 const Options = struct {

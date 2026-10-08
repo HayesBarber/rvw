@@ -42,21 +42,6 @@ usage: rvw [DIR] [-r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [
        rvw -v | --version
 ```
 
-Use `-l` or `--last-commit` to review the most recent commit:
-
-```bash
-rvw -l
-rvw --last-commit
-rvw /path/to/repository -l
-rvw /path/to/repository --last-commit
-```
-
-Both forms compare the first parent of `HEAD` with `HEAD`, as with
-`--range HEAD~1..HEAD`. For a merge commit, the review uses the first parent.
-The review excludes staged and unstaged changes. The repository must have a
-`HEAD` commit with a first parent. Do not combine this flag with `-r`, `--range`,
-or `--pr`, or use it more than once.
-
 Text search requires [a local ripgrep installation](./docs/configuration.md#codebase-text-search).
 
 ## Usage
