@@ -123,6 +123,7 @@ export default function App() {
     registerDiffPaneActions,
     registerFileTreeActions,
     registerFinderActions,
+    registerOverlayActions,
     selectTreeFile: handleTreeFileSelect,
     showChanges,
     showFiles,
@@ -353,7 +354,7 @@ export default function App() {
             : 'Find a file'}
           onOpen={handleFinderOpen}
           onClose={closeFileFinder}
-          registerActionAdapter={registerFinderActions}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       {workspace.keymapReferenceOpen && (

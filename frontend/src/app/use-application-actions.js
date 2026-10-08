@@ -157,8 +157,7 @@ export function useApplicationActions({
         return overlayActions.get(OverlayKind.KEYMAP_REFERENCE) ?? blockingOverlayActions
       }
       if (workspace.finderOpen) {
-        return overlayActions.get(OverlayKind.FILE_FINDER)
-          ?? finderActionsRef.current ?? blockingOverlayActions
+        return overlayActions.get(OverlayKind.FILE_FINDER) ?? blockingOverlayActions
       }
       if (workspace.searchMode) {
         return overlayActions.get(OverlayKind.CODEBASE_SEARCH)
