@@ -7,7 +7,7 @@ import {
 import { ApplicationAction, defaultApplicationBindings } from './application-actions.js'
 import { VimController } from '../vim/machine.js'
 import { ActiveSurface } from '../app/workspace.js'
-import { blockingOverlayActions, OverlayKind } from './overlay-actions.js'
+import { blockingOverlayActions, createOverlayActionRegistry, OverlayKind } from './overlay-actions.js'
 
 test('global actions receive counts and must explicitly report handled', () => {
   const calls = []
@@ -285,50 +285,49 @@ test('surface registrations clean up without removing a newer adapter', () => {
   assert.equal(registry.get(ActiveSurface.FILE_TREE), null)
 })
 
-test('overlay registrations remain separate and block workspace actions during replacement', () => {
-  const registry = createSurfaceActionRegistry()
+test('the last opened overlay blocks the workspace and preserves priority during updates', () => {
+  const registry = createOverlayActionRegistry()
   const calls = []
-  const first = { [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Old adapter must not run') }
-  const replacement = {
-    [ApplicationAction.CURSOR_DOWN]: (count) => {
-      calls.push(count)
-      return true
-    },
-  }
-  const unregisterFirst = registry.register(OverlayKind.FILE_FINDER, first)
-  const unregisterReplacement = registry.register(OverlayKind.FILE_FINDER, replacement)
-  const unregisterReference = registry.register(OverlayKind.KEYMAP_REFERENCE, blockingOverlayActions)
-  let activeOverlay = OverlayKind.FILE_FINDER
+  const finder = registry.register(OverlayKind.FILE_FINDER)
+  finder.update({
+    [ApplicationAction.CURSOR_DOWN]: (count) => { calls.push(count); return true },
+  })
   const dispatch = createApplicationDispatcher({
     getActiveSurface: () => assert.fail('Overlay must block workspace dispatch'),
     getSurfaceActions: () => assert.fail('Overlay must block workspace dispatch'),
-    getOverlayActions: () => registry.get(activeOverlay) ?? blockingOverlayActions,
+    getOverlayActions: registry.get,
     globalActions: {
       [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Overlay must block global dispatch'),
     },
   })
 
-  unregisterFirst()
   assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 2), true)
-  activeOverlay = OverlayKind.KEYMAP_REFERENCE
+  const reference = registry.register(OverlayKind.KEYMAP_REFERENCE)
   assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
-  unregisterReference()
+  finder.update({ [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Covered overlay must not run') })
   assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
-  activeOverlay = OverlayKind.FILE_FINDER
-  unregisterReplacement()
-  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
-  assert.deepEqual(calls, [2])
+  const restored = { [ApplicationAction.CURSOR_DOWN]: () => { calls.push(1); return true } }
+  finder.update(restored)
+  reference.unregister()
+  assert.equal(registry.get(), restored)
+  assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), true)
+  reference.unregister()
+  assert.equal(registry.get(), restored)
+  finder.unregister()
+  assert.equal(registry.get(), null)
+  assert.deepEqual(calls, [2, 1])
 })
 
-test('overlay registration can restart after Strict Mode cleanup', () => {
-  const registry = createSurfaceActionRegistry()
-  const cleanup = registry.register(OverlayKind.CODEBASE_SEARCH, blockingOverlayActions)
-  cleanup()
-  assert.equal(registry.get(OverlayKind.CODEBASE_SEARCH), null)
-  const restartedCleanup = registry.register(OverlayKind.CODEBASE_SEARCH, blockingOverlayActions)
-  assert.equal(registry.get(OverlayKind.CODEBASE_SEARCH), blockingOverlayActions)
-  restartedCleanup()
-  assert.equal(registry.get(OverlayKind.CODEBASE_SEARCH), null)
+test('overlay registration can restart after Strict Mode cleanup without stale cleanup removing it', () => {
+  const registry = createOverlayActionRegistry()
+  const first = registry.register(OverlayKind.CODEBASE_SEARCH)
+  first.unregister()
+  assert.equal(registry.get(), null)
+  const second = registry.register(OverlayKind.CODEBASE_SEARCH)
+  first.unregister()
+  assert.equal(registry.get(), blockingOverlayActions)
+  second.unregister()
+  assert.equal(registry.get(), null)
 })
 
 test('Vim commands consume keys only when application dispatch handles them', () => {

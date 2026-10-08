@@ -9,7 +9,7 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from '../actions/codebase-search-actions.js'
-import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
+import { createOverlayActionRegistry } from '../actions/overlay-actions.js'
 import { closeApplication } from '../review/api.js'
 import { ActiveSurface, TreeMode } from './workspace.js'
 
@@ -33,7 +33,7 @@ export function useApplicationActions({
   const fileTreePaneRef = useRef(null)
   const diffPaneRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
-  const [overlayActions] = useState(createSurfaceActionRegistry)
+  const [overlayActions] = useState(createOverlayActionRegistry)
 
   const activateSurface = useCallback((surface) => {
     dispatchWorkspace({ type: 'surface_activated', surface })
@@ -144,27 +144,13 @@ export function useApplicationActions({
   const dispatchApplicationAction = useMemo(() => createApplicationDispatcher({
     getActiveSurface: () => workspace.activeSurface,
     getSurfaceActions: surfaceActions.get,
-    getOverlayActions: () => {
-      if (workspace.keymapReferenceOpen) {
-        return overlayActions.get(OverlayKind.KEYMAP_REFERENCE) ?? blockingOverlayActions
-      }
-      if (workspace.finderOpen) {
-        return overlayActions.get(OverlayKind.FILE_FINDER) ?? blockingOverlayActions
-      }
-      if (workspace.searchMode) {
-        return overlayActions.get(OverlayKind.CODEBASE_SEARCH) ?? blockingOverlayActions
-      }
-      return null
-    },
+    getOverlayActions: overlayActions.get,
     globalActions,
   }), [
     globalActions,
     overlayActions,
     surfaceActions,
     workspace.activeSurface,
-    workspace.finderOpen,
-    workspace.searchMode,
-    workspace.keymapReferenceOpen,
   ])
 
   useEffect(() => {

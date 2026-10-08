@@ -362,6 +362,7 @@ export default function App() {
           leader={keyboardConfiguration.leader}
           aliases={keyboardConfiguration.commandAliases}
           onClose={closeKeymapReference}
+          registerActionAdapter={registerOverlayActions}
         />
       )}
       <ApplicationFooter
