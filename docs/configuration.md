@@ -133,21 +133,6 @@ Actions absent from the file keep their default bindings.
 A binding cannot also be a prefix of another binding. For example, do not bind
 both `g` and `g g`.
 
-## Keyboard reference navigation
-
-The keyboard reference uses the effective `cursor.up` and `cursor.down` bindings
-to scroll. With the default configuration, use `k` or `<Up>` to scroll up and
-`j` or `<Down>` to scroll down. Custom bindings replace these defaults. An empty
-binding array disables scrolling for that direction.
-
-Counts and multi-key sequences also apply in the reference. For example, if
-`cursor.down` is bound to `["g", "d"]`, press `3 g d` to scroll three steps down.
-The reference header shows the effective scroll bindings.
-
-Press `/` or select Search to open the search input. The input accepts text
-without moving the reference. Press Escape to leave the input, then press Escape
-again to close the reference. Tab and Shift+Tab move between the controls.
-
 ## Key notation
 
 - Printable keys use the character produced by the keyboard, such as `j`, `G`, `/`, or `0`. Letter case is significant.

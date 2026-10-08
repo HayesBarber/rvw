@@ -10,7 +10,6 @@ import {
   createKeymapReference,
   createKeymapReferenceActionAdapter,
   filterKeymapReference,
-  keymapReferenceNavigationInstructions,
 } from './keymap-reference.js'
 import { resolveConfiguration } from '../app/configuration.js'
 import { createApplicationDispatcher } from './application-dispatch.js'
@@ -122,17 +121,6 @@ test('disabled reference motions do not scroll', () => {
     assert.equal(controller.dispatch({ type: 'key', key }).handled, false)
   }
   assert.deepEqual(scrolls, [])
-})
-
-test('reference navigation instructions show effective sequences and disabled motions', () => {
-  assert.equal(keymapReferenceNavigationInstructions(defaultNormalKeymap),
-    'Press / to search. Scroll up: k or <Up>. Scroll down: j or <Down>.')
-  const { configuration } = referenceController({
-    [ApplicationAction.CURSOR_UP]: [],
-    [ApplicationAction.CURSOR_DOWN]: [['n'], ['<leader>', 'd']],
-  }, ',')
-  assert.equal(keymapReferenceNavigationInstructions(configuration.keymap, configuration.leader),
-    'Press / to search. Scroll up: disabled. Scroll down: n or , d.')
 })
 
 test('reference capture leaves search input and header controls native', () => {

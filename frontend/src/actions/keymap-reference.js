@@ -25,16 +25,6 @@ export function createKeymapReferenceActionAdapter({ scrollBy }) {
   }
 }
 
-export function keymapReferenceNavigationInstructions(keymap, leader = DEFAULT_LEADER_KEY) {
-  function bindingLabel(action) {
-    const sequences = keymap[action] ?? []
-    return sequences.length === 0 ? 'disabled'
-      : sequences.map((keys) => effectiveSequence(keys, leader).join(' ')).join(' or ')
-  }
-  return `Press / to search. Scroll up: ${bindingLabel(ApplicationAction.CURSOR_UP)}. ` +
-    `Scroll down: ${bindingLabel(ApplicationAction.CURSOR_DOWN)}.`
-}
-
 /** Filters actions by the text shown in the reference. Keeps catalog order. */
 export function filterKeymapReference(groups, query) {
   const needle = query.toLowerCase()

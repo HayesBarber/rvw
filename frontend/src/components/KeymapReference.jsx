@@ -3,7 +3,6 @@ import {
   createKeymapReference,
   filterKeymapReference,
   createKeymapReferenceActionAdapter,
-  keymapReferenceNavigationInstructions,
 } from '../actions/keymap-reference.js'
 import { OverlayKind } from '../actions/overlay-actions.js'
 import Overlay from './Overlay.jsx'
@@ -82,7 +81,7 @@ export default function KeymapReference({ keymap, leader, aliases, onClose, regi
       <header className="keymap-reference-header">
         <div>
           <h2 id="keymap-reference-title">Keyboard reference</h2>
-          <p>{keymapReferenceNavigationInstructions(keymap, leader)}</p>
+          <p>Press / to search</p>
         </div>
         <div className="keymap-reference-controls" data-vim-ignore>
           <button
