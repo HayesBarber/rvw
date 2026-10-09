@@ -923,7 +923,7 @@ test "core copies configured comment text and still rejects an empty comment lis
     defer std.testing.allocator.free(dependencies.copied.?);
     try std.testing.expectEqual(@as(usize, 2), result.commentCount);
     try std.testing.expectEqualStrings(
-        "Review first\nThen fix\n\nrvw: working tree\n\n## Review comments\n\n- [CUSTOM] Summary\n\n## File and line comments\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
+        "Review first\nThen fix\n\nrvw: working tree\n\nReview comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
         dependencies.copied.?,
     );
 
@@ -934,7 +934,7 @@ test "core copies configured comment text and still rejects an empty comment lis
     std.testing.allocator.free(dependencies.copied.?);
     dependencies.copied = null;
     _ = try core.dispatch(.copy_comments_as_markdown);
-    try std.testing.expectEqualStrings("## Review comments\n\n- [CUSTOM] Summary\n\n## File and line comments\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n", dependencies.copied.?);
+    try std.testing.expectEqualStrings("Review comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n", dependencies.copied.?);
 }
 
 test "relay acknowledges filtered events and writes once without recursive instrumentation" {

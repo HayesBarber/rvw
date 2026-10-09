@@ -28,11 +28,11 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: [
     }
 
     const has_review_comments = sorted.len > 0 and sorted[0].target == .review;
-    if (has_review_comments) try writer.writeAll("## Review comments\n\n");
+    if (has_review_comments) try writer.writeAll("Review comments:\n\n");
     var wrote_location_heading = false;
     for (sorted) |comment| {
         if (has_review_comments and comment.target != .review and !wrote_location_heading) {
-            try writer.writeAll("\n## File and line comments\n\n");
+            try writer.writeAll("\nFile and line comments:\n\n");
             wrote_location_heading = true;
         }
         try writer.writeAll("- ");
@@ -196,7 +196,7 @@ test "review comments precede mixed locations and retain configured text and typ
     const markdown = try serialize(std.testing.allocator, &comments, "Intro", "Outro", "rvw", "PR #233");
     defer std.testing.allocator.free(markdown);
     try std.testing.expectEqualStrings(
-        "Intro\n\nrvw: PR #233\n\n## Review comments\n\n- [CUSTOM] Design question\n- Summary\n  Next step\n\n## File and line comments\n\n- a.txt - File note\n- a.txt:2-4 - Line note\n\nOutro\n",
+        "Intro\n\nrvw: PR #233\n\nReview comments:\n\n- [CUSTOM] Design question\n- Summary\n  Next step\n\nFile and line comments:\n\n- a.txt - File note\n- a.txt:2-4 - Line note\n\nOutro\n",
         markdown,
     );
 }
@@ -208,5 +208,5 @@ test "review-only Markdown has no location references or empty location section"
     };
     const markdown = try serialize(std.testing.allocator, &comments, "", "", "", "");
     defer std.testing.allocator.free(markdown);
-    try std.testing.expectEqualStrings("## Review comments\n\n- [QUESTION] Question\n- Summary\n", markdown);
+    try std.testing.expectEqualStrings("Review comments:\n\n- [QUESTION] Question\n- Summary\n", markdown);
 }

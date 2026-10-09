@@ -78,13 +78,6 @@ The default types are `ISSUE`, `QUESTION`, and `NITPICK`. An empty list disables
 Names must be unique, non-blank strings with no line breaks.
 Set `comments.defaultType` to `null` (the default) or a name from the list.
 In the comment editor, use `Tab`, `Shift+Tab`, or the dropdown to change the type.
-
-Review comments apply to the full session. The comment API accepts
-`{ "kind": "review" }` as a target, without a path, side, or line range.
-These comments use the same types and session lifetime as file and line comments.
-Reload preserves saved comments. Clear removes all comment targets.
-Copied Markdown puts review comments under `Review comments` before file and line comments.
-
 Set `comments.intro` and `comments.outro` to strings that appear before and after
 the copied Markdown comment list. Both default to empty strings.
 Copied Markdown includes the repository name and review source after the intro.
