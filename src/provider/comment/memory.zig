@@ -150,6 +150,7 @@ pub const MemoryProvider = struct {
 
 fn duplicateTarget(allocator: Allocator, target: model.CommentTarget) !model.CommentTarget {
     return switch (target) {
+        .review => .review,
         .file => |details| .{ .file = .{
             .path = try allocator.dupe(u8, details.path),
         } },
@@ -163,10 +164,11 @@ fn duplicateTarget(allocator: Allocator, target: model.CommentTarget) !model.Com
 }
 
 fn freeTarget(allocator: Allocator, target: model.CommentTarget) void {
-    allocator.free(switch (target) {
-        .file => |details| details.path,
-        .line => |details| details.path,
-    });
+    switch (target) {
+        .review => {},
+        .file => |details| allocator.free(details.path),
+        .line => |details| allocator.free(details.path),
+    }
 }
 
 test "editing and deleting comments preserve identity and isolate stale IDs" {
@@ -228,8 +230,10 @@ test "clearing comments frees storage and reports the removed count" {
         .path = "README.md",
     } });
 
+    _ = try comments.createComment(threaded.io(), "summary", "QUESTION", .review);
+
     const cleared = try comments.clearComments(threaded.io());
-    try std.testing.expectEqual(@as(usize, 2), cleared);
+    try std.testing.expectEqual(@as(usize, 3), cleared);
 
     const remaining = try comments.getComments(threaded.io());
     try std.testing.expectEqual(@as(usize, 0), remaining.len);

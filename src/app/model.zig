@@ -125,6 +125,7 @@ pub const UnavailableReason = enum {
 };
 
 pub const CommentTarget = union(enum) {
+    review,
     file: struct { path: []const u8 },
     line: struct {
         path: []const u8,
@@ -138,6 +139,10 @@ pub const CommentTarget = union(enum) {
     pub fn jsonStringify(self: CommentTarget, writer: *std.json.Stringify) !void {
         try writer.beginObject();
         switch (self) {
+            .review => {
+                try writer.objectField("kind");
+                try writer.write("review");
+            },
             .file => |target| {
                 try writer.objectField("kind");
                 try writer.write("file");

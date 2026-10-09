@@ -120,11 +120,55 @@ private func testNativeSearchFailure(_ directory: URL) throws {
     }
 }
 
+private func testNativeReviewComments() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        try git(directory, ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
+                            "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m", "empty review"])
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+        let router = routerBlockingTermination(core)
+        let overview = try response(router, ["type": "get_diff_overview"])
+        expect((overview["files"] as? [Any])?.isEmpty == true, "review should have no changed files")
+        let first = try response(router, ["type": "create_comment", "body": "Summary", "commentType": "QUESTION",
+                                          "target": ["kind": "review"]])
+        let second = try response(router, ["type": "create_comment", "body": "Design", "target": ["kind": "review"]])
+        guard let firstID = first["id"] as? String, let secondID = second["id"] as? String else {
+            throw NativeCoreTestError.invalidResponse
+        }
+        expect(firstID != secondID, "review comments should have distinct IDs")
+        let target = first["target"] as? [String: String]
+        expect(target == ["kind": "review"], "review target should contain no location")
+        expect(first["commentType"] as? String == "QUESTION", "review should retain its type")
+        let edited = try response(router, ["type": "edit_comment", "commentId": firstID, "body": "Revised"])
+        expect(edited["id"] as? String == firstID, "editing should preserve the ID")
+        expect(edited["target"] as? [String: String] == target, "editing should preserve the review target")
+        _ = try response(router, ["type": "reload_review"])
+        let saved = try core.dispatch(["type": "get_comments"]) as? [[String: Any]]
+        expect(saved?.count == 2, "reload should preserve both review comments")
+        expect(saved?.first?["body"] as? String == "Revised", "reload should preserve edited text")
+        _ = try response(router, ["type": "delete_comment", "commentId": firstID])
+        let remaining = try core.dispatch(["type": "get_comments"]) as? [[String: Any]]
+        expect(remaining?.count == 1 && remaining?.first?["id"] as? String == secondID,
+               "deleting should affect only the selected comment")
+        let cleared = try response(router, ["type": "clear_comments"])
+        expect(cleared["commentCount"] as? Int == 1, "clear should report the review comment count")
+        let empty = try core.dispatch(["type": "get_comments"]) as? [Any]
+        expect(empty?.isEmpty == true,
+               "clear should remove review comments")
+        _ = try response(router, ["type": "create_comment", "body": "Session only", "target": ["kind": "review"]])
+        let nextSession = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+        let fresh = try nextSession.dispatch(["type": "get_comments"]) as? [Any]
+        expect(fresh?.isEmpty == true,
+               "a new session should start without saved comments")
+    }
+}
+
 @main
 struct NativeCoreTests {
     static func main() {
         do {
             try testNativeTextSearch()
+            try testNativeReviewComments()
             print("Native core tests passed")
         } catch {
             FileHandle.standardError.write(Data("Native core test failed: \(error)\n".utf8))
