@@ -404,3 +404,31 @@ for (const mode of ['ignore-aware', 'all-files']) {
     }
   })
 }
+
+test('review comments have no location on native and HTTP transports', async () => {
+  const { createComment } = await import('./api.js')
+  const target = { kind: 'review' }
+  const requests = []
+  const previousFetch = globalThis.fetch
+  const previousWindow = globalThis.window
+  try {
+    globalThis.window = { webkit: { messageHandlers: { native: {
+      postMessage: async (request) => { requests.push(request); return { id: 'native', target: request.target } },
+    } } } }
+    assert.deepEqual((await createComment('Summary', 'CUSTOM', target)).target, target)
+    globalThis.window = {}
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, '/api/comments')
+      assert.equal(options.method, 'POST')
+      const request = JSON.parse(options.body)
+      requests.push(request)
+      return { ok: true, json: async () => ({ id: 'http', target: request.target }) }
+    }
+    assert.deepEqual((await createComment('Summary', 'CUSTOM', target)).target, target)
+    assert.deepEqual(requests[0], requests[1])
+    assert.deepEqual(requests[0], { type: 'create_comment', body: 'Summary', commentType: 'CUSTOM', target })
+  } finally {
+    globalThis.fetch = previousFetch
+    globalThis.window = previousWindow
+  }
+})

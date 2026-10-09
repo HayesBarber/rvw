@@ -27,9 +27,17 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: [
         try writer.print("{s}: {s}\n\n", .{ repository_name, source_label });
     }
 
+    const has_review_comments = sorted.len > 0 and sorted[0].target == .review;
+    if (has_review_comments) try writer.writeAll("Review comments:\n\n");
+    var wrote_location_heading = false;
     for (sorted) |comment| {
+        if (has_review_comments and comment.target != .review and !wrote_location_heading) {
+            try writer.writeAll("\nFile and line comments:\n\n");
+            wrote_location_heading = true;
+        }
         try writer.writeAll("- ");
         switch (comment.target) {
+            .review => {},
             .file => |target| try writer.writeAll(target.path),
             .line => |target| {
                 try writer.print("{s}:{d}", .{ target.path, target.startLine });
@@ -38,7 +46,7 @@ pub fn serialize(allocator: Allocator, comments: []const model.Comment, intro: [
                 }
             },
         }
-        try writer.writeAll(" - ");
+        if (comment.target != .review) try writer.writeAll(" - ");
         if (comment.commentType) |comment_type| {
             try writer.writeByte('[');
             try writeCommentType(writer, comment_type);
@@ -88,6 +96,7 @@ fn commentLessThan(_: void, lhs: model.Comment, rhs: model.Comment) bool {
 
 fn targetPath(target: model.CommentTarget) []const u8 {
     return switch (target) {
+        .review => "",
         .file => |details| details.path,
         .line => |details| details.path,
     };
@@ -95,11 +104,14 @@ fn targetPath(target: model.CommentTarget) []const u8 {
 
 fn compareTargets(lhs: model.CommentTarget, rhs: model.CommentTarget) std.math.Order {
     return switch (lhs) {
+        .review => if (rhs == .review) .eq else .lt,
         .file => switch (rhs) {
+            .review => .gt,
             .file => .eq,
             .line => .lt,
         },
         .line => |left| switch (rhs) {
+            .review => .gt,
             .file => .gt,
             .line => |right| blk: {
                 if (left.startLine != right.startLine) {
@@ -172,4 +184,29 @@ test "review header follows intro and precedes sorted comments" {
         "Intro\n\nrvw: PR #100\n\n- a.txt - First\n- b.txt - Second\n\nOutro\n",
         markdown,
     );
+}
+
+test "review comments precede mixed locations and retain configured text and types" {
+    const comments = [_]model.Comment{
+        .{ .id = "line", .body = "Line note", .target = .{ .line = .{ .path = "a.txt", .side = .old, .startLine = 2, .endLine = 4 } } },
+        .{ .id = "review-2", .body = "Summary\nNext step", .target = .review },
+        .{ .id = "file", .body = "File note", .target = .{ .file = .{ .path = "a.txt" } } },
+        .{ .id = "review-1", .body = "Design question", .commentType = "CUSTOM", .target = .review },
+    };
+    const markdown = try serialize(std.testing.allocator, &comments, "Intro", "Outro", "rvw", "PR #233");
+    defer std.testing.allocator.free(markdown);
+    try std.testing.expectEqualStrings(
+        "Intro\n\nrvw: PR #233\n\nReview comments:\n\n- [CUSTOM] Design question\n- Summary\n  Next step\n\nFile and line comments:\n\n- a.txt - File note\n- a.txt:2-4 - Line note\n\nOutro\n",
+        markdown,
+    );
+}
+
+test "review-only Markdown has no location references or empty location section" {
+    const comments = [_]model.Comment{
+        .{ .id = "1", .body = "Summary", .target = .review },
+        .{ .id = "2", .body = "Question", .commentType = "QUESTION", .target = .review },
+    };
+    const markdown = try serialize(std.testing.allocator, &comments, "", "", "", "");
+    defer std.testing.allocator.free(markdown);
+    try std.testing.expectEqualStrings("Review comments:\n\n- [QUESTION] Question\n- Summary\n", markdown);
 }

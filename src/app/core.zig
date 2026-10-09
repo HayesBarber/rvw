@@ -254,6 +254,7 @@ fn logRequestFailureWithoutContext(logger: log.Logger, io: Io) void {
 fn validComment(body: []const u8, comment_type: ?[]const u8, target: model.CommentTarget) bool {
     if (!validCommentBody(body) or !validCommentType(comment_type)) return false;
     return switch (target) {
+        .review => true,
         .file => |details| details.path.len > 0,
         .line => |details| details.path.len > 0 and
             details.startLine > 0 and
@@ -561,15 +562,20 @@ test "core reload replaces the review snapshot without touching comments and pre
         .body = "keep me",
         .target = .{ .file = .{ .path = "before.txt" } },
     } });
+    _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review", .target = .review } });
     const result = (try core.dispatch(.reload_review)).reload_review_result;
     try std.testing.expectEqual(@as(usize, 1), result.generation);
     try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
     try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
+    const review_comment = (try core.dispatch(.get_comments)).comments[1];
+    try std.testing.expect(review_comment.target == .review);
+    try std.testing.expectEqualStrings("keep review", review_comment.body);
 
     review.fail_reload = true;
     try std.testing.expectError(error.ReloadUnavailable, core.dispatch(.reload_review));
     try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
     try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
+    try std.testing.expectEqualStrings("keep review", (try core.dispatch(.get_comments)).comments[1].body);
 }
 
 const noop_clipboard_vtable: output.Clipboard.VTable = .{
@@ -587,7 +593,13 @@ fn silentLog(_: *anyopaque, _: Io, _: log.Event) !void {}
 test "core edits and deletes only the requested comment with useful errors" {
     const TestDependencies = struct {
         fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
-            return error.TestUnexpectedResult;
+            return .{
+                .id = "empty-review",
+                .repository = .{ .name = "rvw" },
+                .source = .{ .working_tree = .{ .base = "HEAD" } },
+                .initialPath = null,
+                .files = &.{},
+            };
         }
 
         fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
@@ -625,85 +637,98 @@ test "core edits and deletes only the requested comment with useful errors" {
         const logger_vtable: log.Logger.VTable = .{ .write = writeLog };
     };
 
-    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
-    defer threaded.deinit();
-    var context: u8 = 0;
-    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
-    defer comments.deinit();
-    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
-    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
-    var core = Core.init(
-        std.testing.allocator,
-        threaded.io(),
-        .{ .context = &context, .vtable = &TestDependencies.review_vtable },
-        search_ignore_aware.interface(),
-        search_all_files.interface(),
-        comments.interface(),
-        .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
-        .{
-            .allocator = std.testing.allocator,
-            .context = &context,
-            .vtable = &TestDependencies.logger_vtable,
-        },
-        .{ .configuration = .{ .object = .empty }, .diagnostic = null },
-    );
+    for ([_]model.CommentTarget{ .{ .file = .{ .path = "README.md" } }, .review }) |target| {
+        var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
+        defer threaded.deinit();
+        var context: u8 = 0;
+        var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+        defer comments.deinit();
+        var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+        var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
+        var core = Core.init(
+            std.testing.allocator,
+            threaded.io(),
+            .{ .context = &context, .vtable = &TestDependencies.review_vtable },
+            search_ignore_aware.interface(),
+            search_all_files.interface(),
+            comments.interface(),
+            .{ .context = &context, .vtable = &TestDependencies.clipboard_vtable },
+            .{
+                .allocator = std.testing.allocator,
+                .context = &context,
+                .vtable = &TestDependencies.logger_vtable,
+            },
+            .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+        );
 
-    const first = (try core.dispatch(.{ .create_comment = .{
-        .body = "first",
-        .comment_type = "ISSUE",
-        .target = .{ .file = .{ .path = "README.md" } },
-    } })).comment;
-    const second = (try core.dispatch(.{ .create_comment = .{
-        .body = "second",
-        .target = .{ .file = .{ .path = "LICENSE" } },
-    } })).comment;
-    const first_id = try std.testing.allocator.dupe(u8, first.id);
-    defer std.testing.allocator.free(first_id);
+        try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .create_comment = .{
+            .body = " \n",
+            .target = target,
+        } }));
+        const first = (try core.dispatch(.{ .create_comment = .{
+            .body = "first",
+            .comment_type = "ISSUE",
+            .target = target,
+        } })).comment;
+        const second = (try core.dispatch(.{ .create_comment = .{
+            .body = "second",
+            .target = if (target == .review) .review else .{ .file = .{ .path = "LICENSE" } },
+        } })).comment;
+        const first_id = try std.testing.allocator.dupe(u8, first.id);
+        defer std.testing.allocator.free(first_id);
 
-    const edited = (try core.dispatch(.{ .edit_comment = .{
-        .comment_id = first_id,
-        .body = "updated",
-        .comment_type = "QUESTION",
-    } })).comment;
-    try std.testing.expectEqualStrings(first_id, edited.id);
-    try std.testing.expectEqualStrings("updated", edited.body);
-    try std.testing.expectEqualStrings("QUESTION", edited.commentType.?);
-    try std.testing.expectEqualStrings("README.md", edited.target.file.path);
-    try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
-        .comment_id = first_id,
-        .body = "  \n",
-    } }));
-    try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
-        .comment_id = first_id,
-        .body = "valid",
-        .comment_type = "MULTI\nLINE",
-    } }));
-    try std.testing.expectError(error.InvalidCommentId, core.dispatch(.{ .delete_comment = .{
-        .comment_id = " invalid",
-    } }));
-    try std.testing.expectError(error.UnknownComment, core.dispatch(.{ .edit_comment = .{
-        .comment_id = "comment-99",
-        .body = "missing",
-    } }));
+        const edited = (try core.dispatch(.{ .edit_comment = .{
+            .comment_id = first_id,
+            .body = "updated",
+            .comment_type = "QUESTION",
+        } })).comment;
+        try std.testing.expectEqualStrings(first_id, edited.id);
+        try std.testing.expectEqualStrings("updated", edited.body);
+        try std.testing.expectEqualStrings("QUESTION", edited.commentType.?);
+        if (target == .review) {
+            try std.testing.expect(edited.target == .review);
+            const overview = (try core.dispatch(.get_diff_overview)).diff_overview;
+            try std.testing.expectEqual(@as(usize, 0), overview.files.len);
+            try std.testing.expect(overview.initialPath == null);
+        } else {
+            try std.testing.expectEqualStrings("README.md", edited.target.file.path);
+        }
+        try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
+            .comment_id = first_id,
+            .body = "  \n",
+        } }));
+        try std.testing.expectError(error.InvalidComment, core.dispatch(.{ .edit_comment = .{
+            .comment_id = first_id,
+            .body = "valid",
+            .comment_type = "MULTI\nLINE",
+        } }));
+        try std.testing.expectError(error.InvalidCommentId, core.dispatch(.{ .delete_comment = .{
+            .comment_id = " invalid",
+        } }));
+        try std.testing.expectError(error.UnknownComment, core.dispatch(.{ .edit_comment = .{
+            .comment_id = "comment-99",
+            .body = "missing",
+        } }));
 
-    const deleted = (try core.dispatch(.{ .delete_comment = .{
-        .comment_id = first_id,
-    } })).delete_comment_result;
-    try std.testing.expectEqualStrings(first_id, deleted.commentId);
-    try std.testing.expectError(error.UnknownComment, core.dispatch(.{ .delete_comment = .{
-        .comment_id = first_id,
-    } }));
-    const remaining = (try core.dispatch(.get_comments)).comments;
-    try std.testing.expectEqual(@as(usize, 1), remaining.len);
-    try std.testing.expectEqualStrings(second.id, remaining[0].id);
-    try std.testing.expectEqualStrings("second", remaining[0].body);
+        const deleted = (try core.dispatch(.{ .delete_comment = .{
+            .comment_id = first_id,
+        } })).delete_comment_result;
+        try std.testing.expectEqualStrings(first_id, deleted.commentId);
+        try std.testing.expectError(error.UnknownComment, core.dispatch(.{ .delete_comment = .{
+            .comment_id = first_id,
+        } }));
+        const remaining = (try core.dispatch(.get_comments)).comments;
+        try std.testing.expectEqual(@as(usize, 1), remaining.len);
+        try std.testing.expectEqualStrings(second.id, remaining[0].id);
+        try std.testing.expectEqualStrings("second", remaining[0].body);
 
-    const cleared = (try core.dispatch(.clear_comments)).clear_comments_result;
-    try std.testing.expectEqual(@as(usize, 1), cleared.commentCount);
-    const empty = (try core.dispatch(.get_comments)).comments;
-    try std.testing.expectEqual(@as(usize, 0), empty.len);
-    const cleared_again = (try core.dispatch(.clear_comments)).clear_comments_result;
-    try std.testing.expectEqual(@as(usize, 0), cleared_again.commentCount);
+        const cleared = (try core.dispatch(.clear_comments)).clear_comments_result;
+        try std.testing.expectEqual(@as(usize, 1), cleared.commentCount);
+        const empty = (try core.dispatch(.get_comments)).comments;
+        try std.testing.expectEqual(@as(usize, 0), empty.len);
+        const cleared_again = (try core.dispatch(.clear_comments)).clear_comments_result;
+        try std.testing.expectEqual(@as(usize, 0), cleared_again.commentCount);
+    }
 }
 
 test "core copies validated file paths exactly without accessing the file" {
@@ -893,11 +918,12 @@ test "core copies configured comment text and still rejects an empty comment lis
         .comment_type = "ISSUE",
         .target = .{ .line = .{ .path = "src/auth.zig", .side = .new, .startLine = 42, .endLine = 42 } },
     } });
+    _ = try core.dispatch(.{ .create_comment = .{ .body = "Summary", .comment_type = "CUSTOM", .target = .review } });
     const result = (try core.dispatch(.copy_comments_as_markdown)).copy_comments_result;
     defer std.testing.allocator.free(dependencies.copied.?);
-    try std.testing.expectEqual(@as(usize, 1), result.commentCount);
+    try std.testing.expectEqual(@as(usize, 2), result.commentCount);
     try std.testing.expectEqualStrings(
-        "Review first\nThen fix\n\nrvw: working tree\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
+        "Review first\nThen fix\n\nrvw: working tree\n\nReview comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
         dependencies.copied.?,
     );
 
@@ -908,7 +934,7 @@ test "core copies configured comment text and still rejects an empty comment lis
     std.testing.allocator.free(dependencies.copied.?);
     dependencies.copied = null;
     _ = try core.dispatch(.copy_comments_as_markdown);
-    try std.testing.expectEqualStrings("- src/auth.zig:42 - [ISSUE] Handle expiry\n", dependencies.copied.?);
+    try std.testing.expectEqualStrings("Review comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n", dependencies.copied.?);
 }
 
 test "relay acknowledges filtered events and writes once without recursive instrumentation" {

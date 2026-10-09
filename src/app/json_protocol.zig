@@ -130,6 +130,12 @@ fn parseCommentTarget(value: ?std.json.Value) ?model.CommentTarget {
         else => return null,
     };
     const kind = jsonString(object.get("kind")) orelse return null;
+    if (std.mem.eql(u8, kind, "review")) {
+        for ([_][]const u8{ "path", "side", "startLine", "endLine" }) |field| {
+            if (object.contains(field)) return null;
+        }
+        return .review;
+    }
     const path = jsonString(object.get("path")) orelse return null;
     if (std.mem.eql(u8, kind, "file")) return .{ .file = .{ .path = path } };
     if (!std.mem.eql(u8, kind, "line")) return null;
@@ -323,4 +329,44 @@ test "text search serializes navigation metadata UTF-16 spans and truncation" {
     try std.testing.expectEqualStrings(
         \\{"matches":[{"path":"src/雪.txt","lineNumber":12,"lineText":"a😀é","spans":[{"start":1,"end":3}]}],"truncated":true}
     , encoded);
+}
+
+test "review comment targets decode and encode without location fields" {
+    var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator,
+        \\{"type":"create_comment","body":"Summary","commentType":"QUESTION","target":{"kind":"review"}}
+    , .{});
+    defer parsed.deinit();
+    const request = try decodeRequestValue(parsed.value);
+    try std.testing.expect(request.create_comment.target == .review);
+    try std.testing.expectEqualStrings("QUESTION", request.create_comment.comment_type.?);
+    const encoded = try encodeResponse(std.testing.allocator, .{ .comment = .{
+        .id = "comment-1",
+        .body = request.create_comment.body,
+        .commentType = request.create_comment.comment_type,
+        .target = request.create_comment.target,
+    } });
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings(
+        \\{"id":"comment-1","body":"Summary","commentType":"QUESTION","target":{"kind":"review"}}
+    , encoded);
+}
+
+test "review comment requests reject location fields and still require a target" {
+    const inputs = [_][]const u8{
+        \\{"type":"create_comment","body":"Summary"}
+        ,
+        \\{"type":"create_comment","body":"Summary","target":{"kind":"review","path":"a.txt"}}
+        ,
+        \\{"type":"create_comment","body":"Summary","target":{"kind":"review","side":"new"}}
+        ,
+        \\{"type":"create_comment","body":"Summary","target":{"kind":"review","startLine":1}}
+        ,
+        \\{"type":"create_comment","body":"Summary","target":{"kind":"review","endLine":1}}
+        ,
+    };
+    for (inputs) |input| {
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
+    }
 }

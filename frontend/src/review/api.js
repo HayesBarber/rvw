@@ -165,7 +165,7 @@ export async function getFile(path) {
  * @property {string} id
  * @property {string} body
  * @property {string | null} [commentType]
- * @property {{ kind: 'file', path: string } | { kind: 'line', path: string, side: 'old' | 'new', startLine: number, endLine: number }} target
+ * @property {{ kind: 'review' } | { kind: 'file', path: string } | { kind: 'line', path: string, side: 'old' | 'new', startLine: number, endLine: number }} target
  */
 
 /**
