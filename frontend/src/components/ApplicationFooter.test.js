@@ -21,7 +21,7 @@ function render(comments = [], extra = {}) {
     repositoryName: 'review',
     overview: { files: [] },
     commentsCount: comments.length,
-    onOpenComments: () => {},
+    onToggleComments: () => {},
     vimState: { mode: 'normal', pendingKeys: [] },
     ...extra,
   }))
@@ -30,7 +30,7 @@ function render(comments = [], extra = {}) {
 function assertCount(comments, count) {
   const html = render(comments)
   assert.match(html, new RegExp(`Comments \\(${count}\\)`))
-  assert.match(html, /<button class="comments-button" type="button" aria-haspopup="dialog">/)
+  assert.match(html, /<button class="comments-button" type="button" aria-haspopup="dialog" aria-expanded="false">/)
   assert.doesNotMatch(html, /Copy as Markdown|copy-markdown-button/)
 }
 
@@ -56,7 +56,7 @@ test('footer counts saved review, file, and line comments after mutations', () =
 test('an empty review keeps the comments button enabled during copy requests', () => {
   for (const status of ['idle', 'loading', 'success', 'error']) {
     const html = render([], { copyRequest: { status } })
-    assert.match(html, /<button class="comments-button" type="button" aria-haspopup="dialog">/)
+    assert.match(html, /<button class="comments-button" type="button" aria-haspopup="dialog" aria-expanded="false">/)
     assert.match(html, /Comments \(0\)/)
   }
 })
@@ -71,4 +71,15 @@ test('workspace copy errors remain visible next to the comments button', () => {
     copyMessage: 'Unable to copy: Clipboard unavailable',
   })
   assert.match(html, /role="alert"[^>]*>Unable to copy: Clipboard unavailable/)
+})
+
+
+test('comments button exposes panel state and a directional chevron', () => {
+  const closed = render()
+  const open = render([], { commentsOpen: true })
+  assert.match(closed, /aria-expanded="false"/)
+  assert.match(closed, /<path d="M4 10l4-4 4 4"/)
+  assert.match(open, /aria-expanded="true"/)
+  assert.match(open, /<path d="M4 6l4 4 4-4"/)
+  assert.match(open, /<svg class="comments-chevron"[^>]*aria-hidden="true"/)
 })

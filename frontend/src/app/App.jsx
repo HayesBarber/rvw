@@ -415,10 +415,14 @@ export default function App() {
         clearMessage={clearMessage}
         clearStatus={clearRequest.status}
         commentsCount={comments.length}
+        commentsOpen={workspace.commentsOpen}
         copyMessage={copyMessage}
         copyRequest={copyRequest}
         diagnostic={configurationDiagnostic}
-        onOpenComments={() => dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)}
+        onToggleComments={() => {
+          if (workspace.commentsOpen) dispatchWorkspace({ type: 'comments_closed' })
+          else dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)
+        }}
         onReload={reloadRequest.reload}
         onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}

@@ -86,10 +86,11 @@ export default function ApplicationFooter({
   clearMessage,
   clearStatus,
   commentsCount = 0,
+  commentsOpen = false,
   copyMessage,
   copyRequest,
   diagnostic,
-  onOpenComments,
+  onToggleComments,
   onReload,
   onSearchText,
   overview,
@@ -171,9 +172,13 @@ export default function ApplicationFooter({
                 className="comments-button"
                 type="button"
                 aria-haspopup="dialog"
-                onClick={onOpenComments}
+                aria-expanded={commentsOpen}
+                onClick={onToggleComments}
               >
                 <span aria-live="polite">Comments ({commentsCount})</span>
+                <svg className="comments-chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d={commentsOpen ? 'M4 6l4 4 4-4' : 'M4 10l4-4 4 4'} />
+                </svg>
               </button>
             </span>
           </>
