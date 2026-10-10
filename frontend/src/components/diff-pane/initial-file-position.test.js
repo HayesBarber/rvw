@@ -1,6 +1,36 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createInitialFilePosition } from './initial-file-position.js'
+import { parseDiffFromFile } from '@pierre/diffs'
+import { createInitialFilePosition, lineNavigationCursor, navigationRevealLine } from './initial-file-position.js'
+
+test('comment navigation selects its diff side and keeps full-file and search navigation on the new side', () => {
+  assert.deepEqual(lineNavigationCursor({ lineNumber: 15, side: 'old' }, { type: 'file-diff' }), {
+    lineNumber: 15, side: 'deletions',
+  })
+  for (const [target, instance] of [
+    [{ lineNumber: 15, side: 'new' }, { type: 'file-diff' }],
+    [{ lineNumber: 15 }, { type: 'file-diff' }],
+    [{ lineNumber: 15, side: 'old' }, { type: 'file' }],
+  ]) {
+    assert.deepEqual(lineNavigationCursor(target, instance), { lineNumber: 15, side: 'additions' })
+  }
+})
+
+test('old-side collapsed context uses mapped new-side lines without revealing deletion rows', () => {
+  const lines = Array.from({ length: 300 }, (_, index) => `line ${index + 1}\n`)
+  const modified = [...lines]
+  modified.splice(149, 1)
+  modified.splice(20, 0, 'inserted\n')
+  const instance = { type: 'file-diff', fileDiff: parseDiffFromFile(
+    { name: 'a.txt', contents: lines.join('') },
+    { name: 'a.txt', contents: modified.join('') },
+  ) }
+  assert.equal(navigationRevealLine(instance, { lineNumber: 100, side: 'old' }), 101)
+  assert.equal(navigationRevealLine(instance, { lineNumber: 220, side: 'old' }), 220)
+  assert.equal(navigationRevealLine(instance, { lineNumber: 150, side: 'old' }), null)
+  assert.equal(navigationRevealLine(instance, { lineNumber: 100, side: 'new' }), 100)
+  assert.equal(navigationRevealLine(instance, { lineNumber: 0, side: 'new' }), null)
+})
 
 function setup() {
   const frames = new Map()

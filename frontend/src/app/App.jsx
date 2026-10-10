@@ -97,6 +97,7 @@ export default function App() {
     openFileFinder,
     openFileFinderAll,
     openFinderFile: handleFinderOpen,
+    openCommentLocation,
     overview,
     overviewRequest,
     reloadRequest,
@@ -364,6 +365,11 @@ export default function App() {
           comments={comments}
           status={commentsStatus}
           error={commentsError}
+          onOpenLocation={(location) => {
+            if (!openCommentLocation(location)) return false
+            requestAnimationFrame(focusDiffPane)
+            return true
+          }}
           onClose={() => dispatchWorkspace({ type: 'comments_closed' })}
           registerActionAdapter={registerOverlayActions}
         />

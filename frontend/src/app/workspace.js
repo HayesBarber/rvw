@@ -144,6 +144,15 @@ function reduceWorkspace(state, action) {
       return state.commentsOpen ? state : { ...state, commentsOpen: true }
     case 'comments_closed':
       return state.commentsOpen ? { ...state, commentsOpen: false } : state
+    case 'comment_location_opened':
+      return {
+        ...state,
+        selectedPath: action.location.path,
+        lineNavigation: { ...action.location },
+        commentsOpen: false,
+        treeMode: action.changed ? state.treeMode : TreeMode.FILES,
+        activeSurface: ActiveSurface.DIFF_PANE,
+      }
     case 'keymap_reference_opened':
       return state.keymapReferenceOpen
         ? state

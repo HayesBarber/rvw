@@ -465,7 +465,10 @@ export function centerDiffCursor(instance, node, cursor) {
     ? 0
     : viewport.getBoundingClientRect().top
   const nodeTop = node.getBoundingClientRect().top
-  const rowCenter = scrollTop + nodeTop - viewportTop + position.top + position.height / 2
+  const renderedBounds = renderedCursorBounds(node)
+  const rowCenter = renderedBounds
+    ? scrollTop + (renderedBounds.top + renderedBounds.bottom) / 2 - viewportTop
+    : scrollTop + nodeTop - viewportTop + position.top + position.height / 2
   const nextScrollTop = Math.max(0, rowCenter - viewportHeight / 2)
 
   if (isDocument) viewport.defaultView?.scrollTo({ top: nextScrollTop })

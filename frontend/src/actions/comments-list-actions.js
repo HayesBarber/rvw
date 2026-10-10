@@ -35,7 +35,17 @@ export function revealSelectedComment(list, item) {
   }
 }
 
-export function createCommentsListActionAdapter({ getComments, getSelectedId, selectComment, getPageIndex }) {
+export function commentLocation(comment) {
+  const target = comment?.target
+  if (!target || target.kind === 'review') return null
+  return {
+    path: target.path,
+    lineNumber: target.kind === 'line' ? target.endLine : 0,
+    side: target.kind === 'line' ? target.side : 'new',
+  }
+}
+
+export function createCommentsListActionAdapter({ getComments, getSelectedId, selectComment, getPageIndex, openLocation = () => false }) {
   const select = (getIndex) => (count) => {
     const comments = getComments()
     if (comments.length === 0) return false
@@ -46,6 +56,12 @@ export function createCommentsListActionAdapter({ getComments, getSelectedId, se
     return true
   }
   return Object.freeze({
+    [ApplicationAction.OPEN_COMMENT_LOCATION]: () => {
+      const comments = getComments()
+      const selected = comments.find((comment) => comment.id === getSelectedId())
+      const location = commentLocation(selected)
+      return location !== null && openLocation(location) === true
+    },
     [ApplicationAction.CURSOR_UP]: select((length, index, count) => moveCommentSelection(length, index, -1, count)),
     [ApplicationAction.CURSOR_DOWN]: select((length, index, count) => moveCommentSelection(length, index, 1, count)),
     [ApplicationAction.CURSOR_FIRST]: select(() => 0),

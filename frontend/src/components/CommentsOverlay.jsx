@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
+import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
 import Overlay from './Overlay.jsx'
@@ -13,7 +13,7 @@ function targetLabel(target) {
   return `${target.side === 'old' ? 'Old' : 'New'} ${lines.toLowerCase()}`
 }
 
-export default function CommentsOverlay({ comments, status, error, onClose, registerActionAdapter }) {
+export default function CommentsOverlay({ comments, status, error, onClose, onOpenLocation, registerActionAdapter }) {
   const dialogRef = useRef(null)
   const listRef = useRef(null)
   const [selectedId, setSelectedId] = useState(null)
@@ -52,7 +52,8 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
     getSelectedId,
     selectComment,
     getPageIndex,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex])
+    openLocation: onOpenLocation,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation])
 
   return (
     <Overlay
@@ -112,6 +113,20 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
                 <header>
                   <span>{targetLabel(comment.target)}</span>
                   {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
+                  {comment.target.kind !== 'review' && (
+                    <a
+                      className="comment-location-link"
+                      href={`#${encodeURIComponent(comment.target.path)}`}
+                      data-vim-ignore
+                      aria-label={`Open ${targetLabel(comment.target).toLowerCase()} on ${comment.target.path}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        onOpenLocation(commentLocation(comment))
+                      }}
+                    >
+                      Open location
+                    </a>
+                  )}
                 </header>
                 <p>{comment.body}</p>
               </article>

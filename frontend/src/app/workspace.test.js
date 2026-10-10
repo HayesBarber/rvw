@@ -291,6 +291,27 @@ test('opening and closing comments preserves the complete workspace context', ()
   assert.deepEqual(closed, state)
   assert.equal(workspaceReducer(closed, { type: 'comments_closed' }), closed)
 })
+
+test('comment locations close the panel, preserve coordinates, and track file history', () => {
+  const state = { ...initialWorkspaceState, commentsOpen: true, selectedPath: 'A', fileHistory: ['A'], fileHistoryIndex: 0 }
+  const location = { path: 'B', lineNumber: 15, side: 'old' }
+  const opened = workspaceReducer(state, { type: 'comment_location_opened', location, changed: true })
+  assert.equal(opened.commentsOpen, false)
+  assert.equal(opened.selectedPath, 'B')
+  assert.equal(opened.activeSurface, ActiveSurface.DIFF_PANE)
+  assert.equal(opened.treeMode, TreeMode.CHANGES)
+  assert.deepEqual(opened.lineNavigation, location)
+  assert.deepEqual(opened.fileHistory, ['A', 'B'])
+  const repeated = workspaceReducer(opened, { type: 'comment_location_opened', location, changed: true })
+  assert.notEqual(repeated.lineNavigation, opened.lineNavigation)
+  assert.deepEqual(repeated.fileHistory, ['A', 'B'])
+  const file = workspaceReducer(opened, {
+    type: 'comment_location_opened', location: { path: 'README.md', lineNumber: 0, side: 'new' }, changed: false,
+  })
+  assert.equal(file.treeMode, TreeMode.FILES)
+  assert.equal(file.selectedPath, 'README.md')
+  assert.equal(file.lineNavigation.lineNumber, 0)
+})
 const moveHistory = (state, direction, extra = {}) => workspaceReducer(state, {
   type: 'file_history_moved', direction, changedPaths: ['A', 'B', 'C', 'D'], ...extra,
 })

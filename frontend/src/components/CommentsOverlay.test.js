@@ -34,6 +34,7 @@ test('empty comments remain a non-modal panel with a keyboard-accessible close c
   assert.match(html, /role="listbox" aria-label="Saved comments" tabindex="-1"/)
   assert.match(html, /No saved comments in this review/)
   assert.doesNotMatch(html, /role="option"|aria-activedescendant/)
+  assert.doesNotMatch(render([{ id: 'review', body: 'Summary', target: { kind: 'review' } }]), /<a /)
 })
 
 test('all saved comments appear with groups, target labels, types, and one initial selection', () => {
@@ -59,6 +60,8 @@ test('all saved comments appear with groups, target labels, types, and one initi
   assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1)
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
   assert.doesNotMatch(html, /Edit|Delete/)
+  assert.equal((html.match(/class="comment-location-link"/g) ?? []).length, 3)
+  assert.match(html, /aria-label="Open old lines 3–5 on z.zig"/)
 })
 
 test('loading and errors do not report an empty review', () => {

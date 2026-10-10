@@ -7,6 +7,7 @@ import { resolveConfiguration } from '../app/configuration.js'
 import { VimController } from '../vim/machine.js'
 import {
   createCommentsListActionAdapter,
+  commentLocation,
   moveCommentSelection,
   pageCommentSelection,
   revealSelectedComment,
@@ -78,6 +79,56 @@ test('empty lists leave every cursor action unavailable', () => {
   const model = listModel(0)
   for (const action of Object.values(model.actions)) assert.equal(action(3), false)
   assert.equal(model.selected(), null)
+})
+
+test('comment locations preserve file, old-side range, and new-side coordinates', () => {
+  assert.equal(commentLocation({ target: { kind: 'review' } }), null)
+  assert.equal(commentLocation(null), null)
+  assert.deepEqual(commentLocation({ target: { kind: 'file', path: 'README.md' } }), {
+    path: 'README.md', lineNumber: 0, side: 'new',
+  })
+  for (const side of ['old', 'new']) {
+    assert.deepEqual(commentLocation({ target: {
+      kind: 'line', path: 'src/main.zig', side, startLine: 10, endLine: 15,
+    } }), { path: 'src/main.zig', lineNumber: 15, side })
+  }
+})
+
+test('the configured location action opens only the selected comment through the overlay', () => {
+  const comments = [
+    { id: 'review', target: { kind: 'review' } },
+    { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'old', startLine: 3, endLine: 5 } },
+  ]
+  for (const keys of [['<Enter>'], ['<C-g>']]) {
+    const result = resolveConfiguration({ configuration: { keybindings: { normal: {
+      [ApplicationAction.OPEN_COMMENT_LOCATION]: [keys],
+    } } } })
+    assert.equal(result.diagnostic, null)
+    let selectedId = 'review'
+    const opened = []
+    const adapter = createCommentsListActionAdapter({
+      getComments: () => comments,
+      getSelectedId: () => selectedId,
+      openLocation: (location) => { opened.push(location); return true },
+    })
+    const dispatch = createApplicationDispatcher({
+      getActiveSurface: () => 'file_tree',
+      getSurfaceActions: () => ({ [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => assert.fail('Reached tree') }),
+      getOverlayActions: () => adapter,
+    })
+    const controller = new VimController({ bindings: result.bindings })
+    const open = () => {
+      let command
+      for (const key of keys) command = controller.dispatch({ type: 'key', key }).command
+      return dispatch(command.args.actions)
+    }
+    assert.equal(open(), false)
+    selectedId = 'line'
+    assert.equal(open(), true)
+    selectedId = 'missing'
+    assert.equal(open(), false)
+    assert.deepEqual(opened, [{ path: 'a.txt', lineNumber: 5, side: 'old' }])
+  }
 })
 
 test('selection scrolling reveals clipped comments without moving a visible item', () => {

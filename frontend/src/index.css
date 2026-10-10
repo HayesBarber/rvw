@@ -850,6 +850,17 @@ textarea {
   line-height: 1.5;
 }
 
+.comment-location-link {
+  margin-left: auto;
+  color: #9ebaff;
+  white-space: nowrap;
+}
+
+.comment-location-link:focus-visible {
+  outline: 2px solid #6686d5;
+  outline-offset: 2px;
+}
+
 .file-finder-dialog {
   width: min(680px, calc(100vw - 48px));
   overflow: hidden;
