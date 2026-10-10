@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
 import Overlay from './Overlay.jsx'
@@ -16,15 +17,48 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
   const dialogRef = useRef(null)
   const listRef = useRef(null)
   const [selectedId, setSelectedId] = useState(null)
+  const selectedIdRef = useRef(null)
   const groups = useMemo(() => createCommentGroups(comments), [comments])
-  const orderedComments = groups.flatMap((group) => group.comments)
+  const orderedComments = useMemo(() => groups.flatMap((group) => group.comments), [groups])
   const selected = orderedComments.find((comment) => comment.id === selectedId)
     ?? orderedComments[0]
+
+  useLayoutEffect(() => {
+    selectedIdRef.current = selected?.id ?? null
+    const item = document.getElementById(`saved-comment-${selected?.id}`)
+    revealSelectedComment(listRef.current, item)
+  }, [selected])
+
+  const selectComment = useCallback((id) => {
+    selectedIdRef.current = id
+    setSelectedId(id)
+    listRef.current?.focus({ preventScroll: true })
+    revealSelectedComment(listRef.current, document.getElementById(`saved-comment-${id}`))
+  }, [])
+  const getSelectedId = useCallback(() => selectedIdRef.current, [])
+  const getPageIndex = useCallback((index, direction, count) => {
+    const list = listRef.current
+    if (!list) return -1
+    const centers = [...list.querySelectorAll('[role="option"]')].map((item) => {
+      const bounds = item.getBoundingClientRect()
+      return bounds.top + bounds.height / 2
+    })
+    return pageCommentSelection(centers, index, direction, list.clientHeight, count)
+  }, [])
+  // The factory stores these callbacks. It does not read refs during render.
+  // eslint-disable-next-line react-hooks/refs
+  const actions = useMemo(() => createCommentsListActionAdapter({
+    getComments: () => orderedComments,
+    getSelectedId,
+    selectComment,
+    getPageIndex,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex])
 
   return (
     <Overlay
       kind={OverlayKind.COMMENTS}
       modal={false}
+      actions={actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={listRef}
