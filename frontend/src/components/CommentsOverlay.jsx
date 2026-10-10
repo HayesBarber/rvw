@@ -24,6 +24,7 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
   return (
     <Overlay
       kind={OverlayKind.COMMENTS}
+      modal={false}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={listRef}
@@ -31,7 +32,7 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
       onClose={onClose}
       labelledBy="comments-title"
       className="comments-dialog"
-      backdropClassName="file-finder-backdrop"
+      backdropClassName="comments-positioner"
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>

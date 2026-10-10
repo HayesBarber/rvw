@@ -25,9 +25,11 @@ function render(comments = [], extra = {}) {
   }))
 }
 
-test('empty comments remain a labelled dialog with a keyboard-accessible close control', () => {
+test('empty comments remain a non-modal panel with a keyboard-accessible close control', () => {
   const html = render()
-  assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="comments-title"/)
+  assert.match(html, /role="dialog" aria-labelledby="comments-title"/)
+  assert.doesNotMatch(html, /aria-modal|file-finder-backdrop/)
+  assert.match(html, /class="comments-positioner"/)
   assert.match(html, /aria-label="Close comments"/)
   assert.match(html, /role="listbox" aria-label="Saved comments" tabindex="-1"/)
   assert.match(html, /No saved comments in this review/)

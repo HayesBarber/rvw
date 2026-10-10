@@ -749,16 +749,25 @@ textarea {
   background: rgb(0 0 0 / 68%);
 }
 
+.comments-positioner {
+  position: fixed;
+  z-index: 100;
+  right: 16px;
+  bottom: 48px;
+  pointer-events: none;
+}
+
 .comments-dialog {
   display: flex;
   flex-direction: column;
-  width: min(760px, calc(100vw - 48px));
-  max-height: 72vh;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(600px, calc(100vh - 80px));
+  pointer-events: auto;
   overflow: hidden;
   border: 1px solid #414145;
   border-radius: 10px;
   background: #141415;
-  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
 }
 
 .comments-header {
