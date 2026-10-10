@@ -415,3 +415,66 @@ test('panel copy reports availability from its handler without workspace fallbac
   assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
   assert.equal(copies, 1)
 })
+
+test('default and custom clear bindings remove all targets through the panel handler', async () => {
+  const { clearComments } = await import('../review/api.js')
+  const { clearAllComments } = await import('../review/comments-request.js')
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  globalThis.window = {}
+  const requests = []
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, method: options.method, body: JSON.parse(options.body) })
+    return { ok: true, status: 200, json: async () => ({ commentCount: 3 }) }
+  }
+  try {
+    for (const keys of [['d', 'a'], ['<C-g>']]) {
+      const configuration = resolveConfiguration({ configuration: {
+        keybindings: { normal: { [ApplicationAction.CLEAR_COMMENTS]: [keys] } },
+      } })
+      assert.equal(configuration.diagnostic, null)
+      let comments = [
+        { id: 'review', target: { kind: 'review' } },
+        { id: 'file', target: { kind: 'file', path: 'a.txt' } },
+        { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'new', startLine: 1, endLine: 1 } },
+      ]
+      let operation
+      const adapter = createCommentsListActionAdapter({
+        getComments: () => comments,
+        getSelectedId: () => 'line',
+        clearComments: () => {
+          if (comments.length === 0) return false
+          operation = clearComments().then((result) => {
+            comments = clearAllComments(comments)
+            return result
+          })
+          return true
+        },
+      })
+      const dispatch = createApplicationDispatcher({
+        getActiveSurface: () => 'diff_pane',
+        getSurfaceActions: () => ({}),
+        getOverlayActions: () => adapter,
+        globalActions: { [ApplicationAction.CLEAR_COMMENTS]: () => assert.fail('Reached workspace clear') },
+      })
+      const controller = new VimController({ bindings: configuration.bindings })
+      controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+      const before = requests.length
+      for (const key of keys) controller.dispatch({ type: 'key', key })
+      assert.deepEqual(await operation, { commentCount: 3 })
+      assert.deepEqual(comments, [])
+      assert.equal(requests.length, before + 1)
+      assert.deepEqual(requests.at(-1), {
+        url: '/api/comments', method: 'DELETE', body: { type: 'clear_comments' },
+      })
+      assert.equal(dispatch(ApplicationAction.CLEAR_COMMENTS), false)
+      assert.equal(dispatch(ApplicationAction.EDIT_COMMENT), false)
+      assert.equal(dispatch(ApplicationAction.DELETE_COMMENT), false)
+      assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
+      assert.equal(requests.length, before + 1)
+    }
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.fetch = previousFetch
+  }
+})

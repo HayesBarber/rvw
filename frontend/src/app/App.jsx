@@ -115,6 +115,9 @@ export default function App() {
     changeTreeMode: handleTreeModeChange,
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft })
+  const clearSessionComments = useCallback(() => (
+    handleClearComments(() => setCommentEditDrafts({}))
+  ), [handleClearComments])
   const copyMessage = copyRequestMessage(copyRequest)
   const filePathCopyRequest = useCopyFilePath()
   const clearMessage = clearRequestMessage(clearRequest)
@@ -149,7 +152,7 @@ export default function App() {
     reloadReview: reloadRequest.reload,
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
-    clearComments: handleClearComments,
+    clearComments: clearSessionComments,
     navigateFile,
     navigateHistory,
     openFileFinder,
@@ -375,6 +378,8 @@ export default function App() {
           comments={comments}
           copyRequest={copyRequest}
           onCopyComments={handleCopyComments}
+          clearRequest={clearRequest}
+          onClearComments={clearSessionComments}
           commentTypes={keyboardConfiguration.commentTypes}
           defaultCommentType={keyboardConfiguration.defaultCommentType}
           newCommentDraft={reviewCommentDraft}

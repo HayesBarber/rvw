@@ -119,3 +119,43 @@ test('panel copy keeps button feedback and retry without duplicate status messag
     assert.doesNotMatch(html, /copy-status|Copied|Clipboard unavailable/)
   }
 })
+
+test('panel clear is available only for a loaded list with saved comments', () => {
+  const enabled = render([copyComment], { onClearComments: () => true })
+  assert.match(enabled, /<button type="button" data-vim-ignore="true">Clear all comments<\/button>/)
+  for (const html of [
+    render([], { onClearComments: () => true }),
+    render([copyComment]),
+    render([copyComment], { status: 'loading', onClearComments: () => true }),
+    render([copyComment], { status: 'error', onClearComments: () => true }),
+    render([copyComment], { copyRequest: { status: 'loading' }, onClearComments: () => true }),
+  ]) {
+    assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Clear all comments<\/button>/)
+  }
+})
+
+test('clearing blocks panel actions and reports progress only on its button', () => {
+  const html = render([copyComment], {
+    onClearComments: () => true,
+    onCopyComments: () => true,
+    clearRequest: { status: 'loading' },
+  })
+  assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Clearing…<\/button>/)
+  for (const label of ['Copy comments', 'Add review comment']) {
+    assert.match(html, new RegExp(`<button type="button" disabled="" data-vim-ignore="true">${label}<\\/button>`))
+  }
+  assert.match(html, /disabled="" aria-label="Edit review comment"/)
+  assert.match(html, /disabled="" aria-label="Delete review comment"/)
+  assert.doesNotMatch(html, /clear-status/)
+})
+
+test('a failed clear keeps comments, selection, and the retry control', () => {
+  const html = render([copyComment], {
+    onClearComments: () => true,
+    clearRequest: { status: 'error', error: 'Clear failed' },
+  })
+  assert.match(html, /Saved summary/)
+  assert.match(html, /aria-activedescendant="saved-comment-review"/)
+  assert.match(html, /<button type="button" data-vim-ignore="true">Clear all comments<\/button>/)
+  assert.doesNotMatch(html, /Clear failed/)
+})

@@ -91,3 +91,14 @@ test('workspace copy progress and success remain visible with the comments butto
     assert.match(html, /Comments \(0\)/)
   }
 })
+
+test('footer shows clear progress, success, and errors', () => {
+  for (const [status, message, role] of [
+    ['loading', 'Clearing…', 'status'],
+    ['success', 'Cleared 3 comments', 'status'],
+    ['error', 'Clear failed', 'alert'],
+  ]) {
+    const html = render([], { clearStatus: status, clearMessage: message })
+    assert.match(html, new RegExp(`class="clear-status ${status}" role="${role}">${message}`))
+  }
+})

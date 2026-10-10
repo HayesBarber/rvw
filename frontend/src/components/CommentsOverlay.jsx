@@ -23,6 +23,7 @@ function targetLabel(target) {
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
   copyRequest = idleTransientRequest, onCopyComments,
+  clearRequest = idleTransientRequest, onClearComments,
   newCommentDraft, onNewCommentDraftChange, onCreateComment,
   editDrafts = {}, onEditDraftChange, onEditComment, onDeleteComment,
   onClose, onOpenLocation, registerActionAdapter,
@@ -37,9 +38,13 @@ export default function CommentsOverlay({
   const [deletingId, setDeletingId] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
   const deletingIdRef = useRef(null)
-  const busy = saving || deletingId !== null
+  const copying = copyRequest.status === RequestStatus.LOADING
+  const clearing = clearRequest.status === RequestStatus.LOADING
+  const busy = saving || deletingId !== null || copying || clearing
   const canCopy = status === 'success' && comments.length > 0 &&
     copyRequest.status !== RequestStatus.LOADING && typeof onCopyComments === 'function'
+  const canClear = status === 'success' && comments.length > 0 && !busy &&
+    typeof onClearComments === 'function'
   const canCreate = status === 'success' && typeof onCreateComment === 'function'
   const canEdit = status === 'success' && typeof onEditComment === 'function'
   const canDelete = status === 'success' && typeof onDeleteComment === 'function'
@@ -68,6 +73,12 @@ export default function CommentsOverlay({
     if (!canCopy) return false
     return onCopyComments()
   }, [canCopy, onCopyComments])
+  const clearComments = useCallback(() => {
+    if (!canClear) return false
+    setDeleteError(null)
+    listRef.current?.focus({ preventScroll: true })
+    return onClearComments()
+  }, [canClear, onClearComments])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
     setDeleteError(null)
@@ -158,7 +169,8 @@ export default function CommentsOverlay({
     editComment: beginEdit,
     deleteComment,
     copyComments,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit, deleteComment, copyComments])
+    clearComments,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit, deleteComment, copyComments, clearComments])
 
   return (
     <Overlay
@@ -195,6 +207,14 @@ export default function CommentsOverlay({
           title={comments.length === 0 ? 'Add a comment before copying' : undefined}
         >
           {copyRequestButtonLabel(copyRequest)}
+        </button>
+        <button
+          type="button"
+          disabled={!canClear || editorOpen}
+          onClick={clearComments}
+          data-vim-ignore
+        >
+          {clearing ? 'Clearing…' : 'Clear all comments'}
         </button>
         <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
           Close
