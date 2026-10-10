@@ -58,6 +58,7 @@ export default function CommentsOverlay({ comments, status, error, onClose, regi
     <Overlay
       kind={OverlayKind.COMMENTS}
       modal={false}
+      trapFocus
       actions={actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}

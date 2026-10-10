@@ -16,6 +16,7 @@ export default function Overlay({
   backdropClassName,
   nativeDialog = false,
   modal = true,
+  trapFocus = modal,
   onKeyDown,
   children,
 }) {
@@ -50,7 +51,7 @@ export default function Overlay({
       onClose()
       return
     }
-    if (modal) trapOverlayFocus(event, dialogRef.current, navigationRef?.current)
+    if (trapFocus) trapOverlayFocus(event, dialogRef.current, navigationRef?.current)
   }
 
   if (nativeDialog) {
