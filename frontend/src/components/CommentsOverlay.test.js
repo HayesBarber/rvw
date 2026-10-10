@@ -110,12 +110,12 @@ test('panel copy keeps button feedback and retry without duplicate status messag
   const success = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'success', data: { commentCount: 3 } },
   })
-  assert.match(success, /<button type="button" data-vim-ignore="true">Copied<\/button>/)
+  assert.match(success, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
   const failure = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'error', error: 'Clipboard unavailable' },
   })
   assert.match(failure, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
   for (const html of [progress, success, failure]) {
-    assert.doesNotMatch(html, /copy-status|Copied 3 comments|Clipboard unavailable/)
+    assert.doesNotMatch(html, /copy-status|Copied|Clipboard unavailable/)
   }
 })
