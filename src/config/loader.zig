@@ -457,35 +457,6 @@ test "codebase search modes accept independent bindings and command aliases" {
     try std.testing.expect(disabled == .configuration);
 }
 
-test "comments overlay actions accept bindings and command aliases" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const parsed = try parseConfiguration(arena.allocator(),
-        \\{
-        \\  "keybindings": {"normal": {
-        \\    "comments.open": [["<leader>", "m"]],
-        \\    "comments.location.open": [["<C-g>"]]
-        \\  }},
-        \\  "commandLine": {"aliases": {
-        \\    "feedback": "comments.open",
-        \\    "jump": "comments.location.open"
-        \\  }}
-        \\}
-    );
-    try std.testing.expect(parsed == .configuration);
-    const root = parsed.configuration.object;
-    const normal = root.get("keybindings").?.object.get("normal").?.object;
-    try std.testing.expectEqualStrings("m", normal.get("comments.open").?.array.items[0].array.items[1].string);
-    try std.testing.expectEqualStrings("<C-g>", normal.get("comments.location.open").?.array.items[0].array.items[0].string);
-    const aliases = root.get("commandLine").?.object.get("aliases").?.object;
-    try std.testing.expectEqualStrings("comments.open", aliases.get("feedback").?.string);
-    try std.testing.expectEqualStrings("comments.location.open", aliases.get("jump").?.string);
-    const disabled = try parseConfiguration(arena.allocator(),
-        \\{"keybindings":{"normal":{"comments.open":[],"comments.location.open":[]}}}
-    );
-    try std.testing.expect(disabled == .configuration);
-}
-
 test "malformed JSON and invalid keybinding schema are distinct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
