@@ -347,7 +347,7 @@ textarea {
 }
 
 .application-status .reload-status,
-.application-status .clear-status,
+.footer-comments-action .clear-status,
 .footer-comments-action .copy-status {
   max-width: 220px;
 }
@@ -538,7 +538,7 @@ textarea {
   }
 
   .application-status .reload-status,
-  .application-status .clear-status,
+  .footer-comments-action .clear-status,
   .footer-comments-action .copy-status {
     max-width: 120px;
   }

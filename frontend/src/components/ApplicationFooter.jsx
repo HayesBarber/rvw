@@ -126,14 +126,6 @@ export default function ApplicationFooter({
               {problem}
             </span>
           )}
-          {clearMessage && (
-            <span
-              className={`clear-status ${clearStatus}`}
-              role={clearStatus === RequestStatus.ERROR ? 'alert' : 'status'}
-            >
-              {clearMessage}
-            </span>
-          )}
           {reloadMessage && (
             <span
               className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadStatus}`}
@@ -163,6 +155,15 @@ export default function ApplicationFooter({
               reloadDisabled={reloadDisabled}
             />
             <span className="footer-comments-action">
+              {clearMessage && (
+                <span
+                  className={`clear-status ${clearStatus}`}
+                  role={clearStatus === RequestStatus.ERROR ? 'alert' : 'status'}
+                  title={clearMessage}
+                >
+                  {clearMessage}
+                </span>
+              )}
               {copyMessage && (
                 <span
                   className={`copy-status ${copyRequest?.status}`}

@@ -92,13 +92,21 @@ test('workspace copy progress and success remain visible with the comments butto
   }
 })
 
-test('footer shows clear progress, success, and errors', () => {
+test('footer shows clear progress, success, and errors beside copy and Comments', () => {
   for (const [status, message, role] of [
     ['loading', 'Clearing…', 'status'],
     ['success', 'Cleared 3 comments', 'status'],
     ['error', 'Clear failed', 'alert'],
   ]) {
-    const html = render([], { clearStatus: status, clearMessage: message })
-    assert.match(html, new RegExp(`class="clear-status ${status}" role="${role}">${message}`))
+    const html = render([], {
+      clearStatus: status, clearMessage: message,
+      copyRequest: { status: 'success' }, copyMessage: 'Copied 3 comments',
+    })
+    const left = html.slice(html.indexOf('class="footer-left"'), html.indexOf('class="repository-context"'))
+    const comments = html.slice(html.indexOf('class="footer-comments-action"'))
+    assert.doesNotMatch(left, /clear-status|copy-status/)
+    assert.match(comments, new RegExp(`class="clear-status ${status}" role="${role}"[^>]*>${message}`))
+    assert.match(comments, /class="copy-status success"/)
+    assert.match(comments, /class="comments-button"/)
   }
 })
