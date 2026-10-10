@@ -6,6 +6,7 @@ import Overlay from './Overlay.jsx'
 import CommentComposer from './diff-pane/CommentComposer.jsx'
 import CommentEditor from './diff-pane/CommentEditor.jsx'
 import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
+import { deleteAndSelectComment } from './delete-and-select-comment.js'
 
 function targetLabel(target) {
   if (target.kind === 'review') return 'Review comment'
@@ -19,7 +20,7 @@ function targetLabel(target) {
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
   newCommentDraft, onNewCommentDraftChange, onCreateComment,
-  editDrafts = {}, onEditDraftChange, onEditComment,
+  editDrafts = {}, onEditDraftChange, onEditComment, onDeleteComment,
   onClose, onOpenLocation, registerActionAdapter,
 }) {
   const dialogRef = useRef(null)
@@ -29,8 +30,13 @@ export default function CommentsOverlay({
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
+  const deletingIdRef = useRef(null)
+  const busy = saving || deletingId !== null
   const canCreate = status === 'success' && typeof onCreateComment === 'function'
   const canEdit = status === 'success' && typeof onEditComment === 'function'
+  const canDelete = status === 'success' && typeof onDeleteComment === 'function'
   const editingComment = comments.find((comment) => comment.id === editingId)
   const editorOpen = creating || Boolean(editingComment)
   const groups = useMemo(() => createCommentGroups(comments), [comments])
@@ -45,6 +51,7 @@ export default function CommentsOverlay({
   }, [selected, editorOpen])
 
   const selectComment = useCallback((id) => {
+    setDeleteError(null)
     selectedIdRef.current = id
     setSelectedId(id)
     listRef.current?.focus({ preventScroll: true })
@@ -53,12 +60,14 @@ export default function CommentsOverlay({
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
+    setDeleteError(null)
     setEditingId(null)
     setCreating(true)
     return true
   }, [canCreate])
   const beginEdit = useCallback((comment) => {
     if (!canEdit) return false
+    setDeleteError(null)
     setSelectedId(comment.id)
     setCreating(false)
     setEditingId(comment.id)
@@ -94,8 +103,29 @@ export default function CommentsOverlay({
       setSaving(false)
     }
   }, [onEditComment, onEditDraftChange, selectComment])
+  const deleteComment = useCallback((comment) => {
+    if (!canDelete || deletingIdRef.current !== null) return false
+    deletingIdRef.current = comment.id
+    setDeletingId(comment.id)
+    setDeleteError(null)
+    deleteAndSelectComment({
+      commentId: comment.id,
+      remove: onDeleteComment,
+      getComments: () => orderedComments,
+      getSelectedId,
+      discardDraft: (id) => onEditDraftChange(id, null),
+      selectComment,
+    }).catch((error) => {
+      setDeleteError(error.message)
+      listRef.current?.focus({ preventScroll: true })
+    }).finally(() => {
+      deletingIdRef.current = null
+      setDeletingId(null)
+    })
+    return true
+  }, [canDelete, onDeleteComment, orderedComments, getSelectedId, onEditDraftChange, selectComment])
   const close = () => {
-    if (!saving) onClose()
+    if (!busy) onClose()
   }
   const getPageIndex = useCallback((index, direction, count) => {
     const list = listRef.current
@@ -116,14 +146,15 @@ export default function CommentsOverlay({
     openLocation: onOpenLocation,
     addReviewComment: beginCreate,
     editComment: beginEdit,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit])
+    deleteComment,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit, deleteComment])
 
   return (
     <Overlay
       kind={OverlayKind.COMMENTS}
       modal={false}
       trapFocus
-      actions={editorOpen ? blockingOverlayActions : actions}
+      actions={editorOpen || busy ? blockingOverlayActions : actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={listRef}
@@ -142,10 +173,10 @@ export default function CommentsOverlay({
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>
-        <button type="button" disabled={!canCreate || editorOpen} onClick={beginCreate} data-vim-ignore>
+        <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
           Add review comment
         </button>
-        <button type="button" disabled={saving} onClick={close} data-vim-ignore aria-label="Close comments">
+        <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
           Close
         </button>
       </header>
@@ -184,6 +215,8 @@ export default function CommentsOverlay({
         aria-activedescendant={selected ? `saved-comment-${selected.id}` : undefined}
         tabIndex={-1}
       >
+        {deletingId !== null && <p className="comments-status" role="status">Deleting comment…</p>}
+        {deleteError && <p className="comments-status" role="alert">Unable to delete comment: {deleteError}</p>}
         {status === 'loading' && <p className="comments-status" role="status">Loading comments…</p>}
         {status === 'error' && <p className="comments-status" role="alert">Unable to load comments: {error}</p>}
         {status === 'success' && comments.length === 0 && (
@@ -207,8 +240,8 @@ export default function CommentsOverlay({
                 aria-selected={selected?.id === comment.id}
                 tabIndex={0}
                 className="comments-item"
-                onFocus={() => setSelectedId(comment.id)}
-                onClick={() => setSelectedId(comment.id)}
+                onFocus={() => { if (!busy) setSelectedId(comment.id) }}
+                onClick={() => { if (!busy) setSelectedId(comment.id) }}
               >
                 <header>
                   <span>{targetLabel(comment.target)}</span>
@@ -218,9 +251,11 @@ export default function CommentsOverlay({
                       className="comment-location-link"
                       href={`#${encodeURIComponent(comment.target.path)}`}
                       data-vim-ignore
+                      aria-disabled={busy || undefined}
                       aria-label={`Open ${targetLabel(comment.target).toLowerCase()} on ${comment.target.path}`}
                       onClick={(event) => {
                         event.preventDefault()
+                        if (busy) return
                         onOpenLocation(commentLocation(comment))
                       }}
                     >
@@ -231,11 +266,21 @@ export default function CommentsOverlay({
                     type="button"
                     className="comments-item-edit"
                     data-vim-ignore
-                    disabled={!canEdit}
+                    disabled={!canEdit || busy}
                     aria-label={`Edit ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
                     onClick={() => beginEdit(comment)}
                   >
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="comments-item-delete"
+                    data-vim-ignore
+                    disabled={!canDelete || busy}
+                    aria-label={`Delete ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
+                    onClick={() => deleteComment(comment)}
+                  >
+                    {deletingId === comment.id ? 'Deleting…' : 'Delete'}
                   </button>
                 </header>
                 <p>{comment.body}</p>

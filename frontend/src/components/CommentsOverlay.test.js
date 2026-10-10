@@ -21,6 +21,7 @@ function render(comments = [], extra = {}) {
     status: 'success',
     onCreateComment: async () => {},
     onEditComment: async () => {},
+    onDeleteComment: async () => {},
     onClose: () => {},
     registerActionAdapter: () => {},
     ...extra,
@@ -62,7 +63,10 @@ test('all saved comments appear with groups, target labels, types, and one initi
   assert.equal((html.match(/role="option"/g) ?? []).length, 4)
   assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1)
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
-  assert.doesNotMatch(html, /Delete/)
+  assert.equal((html.match(/class="comments-item-delete"/g) ?? []).length, 4)
+  assert.match(html, /aria-label="Delete review comment"/)
+  assert.match(html, /aria-label="Delete file comment on a.zig"/)
+  assert.match(html, /aria-label="Delete old lines 3–5 on z.zig"/)
   assert.equal((html.match(/class="comments-item-edit"/g) ?? []).length, 4)
   assert.match(html, /aria-label="Edit review comment"/)
   assert.match(html, /aria-label="Edit file comment on a.zig"/)

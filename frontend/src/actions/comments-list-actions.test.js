@@ -165,6 +165,45 @@ test('editing is unavailable when the list has no edit handler', () => {
   assert.equal(model.actions[ApplicationAction.EDIT_COMMENT](), false)
 })
 
+test('default and custom delete bindings delete only the selected comment without reaching the workspace', () => {
+  const comments = [
+    { id: 'review', target: { kind: 'review' } },
+    { id: 'file', target: { kind: 'file', path: 'a.txt' } },
+    { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'old', startLine: 3, endLine: 5 } },
+  ]
+  for (const keys of [['d', 'd'], ['<leader>', 'D']]) {
+    const configuration = resolveConfiguration({ configuration: {
+      keybindings: { normal: { [ApplicationAction.DELETE_COMMENT]: [keys] } },
+    } })
+    assert.equal(configuration.diagnostic, null)
+    let selectedId = null
+    const deleted = []
+    const adapter = createCommentsListActionAdapter({
+      getComments: () => comments,
+      getSelectedId: () => selectedId,
+      deleteComment: (comment) => { deleted.push(comment); return true },
+    })
+    const dispatch = createApplicationDispatcher({
+      getActiveSurface: () => 'diff_pane',
+      getSurfaceActions: () => ({ [ApplicationAction.DELETE_COMMENT]: () => assert.fail('Reached inline deletion') }),
+      getOverlayActions: () => adapter,
+    })
+    const controller = new VimController({ bindings: configuration.bindings })
+    controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+    for (const comment of comments) {
+      selectedId = comment.id
+      for (const key of keys) controller.dispatch({ type: 'key', key: key === '<leader>' ? '<Space>' : key })
+    }
+    assert.deepEqual(deleted, comments)
+    for (const id of [null, 'missing']) {
+      selectedId = id
+      assert.equal(dispatch(ApplicationAction.DELETE_COMMENT), false)
+    }
+    assert.equal(deleted.length, 3)
+  }
+  assert.equal(listModel().actions[ApplicationAction.DELETE_COMMENT](), false)
+})
+
 test('comment locations preserve file, old-side range, and new-side coordinates', () => {
   assert.equal(commentLocation({ target: { kind: 'review' } }), null)
   assert.equal(commentLocation(null), null)

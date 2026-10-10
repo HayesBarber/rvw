@@ -786,7 +786,8 @@ textarea {
 }
 
 .comments-header button,
-.comments-item-edit {
+.comments-item-edit,
+.comments-item-delete {
   padding: 5px 10px;
   border: 1px solid #414145;
   border-radius: 4px;
@@ -842,6 +843,7 @@ textarea {
 
 .comments-item:focus-visible,
 .comments-item-edit:focus-visible,
+.comments-item-delete:focus-visible,
 .comments-header button:focus-visible {
   outline: 2px solid #6686d5;
   outline-offset: 2px;
@@ -849,6 +851,7 @@ textarea {
 
 .comments-item header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   color: #adadb1;

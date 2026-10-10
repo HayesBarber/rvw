@@ -381,6 +381,7 @@ export default function App() {
           editDrafts={commentEditDrafts}
           onEditDraftChange={changeCommentEditDraft}
           onEditComment={handleEditComment}
+          onDeleteComment={handleDeleteComment}
           status={commentsStatus}
           error={commentsError}
           onOpenLocation={(location) => {
