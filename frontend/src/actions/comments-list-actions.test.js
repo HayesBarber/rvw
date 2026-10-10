@@ -122,6 +122,49 @@ test('review-comment creation can be disabled or reported unavailable', () => {
   assert(configuration.bindings.every((binding) => !binding.args.actions.includes(ApplicationAction.ADD_REVIEW_COMMENT)))
 })
 
+test('default and custom edit bindings edit only the selected review, file, or line comment', () => {
+  const comments = [
+    { id: 'review', target: { kind: 'review' } },
+    { id: 'file', target: { kind: 'file', path: 'a.txt' } },
+    { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'old', startLine: 3, endLine: 5 } },
+  ]
+  for (const keys of [['e'], ['<leader>', 'E']]) {
+    const configuration = resolveConfiguration({ configuration: {
+      keybindings: { normal: { [ApplicationAction.EDIT_COMMENT]: [keys] } },
+    } })
+    assert.equal(configuration.diagnostic, null)
+    let selectedId = null
+    const edited = []
+    const adapter = createCommentsListActionAdapter({
+      getComments: () => comments,
+      getSelectedId: () => selectedId,
+      editComment: (comment) => { edited.push(comment); return true },
+    })
+    const dispatch = createApplicationDispatcher({
+      getActiveSurface: () => 'diff_pane',
+      getSurfaceActions: () => ({ [ApplicationAction.EDIT_COMMENT]: () => assert.fail('Reached inline editor') }),
+      getOverlayActions: () => adapter,
+    })
+    const controller = new VimController({ bindings: configuration.bindings })
+    controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+    for (const comment of comments) {
+      selectedId = comment.id
+      for (const key of keys) controller.dispatch({ type: 'key', key: key === '<leader>' ? '<Space>' : key })
+    }
+    assert.deepEqual(edited, comments)
+    for (const id of [null, 'missing']) {
+      selectedId = id
+      assert.equal(dispatch(ApplicationAction.EDIT_COMMENT), false)
+    }
+    assert.equal(edited.length, 3)
+  }
+})
+
+test('editing is unavailable when the list has no edit handler', () => {
+  const model = listModel()
+  assert.equal(model.actions[ApplicationAction.EDIT_COMMENT](), false)
+})
+
 test('comment locations preserve file, old-side range, and new-side coordinates', () => {
   assert.equal(commentLocation({ target: { kind: 'review' } }), null)
   assert.equal(commentLocation(null), null)

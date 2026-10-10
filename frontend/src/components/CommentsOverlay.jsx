@@ -4,6 +4,7 @@ import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.
 import { createCommentGroups } from '../review/comment-list.js'
 import Overlay from './Overlay.jsx'
 import CommentComposer from './diff-pane/CommentComposer.jsx'
+import CommentEditor from './diff-pane/CommentEditor.jsx'
 import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
 
 function targetLabel(target) {
@@ -18,6 +19,7 @@ function targetLabel(target) {
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
   newCommentDraft, onNewCommentDraftChange, onCreateComment,
+  editDrafts = {}, onEditDraftChange, onEditComment,
   onClose, onOpenLocation, registerActionAdapter,
 }) {
   const dialogRef = useRef(null)
@@ -25,8 +27,12 @@ export default function CommentsOverlay({
   const [selectedId, setSelectedId] = useState(null)
   const selectedIdRef = useRef(null)
   const [creating, setCreating] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
   const canCreate = status === 'success' && typeof onCreateComment === 'function'
+  const canEdit = status === 'success' && typeof onEditComment === 'function'
+  const editingComment = comments.find((comment) => comment.id === editingId)
+  const editorOpen = creating || Boolean(editingComment)
   const groups = useMemo(() => createCommentGroups(comments), [comments])
   const orderedComments = useMemo(() => groups.flatMap((group) => group.comments), [groups])
   const selected = orderedComments.find((comment) => comment.id === selectedId)
@@ -36,7 +42,7 @@ export default function CommentsOverlay({
     selectedIdRef.current = selected?.id ?? null
     const item = document.getElementById(`saved-comment-${selected?.id}`)
     revealSelectedComment(listRef.current, item)
-  }, [selected, creating])
+  }, [selected, editorOpen])
 
   const selectComment = useCallback((id) => {
     selectedIdRef.current = id
@@ -47,11 +53,20 @@ export default function CommentsOverlay({
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
+    setEditingId(null)
     setCreating(true)
     return true
   }, [canCreate])
+  const beginEdit = useCallback((comment) => {
+    if (!canEdit) return false
+    setSelectedId(comment.id)
+    setCreating(false)
+    setEditingId(comment.id)
+    return true
+  }, [canEdit])
   const leaveEditor = useCallback(() => {
     setCreating(false)
+    setEditingId(null)
     requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }))
   }, [])
   const createComment = useCallback(async (body, commentType, target) => {
@@ -68,6 +83,17 @@ export default function CommentsOverlay({
       setSaving(false)
     }
   }, [onCreateComment, onNewCommentDraftChange, selectComment])
+  const editComment = useCallback(async (id, body, commentType) => {
+    setSaving(true)
+    try {
+      const comment = await onEditComment(id, body, commentType)
+      onEditDraftChange(id, null)
+      selectComment(id)
+      return comment
+    } finally {
+      setSaving(false)
+    }
+  }, [onEditComment, onEditDraftChange, selectComment])
   const close = () => {
     if (!saving) onClose()
   }
@@ -89,14 +115,15 @@ export default function CommentsOverlay({
     getPageIndex,
     openLocation: onOpenLocation,
     addReviewComment: beginCreate,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate])
+    editComment: beginEdit,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit])
 
   return (
     <Overlay
       kind={OverlayKind.COMMENTS}
       modal={false}
       trapFocus
-      actions={creating ? blockingOverlayActions : actions}
+      actions={editorOpen ? blockingOverlayActions : actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={listRef}
@@ -104,7 +131,7 @@ export default function CommentsOverlay({
       onClose={close}
       onKeyDown={(event) => {
         if (event.defaultPrevented || event.nativeEvent.isComposing) return
-        if (creating && event.key === 'Escape') {
+        if (editorOpen && event.key === 'Escape') {
           event.preventDefault()
           if (!saving) leaveEditor()
         }
@@ -115,7 +142,7 @@ export default function CommentsOverlay({
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>
-        <button type="button" disabled={!canCreate || creating} onClick={beginCreate} data-vim-ignore>
+        <button type="button" disabled={!canCreate || editorOpen} onClick={beginCreate} data-vim-ignore>
           Add review comment
         </button>
         <button type="button" disabled={saving} onClick={close} data-vim-ignore aria-label="Close comments">
@@ -136,7 +163,20 @@ export default function CommentsOverlay({
           />
         </div>
       )}
-      {!creating && <div
+      {editingComment && (
+        <div className="comments-editor">
+          <CommentEditor
+            key={editingComment.id}
+            comment={editingComment}
+            commentTypes={commentTypes}
+            draft={editDrafts[editingComment.id]}
+            onDraftChange={(draft) => onEditDraftChange(editingComment.id, draft)}
+            onSave={editComment}
+            onCancel={leaveEditor}
+          />
+        </div>
+      )}
+      {!editorOpen && <div
         ref={listRef}
         className="comments-list"
         role="listbox"
@@ -187,6 +227,16 @@ export default function CommentsOverlay({
                       Open location
                     </a>
                   )}
+                  <button
+                    type="button"
+                    className="comments-item-edit"
+                    data-vim-ignore
+                    disabled={!canEdit}
+                    aria-label={`Edit ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
+                    onClick={() => beginEdit(comment)}
+                  >
+                    Edit
+                  </button>
                 </header>
                 <p>{comment.body}</p>
               </article>
