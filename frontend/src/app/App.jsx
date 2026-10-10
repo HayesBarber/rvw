@@ -115,6 +115,9 @@ export default function App() {
     changeTreeMode: handleTreeModeChange,
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft })
+  const clearSessionComments = useCallback(() => (
+    handleClearComments(() => setCommentEditDrafts({}))
+  ), [handleClearComments])
   const copyMessage = copyRequestMessage(copyRequest)
   const filePathCopyRequest = useCopyFilePath()
   const clearMessage = clearRequestMessage(clearRequest)
@@ -149,7 +152,7 @@ export default function App() {
     reloadReview: reloadRequest.reload,
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
-    clearComments: handleClearComments,
+    clearComments: clearSessionComments,
     navigateFile,
     navigateHistory,
     openFileFinder,
@@ -373,6 +376,10 @@ export default function App() {
       {workspace.commentsOpen && (
         <CommentsOverlay
           comments={comments}
+          copyRequest={copyRequest}
+          onCopyComments={handleCopyComments}
+          clearRequest={clearRequest}
+          onClearComments={clearSessionComments}
           commentTypes={keyboardConfiguration.commentTypes}
           defaultCommentType={keyboardConfiguration.defaultCommentType}
           newCommentDraft={reviewCommentDraft}
@@ -415,10 +422,14 @@ export default function App() {
         clearMessage={clearMessage}
         clearStatus={clearRequest.status}
         commentsCount={comments.length}
+        commentsOpen={workspace.commentsOpen}
         copyMessage={copyMessage}
         copyRequest={copyRequest}
         diagnostic={configurationDiagnostic}
-        onCopyComments={handleCopyComments}
+        onToggleComments={() => {
+          if (workspace.commentsOpen) dispatchWorkspace({ type: 'comments_closed' })
+          else dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)
+        }}
         onReload={reloadRequest.reload}
         onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}

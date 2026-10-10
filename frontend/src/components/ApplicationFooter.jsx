@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { reviewSourceLabel } from '../review/source-label.js'
-import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
 import { RequestStatus } from '../review/request-state.js'
 
@@ -87,10 +86,11 @@ export default function ApplicationFooter({
   clearMessage,
   clearStatus,
   commentsCount = 0,
+  commentsOpen = false,
   copyMessage,
   copyRequest,
   diagnostic,
-  onCopyComments,
+  onToggleComments,
   onReload,
   onSearchText,
   overview,
@@ -126,14 +126,6 @@ export default function ApplicationFooter({
               {problem}
             </span>
           )}
-          {clearMessage && (
-            <span
-              className={`clear-status ${clearStatus}`}
-              role={clearStatus === RequestStatus.ERROR ? 'alert' : 'status'}
-            >
-              {clearMessage}
-            </span>
-          )}
           {reloadMessage && (
             <span
               className={`reload-status ${reloadMessageIsError ? RequestStatus.ERROR : reloadStatus}`}
@@ -162,20 +154,36 @@ export default function ApplicationFooter({
               onSearchText={onSearchText}
               reloadDisabled={reloadDisabled}
             />
-            <span className="footer-copy-action">
-              {copyIsError && (
-                <span className="copy-status error" role="alert" title={copyMessage}>
+            <span className="footer-comments-action">
+              {clearMessage && (
+                <span
+                  className={`clear-status ${clearStatus}`}
+                  role={clearStatus === RequestStatus.ERROR ? 'alert' : 'status'}
+                  title={clearMessage}
+                >
+                  {clearMessage}
+                </span>
+              )}
+              {copyMessage && (
+                <span
+                  className={`copy-status ${copyRequest?.status}`}
+                  role={copyIsError ? 'alert' : 'status'}
+                  title={copyMessage}
+                >
                   {copyMessage}
                 </span>
               )}
               <button
-                className="copy-markdown-button"
+                className="comments-button"
                 type="button"
-                disabled={commentsCount === 0 || copyRequest.status === RequestStatus.LOADING}
-                title={commentsCount === 0 ? 'Add a comment before copying' : undefined}
-                onClick={onCopyComments}
+                aria-haspopup="dialog"
+                aria-expanded={commentsOpen}
+                onClick={onToggleComments}
               >
-                <span aria-live="polite">{copyRequestButtonLabel(copyRequest)}</span>
+                <span aria-live="polite">Comments ({commentsCount})</span>
+                <svg className="comments-chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d={commentsOpen ? 'M4 6l4 4 4-4' : 'M4 10l4-4 4 4'} />
+                </svg>
               </button>
             </span>
           </>

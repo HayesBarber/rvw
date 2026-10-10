@@ -9,6 +9,7 @@ import {
   relativeFilePath,
 } from '../actions/file-navigation-actions.js'
 import { useClearComments } from './comment-clear-request.js'
+import { createCommentOperationGuard } from './comment-operation.js'
 import { useCopyComments } from './comment-copy-request.js'
 import { useReviewComments } from './comments-request.js'
 import { useReviewOverview } from './overview-request.js'
@@ -74,6 +75,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   const commentsRequest = useReviewComments()
   const copyRequest = useCopyComments()
   const clearRequest = useClearComments()
+  const [commentOperation] = useState(createCommentOperationGuard)
   const overview = overviewRequest.data
   const loadedReview = useRef(null)
   const sessionKey = overview ? JSON.stringify([overview.repository, overview.source]) : null
@@ -270,57 +272,61 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   }, [allFilesRequest, changedPaths, dispatchWorkspace, overview])
 
   const createReviewComment = useCallback(async (body, commentType, target, beforeCommit) => {
-    const comment = await commentsRequest.create(body, commentType, target, beforeCommit)
+    const comment = await commentOperation.run(() => commentsRequest.create(body, commentType, target, beforeCommit))
     copyRequest.reset()
     clearRequest.reset()
     return comment
-  }, [clearRequest, commentsRequest, copyRequest])
+  }, [clearRequest, commentOperation, commentsRequest, copyRequest])
 
   const editReviewComment = useCallback(async (commentId, body, commentType, beforeCommit) => {
-    const comment = await commentsRequest.edit(commentId, body, commentType, beforeCommit)
+    const comment = await commentOperation.run(() => commentsRequest.edit(commentId, body, commentType, beforeCommit))
     copyRequest.reset()
     clearRequest.reset()
     return comment
-  }, [clearRequest, commentsRequest, copyRequest])
+  }, [clearRequest, commentOperation, commentsRequest, copyRequest])
 
   const deleteReviewComment = useCallback(async (commentId, beforeCommit) => {
-    const result = await commentsRequest.remove(commentId, beforeCommit)
+    const result = await commentOperation.run(() => commentsRequest.remove(commentId, beforeCommit))
     copyRequest.reset()
     clearRequest.reset()
     return result
-  }, [clearRequest, commentsRequest, copyRequest])
+  }, [clearRequest, commentOperation, commentsRequest, copyRequest])
 
   const copyComments = useCallback(() => {
     if (
       commentsRequest.data.length === 0 ||
+      commentOperation.isPending() ||
       copyRequest.status === RequestStatus.LOADING
     ) {
       return false
     }
 
-    copyRequest.copy().catch(() => {
+    commentOperation.run(copyRequest.copy).catch(() => {
       // The request exposes its error for the existing status message.
     })
     return true
-  }, [commentsRequest.data.length, copyRequest])
+  }, [commentOperation, commentsRequest.data.length, copyRequest])
 
-  const clearComments = useCallback(() => {
+  const clearComments = useCallback((beforeCommit) => {
     if (
       commentsRequest.data.length === 0 ||
+      commentOperation.isPending() ||
       clearRequest.status === RequestStatus.LOADING
     ) {
       return false
     }
 
     clearRequest.start()
-    commentsRequest.clear().then((result) => {
+    commentOperation.run(() => commentsRequest.clear(
+      typeof beforeCommit === 'function' ? beforeCommit : undefined,
+    )).then((result) => {
       clearRequest.succeed(result)
       copyRequest.reset()
     }).catch((error) => {
       clearRequest.fail(error)
     })
     return true
-  }, [clearRequest, commentsRequest, copyRequest])
+  }, [clearRequest, commentOperation, commentsRequest, copyRequest])
 
   const reviewedOverview = useRef(null)
 

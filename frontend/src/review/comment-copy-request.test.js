@@ -24,9 +24,9 @@ test('comment-copy request states retain their existing status messages', () => 
   }), 'Copied 2 comments')
 })
 
-test('comment-copy button provides stable local progress and success labels', () => {
-  assert.equal(copyRequestButtonLabel({ status: RequestStatus.IDLE }), 'Copy as Markdown')
+test('comment-copy button shows progress and returns to its action label', () => {
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.IDLE }), 'Copy comments')
   assert.equal(copyRequestButtonLabel({ status: RequestStatus.LOADING }), 'Copying…')
-  assert.equal(copyRequestButtonLabel({ status: RequestStatus.SUCCESS }), 'Copied')
-  assert.equal(copyRequestButtonLabel({ status: RequestStatus.ERROR }), 'Copy as Markdown')
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.SUCCESS }), 'Copy comments')
+  assert.equal(copyRequestButtonLabel({ status: RequestStatus.ERROR }), 'Copy comments')
 })

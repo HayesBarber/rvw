@@ -98,7 +98,7 @@ textarea {
   overflow: hidden;
 }
 
-.footer-copy-action {
+.footer-comments-action {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -347,8 +347,8 @@ textarea {
 }
 
 .application-status .reload-status,
-.application-status .clear-status,
-.footer-copy-action .copy-status {
+.footer-comments-action .clear-status,
+.footer-comments-action .copy-status {
   max-width: 220px;
 }
 
@@ -356,7 +356,11 @@ textarea {
   max-width: 180px;
 }
 
-.copy-markdown-button {
+.comments-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-width: 126px;
   padding: 5px 10px;
   border: 1px solid #3da765;
@@ -364,6 +368,16 @@ textarea {
   background: #246b3d;
   color: #fafafa;
   cursor: pointer;
+}
+
+.comments-chevron {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .file-comment-button {
@@ -484,11 +498,11 @@ textarea {
   outline-offset: 2px;
 }
 
-.copy-markdown-button:hover:not(:disabled) {
+.comments-button:hover:not(:disabled) {
   background: #2d8049;
 }
 
-.copy-markdown-button:disabled {
+.comments-button:disabled {
   border-color: #414145;
   background: #202022;
   color: #adadb1;
@@ -524,8 +538,8 @@ textarea {
   }
 
   .application-status .reload-status,
-  .application-status .clear-status,
-  .footer-copy-action .copy-status {
+  .footer-comments-action .clear-status,
+  .footer-comments-action .copy-status {
     max-width: 120px;
   }
 }
@@ -772,6 +786,7 @@ textarea {
 
 .comments-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
