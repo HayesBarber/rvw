@@ -2,6 +2,9 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
+import { copyRequestButtonLabel, copyRequestMessage } from '../review/comment-copy-request.js'
+import { RequestStatus } from '../review/request-state.js'
+import { idleTransientRequest } from '../review/transient-request.js'
 import Overlay from './Overlay.jsx'
 import CommentComposer from './diff-pane/CommentComposer.jsx'
 import CommentEditor from './diff-pane/CommentEditor.jsx'
@@ -19,6 +22,7 @@ function targetLabel(target) {
 
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
+  copyRequest = idleTransientRequest, onCopyComments,
   newCommentDraft, onNewCommentDraftChange, onCreateComment,
   editDrafts = {}, onEditDraftChange, onEditComment, onDeleteComment,
   onClose, onOpenLocation, registerActionAdapter,
@@ -34,6 +38,9 @@ export default function CommentsOverlay({
   const [deleteError, setDeleteError] = useState(null)
   const deletingIdRef = useRef(null)
   const busy = saving || deletingId !== null
+  const canCopy = status === 'success' && comments.length > 0 &&
+    copyRequest.status !== RequestStatus.LOADING && typeof onCopyComments === 'function'
+  const copyMessage = copyRequestMessage(copyRequest)
   const canCreate = status === 'success' && typeof onCreateComment === 'function'
   const canEdit = status === 'success' && typeof onEditComment === 'function'
   const canDelete = status === 'success' && typeof onDeleteComment === 'function'
@@ -58,6 +65,10 @@ export default function CommentsOverlay({
     revealSelectedComment(listRef.current, document.getElementById(`saved-comment-${id}`))
   }, [])
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
+  const copyComments = useCallback(() => {
+    if (!canCopy) return false
+    return onCopyComments()
+  }, [canCopy, onCopyComments])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
     setDeleteError(null)
@@ -147,7 +158,8 @@ export default function CommentsOverlay({
     addReviewComment: beginCreate,
     editComment: beginEdit,
     deleteComment,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit, deleteComment])
+    copyComments,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate, beginEdit, deleteComment, copyComments])
 
   return (
     <Overlay
@@ -176,10 +188,28 @@ export default function CommentsOverlay({
         <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
           Add review comment
         </button>
+        <button
+          type="button"
+          disabled={!canCopy || editorOpen || busy}
+          onClick={copyComments}
+          data-vim-ignore
+          title={comments.length === 0 ? 'Add a comment before copying' : undefined}
+        >
+          {copyRequestButtonLabel(copyRequest)}
+        </button>
         <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
           Close
         </button>
       </header>
+      {copyMessage && (
+        <p
+          className={`comments-status copy-status ${copyRequest.status}`}
+          role={copyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
+          title={copyMessage}
+        >
+          {copyMessage}
+        </p>
+      )}
       {creating && (
         <div className="comments-editor">
           <CommentComposer

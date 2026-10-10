@@ -83,3 +83,11 @@ test('comments button exposes panel state and a directional chevron', () => {
   assert.match(open, /<path d="M4 6l4 4 4-4"/)
   assert.match(open, /<svg class="comments-chevron"[^>]*aria-hidden="true"/)
 })
+
+test('workspace copy progress and success remain visible with the comments button', () => {
+  for (const [status, message] of [['loading', 'Copying…'], ['success', 'Copied 3 comments']]) {
+    const html = render([], { copyRequest: { status }, copyMessage: message })
+    assert.match(html, new RegExp(`role="status"[^>]*>${message}`))
+    assert.match(html, /Comments \(0\)/)
+  }
+})

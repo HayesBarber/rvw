@@ -373,6 +373,8 @@ export default function App() {
       {workspace.commentsOpen && (
         <CommentsOverlay
           comments={comments}
+          copyRequest={copyRequest}
+          onCopyComments={handleCopyComments}
           commentTypes={keyboardConfiguration.commentTypes}
           defaultCommentType={keyboardConfiguration.defaultCommentType}
           newCommentDraft={reviewCommentDraft}

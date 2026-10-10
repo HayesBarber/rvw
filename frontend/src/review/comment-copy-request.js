@@ -12,7 +12,7 @@ export const copyRequestMessage = (request) => transientRequestMessage(request, 
 export function copyRequestButtonLabel(request) {
   if (request.status === RequestStatus.LOADING) return 'Copying…'
   if (request.status === RequestStatus.SUCCESS) return 'Copied'
-  return 'Copy as Markdown'
+  return 'Copy comments'
 }
 
 export function useCopyComments() {

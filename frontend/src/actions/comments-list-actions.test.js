@@ -328,3 +328,90 @@ test('default and custom cursor bindings dispatch only to comments handlers', ()
     assert.equal(registry.get(), null)
   }
 })
+
+test('default and custom copy bindings use the session copy operation from workspace and panel', async () => {
+  const { copyCommentsAsMarkdown } = await import('../review/api.js')
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  const requests = []
+  globalThis.window = {}
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, method: options.method, body: JSON.parse(options.body) })
+    return { ok: true, status: 200, json: async () => ({ commentCount: 3 }) }
+  }
+  try {
+    for (const keys of [['y'], ['<C-y>']]) {
+      const configuration = resolveConfiguration({ configuration: {
+        keybindings: { normal: { [ApplicationAction.COPY_COMMENTS]: [keys] } },
+      } })
+      assert.equal(configuration.diagnostic, null)
+      let operation
+      const copyComments = () => {
+        operation = copyCommentsAsMarkdown()
+        return true
+      }
+      const adapter = createCommentsListActionAdapter({
+        getComments: () => [
+          { id: 'review', target: { kind: 'review' } },
+          { id: 'file', target: { kind: 'file', path: 'a.txt' } },
+          { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'new', startLine: 1, endLine: 1 } },
+        ],
+        getSelectedId: () => 'line',
+        copyComments,
+      })
+      for (const panelOpen of [false, true]) {
+        const before = requests.length
+        const dispatch = createApplicationDispatcher({
+          getActiveSurface: () => 'file_tree',
+          getSurfaceActions: () => ({}),
+          getOverlayActions: () => panelOpen ? adapter : null,
+          globalActions: {
+            [ApplicationAction.COPY_COMMENTS]: panelOpen
+              ? () => assert.fail('Panel copy reached the workspace') : copyComments,
+          },
+        })
+        const controller = new VimController({ bindings: configuration.bindings })
+        controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+        for (const key of keys) controller.dispatch({ type: 'key', key: key === '<leader>' ? '<Space>' : key })
+        assert.deepEqual(await operation, { commentCount: 3 })
+        assert.equal(requests.length, before + 1)
+        assert.deepEqual(requests.at(-1), {
+          url: '/api/comments/copy-markdown', method: 'POST',
+          body: { type: 'copy_comments_as_markdown' },
+        })
+        if (keys[0] !== 'y') {
+          controller.dispatch({ type: 'key', key: 'y' })
+          assert.equal(requests.length, before + 1)
+        }
+      }
+    }
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('panel copy reports availability from its handler without workspace fallback', () => {
+  let allowed = false
+  let copies = 0
+  const adapter = createCommentsListActionAdapter({
+    copyComments: () => {
+      if (!allowed) return false
+      copies += 1
+      return true
+    },
+  })
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => 'diff_pane',
+    getSurfaceActions: () => ({}),
+    getOverlayActions: () => adapter,
+    globalActions: { [ApplicationAction.COPY_COMMENTS]: () => assert.fail('Reached workspace copy') },
+  })
+  assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
+  allowed = true
+  assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), true)
+  assert.equal(copies, 1)
+  allowed = false
+  assert.equal(dispatch(ApplicationAction.COPY_COMMENTS), false)
+  assert.equal(copies, 1)
+})

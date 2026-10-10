@@ -163,8 +163,12 @@ export default function ApplicationFooter({
               reloadDisabled={reloadDisabled}
             />
             <span className="footer-comments-action">
-              {copyIsError && (
-                <span className="copy-status error" role="alert" title={copyMessage}>
+              {copyMessage && (
+                <span
+                  className={`copy-status ${copyRequest?.status}`}
+                  role={copyIsError ? 'alert' : 'status'}
+                  title={copyMessage}
+                >
                   {copyMessage}
                 </span>
               )}
