@@ -98,7 +98,7 @@ textarea {
   overflow: hidden;
 }
 
-.footer-copy-action {
+.footer-comments-action {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -348,7 +348,7 @@ textarea {
 
 .application-status .reload-status,
 .application-status .clear-status,
-.footer-copy-action .copy-status {
+.footer-comments-action .copy-status {
   max-width: 220px;
 }
 
@@ -356,7 +356,7 @@ textarea {
   max-width: 180px;
 }
 
-.copy-markdown-button {
+.comments-button {
   min-width: 126px;
   padding: 5px 10px;
   border: 1px solid #3da765;
@@ -484,11 +484,11 @@ textarea {
   outline-offset: 2px;
 }
 
-.copy-markdown-button:hover:not(:disabled) {
+.comments-button:hover:not(:disabled) {
   background: #2d8049;
 }
 
-.copy-markdown-button:disabled {
+.comments-button:disabled {
   border-color: #414145;
   background: #202022;
   color: #adadb1;
@@ -525,7 +525,7 @@ textarea {
 
   .application-status .reload-status,
   .application-status .clear-status,
-  .footer-copy-action .copy-status {
+  .footer-comments-action .copy-status {
     max-width: 120px;
   }
 }

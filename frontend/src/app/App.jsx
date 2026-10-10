@@ -418,7 +418,7 @@ export default function App() {
         copyMessage={copyMessage}
         copyRequest={copyRequest}
         diagnostic={configurationDiagnostic}
-        onCopyComments={handleCopyComments}
+        onOpenComments={() => dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)}
         onReload={reloadRequest.reload}
         onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}

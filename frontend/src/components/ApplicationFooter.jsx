@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { reviewSourceLabel } from '../review/source-label.js'
-import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
 import { RequestStatus } from '../review/request-state.js'
 
@@ -90,7 +89,7 @@ export default function ApplicationFooter({
   copyMessage,
   copyRequest,
   diagnostic,
-  onCopyComments,
+  onOpenComments,
   onReload,
   onSearchText,
   overview,
@@ -162,20 +161,19 @@ export default function ApplicationFooter({
               onSearchText={onSearchText}
               reloadDisabled={reloadDisabled}
             />
-            <span className="footer-copy-action">
+            <span className="footer-comments-action">
               {copyIsError && (
                 <span className="copy-status error" role="alert" title={copyMessage}>
                   {copyMessage}
                 </span>
               )}
               <button
-                className="copy-markdown-button"
+                className="comments-button"
                 type="button"
-                disabled={commentsCount === 0 || copyRequest.status === RequestStatus.LOADING}
-                title={commentsCount === 0 ? 'Add a comment before copying' : undefined}
-                onClick={onCopyComments}
+                aria-haspopup="dialog"
+                onClick={onOpenComments}
               >
-                <span aria-live="polite">{copyRequestButtonLabel(copyRequest)}</span>
+                <span aria-live="polite">Comments ({commentsCount})</span>
               </button>
             </span>
           </>
