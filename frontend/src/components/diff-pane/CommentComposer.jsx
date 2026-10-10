@@ -16,6 +16,7 @@ export default function CommentComposer({
   target,
   draft,
   onDraftChange,
+  submitLabel = 'Comment',
   onCancel,
   onCreate,
 }) {
@@ -125,7 +126,7 @@ export default function CommentComposer({
           Cancel
         </button>
         <button type="submit" disabled={saving || body.trim().length === 0}>
-          {saving ? 'Saving…' : 'Comment'}
+          {saving ? 'Saving…' : submitLabel}
         </button>
       </div>
     </form>

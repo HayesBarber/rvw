@@ -38,6 +38,7 @@ export default function App() {
   )
   const reviewShellRef = useRef(null)
   const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false)
+  const [reviewCommentDraft, setReviewCommentDraft] = useState(null)
   const resizeFileTree = useCallback((width) => {
     dispatchWorkspace({ type: 'file_tree_width_set', width })
   }, [])
@@ -363,6 +364,11 @@ export default function App() {
       {workspace.commentsOpen && (
         <CommentsOverlay
           comments={comments}
+          commentTypes={keyboardConfiguration.commentTypes}
+          defaultCommentType={keyboardConfiguration.defaultCommentType}
+          newCommentDraft={reviewCommentDraft}
+          onNewCommentDraftChange={setReviewCommentDraft}
+          onCreateComment={handleCreateComment}
           status={commentsStatus}
           error={commentsError}
           onOpenLocation={(location) => {

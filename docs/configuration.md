@@ -43,6 +43,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.path.copy_absolute` | `<leader> Y` | Copy the active file's absolute filesystem path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
 | `comments.open` | `<leader> c` | Open the list of saved comments for the current review. |
 | `comments.location.open` | `<Enter>` | Open the file or line of the selected comment in the comments list. |
+| `comments.add_review` | `c` | Add a review-level comment from the comments list. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |

@@ -774,11 +774,13 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid #303033;
 }
 
 .comments-header h2 {
+  margin-right: auto;
   margin: 0;
   font-size: 0.95rem;
 }
@@ -790,6 +792,11 @@ textarea {
   background: #202022;
   color: inherit;
   cursor: pointer;
+}
+
+.comments-editor {
+  min-height: 0;
+  overflow: auto;
 }
 
 .comments-list {

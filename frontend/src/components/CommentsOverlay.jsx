@@ -1,8 +1,10 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
-import { OverlayKind } from '../actions/overlay-actions.js'
+import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
 import Overlay from './Overlay.jsx'
+import CommentComposer from './diff-pane/CommentComposer.jsx'
+import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
 
 function targetLabel(target) {
   if (target.kind === 'review') return 'Review comment'
@@ -13,11 +15,18 @@ function targetLabel(target) {
   return `${target.side === 'old' ? 'Old' : 'New'} ${lines.toLowerCase()}`
 }
 
-export default function CommentsOverlay({ comments, status, error, onClose, onOpenLocation, registerActionAdapter }) {
+export default function CommentsOverlay({
+  comments, status, error, commentTypes, defaultCommentType,
+  newCommentDraft, onNewCommentDraftChange, onCreateComment,
+  onClose, onOpenLocation, registerActionAdapter,
+}) {
   const dialogRef = useRef(null)
   const listRef = useRef(null)
   const [selectedId, setSelectedId] = useState(null)
   const selectedIdRef = useRef(null)
+  const [creating, setCreating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const canCreate = status === 'success' && typeof onCreateComment === 'function'
   const groups = useMemo(() => createCommentGroups(comments), [comments])
   const orderedComments = useMemo(() => groups.flatMap((group) => group.comments), [groups])
   const selected = orderedComments.find((comment) => comment.id === selectedId)
@@ -27,7 +36,7 @@ export default function CommentsOverlay({ comments, status, error, onClose, onOp
     selectedIdRef.current = selected?.id ?? null
     const item = document.getElementById(`saved-comment-${selected?.id}`)
     revealSelectedComment(listRef.current, item)
-  }, [selected])
+  }, [selected, creating])
 
   const selectComment = useCallback((id) => {
     selectedIdRef.current = id
@@ -36,6 +45,32 @@ export default function CommentsOverlay({ comments, status, error, onClose, onOp
     revealSelectedComment(listRef.current, document.getElementById(`saved-comment-${id}`))
   }, [])
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
+  const beginCreate = useCallback(() => {
+    if (!canCreate) return false
+    setCreating(true)
+    return true
+  }, [canCreate])
+  const leaveEditor = useCallback(() => {
+    setCreating(false)
+    requestAnimationFrame(() => listRef.current?.focus({ preventScroll: true }))
+  }, [])
+  const createComment = useCallback(async (body, commentType, target) => {
+    setSaving(true)
+    try {
+      const comment = await createAndActivateComment({
+        activate: selectComment,
+        body, commentType, target,
+        create: onCreateComment,
+      })
+      onNewCommentDraftChange(null)
+      return comment
+    } finally {
+      setSaving(false)
+    }
+  }, [onCreateComment, onNewCommentDraftChange, selectComment])
+  const close = () => {
+    if (!saving) onClose()
+  }
   const getPageIndex = useCallback((index, direction, count) => {
     const list = listRef.current
     if (!list) return -1
@@ -53,30 +88,55 @@ export default function CommentsOverlay({ comments, status, error, onClose, onOp
     selectComment,
     getPageIndex,
     openLocation: onOpenLocation,
-  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation])
+    addReviewComment: beginCreate,
+  }), [orderedComments, getSelectedId, selectComment, getPageIndex, onOpenLocation, beginCreate])
 
   return (
     <Overlay
       kind={OverlayKind.COMMENTS}
       modal={false}
       trapFocus
-      actions={actions}
+      actions={creating ? blockingOverlayActions : actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={listRef}
       navigationRef={listRef}
-      onClose={onClose}
+      onClose={close}
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || event.nativeEvent.isComposing) return
+        if (creating && event.key === 'Escape') {
+          event.preventDefault()
+          if (!saving) leaveEditor()
+        }
+      }}
       labelledBy="comments-title"
       className="comments-dialog"
       backdropClassName="comments-positioner"
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>
-        <button type="button" onClick={onClose} data-vim-ignore aria-label="Close comments">
+        <button type="button" disabled={!canCreate || creating} onClick={beginCreate} data-vim-ignore>
+          Add review comment
+        </button>
+        <button type="button" disabled={saving} onClick={close} data-vim-ignore aria-label="Close comments">
           Close
         </button>
       </header>
-      <div
+      {creating && (
+        <div className="comments-editor">
+          <CommentComposer
+            target={{ kind: 'review' }}
+            commentTypes={commentTypes}
+            defaultCommentType={defaultCommentType}
+            draft={newCommentDraft}
+            onDraftChange={onNewCommentDraftChange}
+            submitLabel="Save comment"
+            onCreate={createComment}
+            onCancel={leaveEditor}
+          />
+        </div>
+      )}
+      {!creating && <div
         ref={listRef}
         className="comments-list"
         role="listbox"
@@ -133,7 +193,7 @@ export default function CommentsOverlay({ comments, status, error, onClose, onOp
             ))}
           </section>
         ))}
-      </div>
+      </div>}
     </Overlay>
   )
 }

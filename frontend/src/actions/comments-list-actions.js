@@ -45,7 +45,7 @@ export function commentLocation(comment) {
   }
 }
 
-export function createCommentsListActionAdapter({ getComments, getSelectedId, selectComment, getPageIndex, openLocation = () => false }) {
+export function createCommentsListActionAdapter({ getComments, getSelectedId, selectComment, getPageIndex, openLocation = () => false, addReviewComment = () => false }) {
   const select = (getIndex) => (count) => {
     const comments = getComments()
     if (comments.length === 0) return false
@@ -56,6 +56,7 @@ export function createCommentsListActionAdapter({ getComments, getSelectedId, se
     return true
   }
   return Object.freeze({
+    [ApplicationAction.ADD_REVIEW_COMMENT]: addReviewComment,
     [ApplicationAction.OPEN_COMMENT_LOCATION]: () => {
       const comments = getComments()
       const selected = comments.find((comment) => comment.id === getSelectedId())

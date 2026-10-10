@@ -19,6 +19,7 @@ function render(comments = [], extra = {}) {
   return renderToStaticMarkup(createElement(CommentsOverlay, {
     comments,
     status: 'success',
+    onCreateComment: async () => {},
     onClose: () => {},
     registerActionAdapter: () => {},
     ...extra,
@@ -33,6 +34,7 @@ test('empty comments remain a non-modal panel with a keyboard-accessible close c
   assert.match(html, /aria-label="Close comments"/)
   assert.match(html, /role="listbox" aria-label="Saved comments" tabindex="-1"/)
   assert.match(html, /No saved comments in this review/)
+  assert.match(html, /<button type="button" data-vim-ignore="true">Add review comment<\/button>/)
   assert.doesNotMatch(html, /role="option"|aria-activedescendant/)
   assert.doesNotMatch(render([{ id: 'review', body: 'Summary', target: { kind: 'review' } }]), /<a /)
 })
@@ -71,4 +73,7 @@ test('loading and errors do not report an empty review', () => {
   const error = render([], { status: 'error', error: 'Request failed' })
   assert.match(error, /role="alert">Unable to load comments: Request failed/)
   assert.doesNotMatch(error, /No saved comments/)
+  for (const html of [loading, error]) {
+    assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Add review comment<\/button>/)
+  }
 })

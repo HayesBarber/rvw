@@ -73,6 +73,7 @@ test('file ranges omit diff-side selection metadata', () => {
 })
 
 test('target labels distinguish files, sides, and line ranges', () => {
+  assert.equal(commentTargetLabel({ kind: 'review' }), 'Review comment')
   assert.equal(commentTargetLabel({ kind: 'file', path: 'README.md' }), (
     'File comment on README.md'
   ))

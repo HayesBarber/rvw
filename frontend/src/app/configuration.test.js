@@ -417,6 +417,7 @@ test('motion keys can use former Visual controls when those bindings are disable
       [ApplicationAction.CURSOR_DOWN]: [keys],
       [ApplicationAction.ADD_COMMENT]: [],
       [ApplicationAction.SHOW_CHANGES]: [],
+      [ApplicationAction.ADD_REVIEW_COMMENT]: [],
       [ApplicationAction.VISUAL_LINE]: [],
     } } } })
     assert.equal(result.diagnostic, null)
