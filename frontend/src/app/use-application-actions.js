@@ -126,6 +126,11 @@ export function useApplicationActions({
       return true
     },
     [ApplicationAction.COPY_COMMENTS]: copyComments,
+    [ApplicationAction.OPEN_COMMENTS]: () => {
+      if (!reviewAvailable) return false
+      dispatchWorkspace({ type: 'comments_opened' })
+      return true
+    },
     [ApplicationAction.CLEAR_COMMENTS]: clearComments,
   }), [
     clearComments,

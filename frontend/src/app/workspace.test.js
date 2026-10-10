@@ -273,6 +273,24 @@ test('keyboard reference visibility is idempotent and preserves workspace contex
 const openHistoryFiles = (...paths) => paths.reduce((state, path) => workspaceReducer(state, {
   type: 'file_selected', path,
 }), initialWorkspaceState)
+
+test('opening and closing comments preserves the complete workspace context', () => {
+  const state = {
+    ...initialWorkspaceState,
+    selectedPath: 'src/main.zig',
+    lineNavigation: { path: 'src/main.zig', lineNumber: 12 },
+    treeMode: TreeMode.FILES,
+    activeSurface: ActiveSurface.FILE_TREE,
+    fileHistory: ['README.md', 'src/main.zig'],
+    fileHistoryIndex: 1,
+  }
+  const opened = workspaceReducer(state, { type: 'comments_opened' })
+  assert.deepEqual(opened, { ...state, commentsOpen: true })
+  assert.equal(workspaceReducer(opened, { type: 'comments_opened' }), opened)
+  const closed = workspaceReducer(opened, { type: 'comments_closed' })
+  assert.deepEqual(closed, state)
+  assert.equal(workspaceReducer(closed, { type: 'comments_closed' }), closed)
+})
 const moveHistory = (state, direction, extra = {}) => workspaceReducer(state, {
   type: 'file_history_moved', direction, changedPaths: ['A', 'B', 'C', 'D'], ...extra,
 })

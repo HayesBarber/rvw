@@ -749,6 +749,98 @@ textarea {
   background: rgb(0 0 0 / 68%);
 }
 
+.comments-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, calc(100vw - 48px));
+  max-height: 72vh;
+  overflow: hidden;
+  border: 1px solid #414145;
+  border-radius: 10px;
+  background: #141415;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+}
+
+.comments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #303033;
+}
+
+.comments-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.comments-header button {
+  padding: 5px 10px;
+  border: 1px solid #414145;
+  border-radius: 4px;
+  background: #202022;
+  color: inherit;
+  cursor: pointer;
+}
+
+.comments-list {
+  min-height: 92px;
+  overflow: auto;
+  padding: 14px;
+  outline: none;
+}
+
+.comments-status {
+  margin: 4px 0;
+  color: #adadb1;
+  font-size: 0.85rem;
+}
+
+.comments-group + .comments-group {
+  margin-top: 20px;
+}
+
+.comments-group h3 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.comments-item {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #303033;
+  border-radius: 6px;
+  background: #1b1b1d;
+}
+
+.comments-item[aria-selected='true'] {
+  border-color: #6686d5;
+  background: #202a40;
+}
+
+.comments-item:focus-visible,
+.comments-header button:focus-visible {
+  outline: 2px solid #6686d5;
+  outline-offset: 2px;
+}
+
+.comments-item header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #adadb1;
+  font-size: 0.75rem;
+}
+
+.comments-item p {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .file-finder-dialog {
   width: min(680px, calc(100vw - 48px));
   overflow: hidden;

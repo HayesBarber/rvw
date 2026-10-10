@@ -1,0 +1,88 @@
+import { useMemo, useRef, useState } from 'react'
+import { OverlayKind } from '../actions/overlay-actions.js'
+import { createCommentGroups } from '../review/comment-list.js'
+import Overlay from './Overlay.jsx'
+
+function targetLabel(target) {
+  if (target.kind === 'review') return 'Review comment'
+  if (target.kind === 'file') return 'File comment'
+  const lines = target.startLine === target.endLine
+    ? `Line ${target.startLine}`
+    : `Lines ${target.startLine}–${target.endLine}`
+  return `${target.side === 'old' ? 'Old' : 'New'} ${lines.toLowerCase()}`
+}
+
+export default function CommentsOverlay({ comments, status, error, onClose, registerActionAdapter }) {
+  const dialogRef = useRef(null)
+  const listRef = useRef(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const groups = useMemo(() => createCommentGroups(comments), [comments])
+  const orderedComments = groups.flatMap((group) => group.comments)
+  const selected = orderedComments.find((comment) => comment.id === selectedId)
+    ?? orderedComments[0]
+
+  return (
+    <Overlay
+      kind={OverlayKind.COMMENTS}
+      registerActionAdapter={registerActionAdapter}
+      dialogRef={dialogRef}
+      initialFocusRef={listRef}
+      navigationRef={listRef}
+      onClose={onClose}
+      labelledBy="comments-title"
+      className="comments-dialog"
+      backdropClassName="file-finder-backdrop"
+    >
+      <header className="comments-header">
+        <h2 id="comments-title">Comments ({comments.length})</h2>
+        <button type="button" onClick={onClose} data-vim-ignore aria-label="Close comments">
+          Close
+        </button>
+      </header>
+      <div
+        ref={listRef}
+        className="comments-list"
+        role="listbox"
+        aria-label="Saved comments"
+        aria-activedescendant={selected ? `saved-comment-${selected.id}` : undefined}
+        tabIndex={-1}
+      >
+        {status === 'loading' && <p className="comments-status" role="status">Loading comments…</p>}
+        {status === 'error' && <p className="comments-status" role="alert">Unable to load comments: {error}</p>}
+        {status === 'success' && comments.length === 0 && (
+          <p className="comments-status" role="status">No saved comments in this review.</p>
+        )}
+        {groups.map((group, index) => (
+          <section
+            key={group.kind === 'review' ? 'review' : group.path}
+            role="group"
+            aria-labelledby={`comments-group-${index}`}
+            className="comments-group"
+          >
+            <h3 id={`comments-group-${index}`}>
+              {group.kind === 'review' ? 'Review comments' : group.path}
+            </h3>
+            {group.comments.map((comment) => (
+              <article
+                id={`saved-comment-${comment.id}`}
+                key={comment.id}
+                role="option"
+                aria-selected={selected?.id === comment.id}
+                tabIndex={0}
+                className="comments-item"
+                onFocus={() => setSelectedId(comment.id)}
+                onClick={() => setSelectedId(comment.id)}
+              >
+                <header>
+                  <span>{targetLabel(comment.target)}</span>
+                  {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
+                </header>
+                <p>{comment.body}</p>
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
+    </Overlay>
+  )
+}

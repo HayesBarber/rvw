@@ -352,6 +352,8 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     clearRequest,
     closeFileFinder,
     comments: commentsRequest.data,
+    commentsStatus: commentsRequest.status,
+    commentsError: commentsRequest.error,
     copyComments,
     copyRequest,
     createReviewComment,

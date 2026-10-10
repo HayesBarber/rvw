@@ -32,6 +32,7 @@ export const initialWorkspaceState = Object.freeze({
   finderOpen: false,
   finderMode: null,
   keymapReferenceOpen: false,
+  commentsOpen: false,
   activeSurface: ActiveSurface.DIFF_PANE,
   relativeLineNumbers: false,
   wrapLines: true,
@@ -139,6 +140,10 @@ function reduceWorkspace(state, action) {
         finderMode: null,
         activeSurface: ActiveSurface.DIFF_PANE,
       }
+    case 'comments_opened':
+      return state.commentsOpen ? state : { ...state, commentsOpen: true }
+    case 'comments_closed':
+      return state.commentsOpen ? { ...state, commentsOpen: false } : state
     case 'keymap_reference_opened':
       return state.keymapReferenceOpen
         ? state

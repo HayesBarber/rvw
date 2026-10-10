@@ -5,6 +5,7 @@ import ApplicationFooter from '../components/ApplicationFooter.jsx'
 import DiffPane from '../components/DiffPane.jsx'
 import FileFinder from '../components/FileFinder.jsx'
 import CodebaseSearch from '../components/CodebaseSearch.jsx'
+import CommentsOverlay from '../components/CommentsOverlay.jsx'
 import { ApplicationAction } from '../actions/application-actions.js'
 import {
   FileHeaderActions,
@@ -79,6 +80,8 @@ export default function App() {
     clearRequest,
     closeFileFinder,
     comments,
+    commentsStatus,
+    commentsError,
     copyComments: handleCopyComments,
     copyRequest,
     createReviewComment: handleCreateComment,
@@ -300,7 +303,7 @@ export default function App() {
             lineNavigation={workspace.lineNavigation}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
-              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen}
+              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen && !workspace.commentsOpen}
             loading={fileLoading}
             error={fileError}
             comments={comments}
@@ -353,6 +356,15 @@ export default function App() {
             : 'Find a file'}
           onOpen={handleFinderOpen}
           onClose={closeFileFinder}
+          registerActionAdapter={registerOverlayActions}
+        />
+      )}
+      {workspace.commentsOpen && (
+        <CommentsOverlay
+          comments={comments}
+          status={commentsStatus}
+          error={commentsError}
+          onClose={() => dispatchWorkspace({ type: 'comments_closed' })}
           registerActionAdapter={registerOverlayActions}
         />
       )}
