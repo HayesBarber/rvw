@@ -47,8 +47,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
-| `comments.edit` | `e` | Edit the comment at the diff cursor or the selected comment in the comments list. |
-| `comments.delete` | `d d` | Delete the saved comment at the diff cursor or the selected comment in the comments list. |
+| `comments.edit` | `e` | Edit the comment at the cursor. |
+| `comments.delete` | `d d` | Delete the saved comment at the cursor. |
 | `comments.clear` | `d a` | Clear all review comments in the current session. |
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
