@@ -233,7 +233,7 @@ test('duplicate bindings produce a deterministic error', () => {
 test('bindings without a scope conflict with each workspace surface', () => {
   for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP]) {
     assert.equal(Object.hasOwn(applicationActionCatalog[unrestricted], 'scope'), false)
-    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT]) {
+    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT, ApplicationAction.OPEN_COMMENT_LOCATION]) {
       assert.throws(
         () => compileApplicationKeymap({
           [unrestricted]: [['x']],

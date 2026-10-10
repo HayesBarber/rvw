@@ -222,6 +222,19 @@
     "description": "Copy the active file absolute path."
   },
   {
+    "name": "OPEN_COMMENTS",
+    "id": "comments.open",
+    "group": "review",
+    "description": "Open the list of saved comments for the current review."
+  },
+  {
+    "name": "OPEN_COMMENT_LOCATION",
+    "id": "comments.location.open",
+    "scope": "comments_list",
+    "group": "review",
+    "description": "Open the file or line of the selected comment."
+  },
+  {
     "name": "COPY_COMMENTS",
     "id": "comments.copy",
     "group": "review",

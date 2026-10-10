@@ -41,6 +41,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |
 | `file.path.copy_relative` | `<leader> y` | Copy the active file's canonical repository-relative path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
 | `file.path.copy_absolute` | `<leader> Y` | Copy the active file's absolute filesystem path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
+| `comments.open` | `<leader> c` | Open the list of saved comments for the current review. |
+| `comments.location.open` | `<Enter>` | Open the file or line of the selected comment in the comments list. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |
 | `comments.add_file` | `C` | Add a file-level comment to the open text file. |
@@ -101,7 +103,7 @@ It also sets the leader key, display options, comment types, and command aliases
       "cursor.up": [["w"], ["<Up>"]],
       "cursor.down": [["s"], ["<Down>"]],
       "focus.file_tree": [["<leader>", "t"]],
-      "comments.edit": [["<leader>", "c"]],
+      "comments.edit": [["<leader>", "E"]],
       "comments.copy": []
     }
   },

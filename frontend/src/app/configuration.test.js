@@ -430,7 +430,7 @@ test('motion keys can use former Visual controls when those bindings are disable
 test('Visual comment and selection controls support leader sequences and disabled bindings', () => {
   const controls = [ApplicationAction.ADD_COMMENT, ApplicationAction.VISUAL_LINE]
   const result = resolveConfiguration({ configuration: { keybindings: { leader: '\\', normal: {
-    [ApplicationAction.ADD_COMMENT]: [['<leader>', 'c']],
+    [ApplicationAction.ADD_COMMENT]: [['<leader>', 'a']],
     [ApplicationAction.VISUAL_LINE]: [['v', 'v']],
   } } } })
   assert.equal(result.diagnostic, null)
