@@ -102,20 +102,20 @@ test('panel copy requires saved comments, a loaded list, and a copy handler', ()
   }
 })
 
-test('panel copy shows progress, success, errors, and retry controls', () => {
+test('panel copy keeps button feedback and retry without duplicate status messages', () => {
   const progress = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'loading' },
   })
   assert.match(progress, /<button type="button" disabled="" data-vim-ignore="true">Copying…<\/button>/)
-  assert.match(progress, /role="status"[^>]*>Copying…<\/p>/)
   const success = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'success', data: { commentCount: 3 } },
   })
-  assert.match(success, /role="status"[^>]*>Copied 3 comments<\/p>/)
   assert.match(success, /<button type="button" data-vim-ignore="true">Copied<\/button>/)
   const failure = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'error', error: 'Clipboard unavailable' },
   })
-  assert.match(failure, /role="alert"[^>]*>Clipboard unavailable<\/p>/)
   assert.match(failure, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
+  for (const html of [progress, success, failure]) {
+    assert.doesNotMatch(html, /copy-status|Copied 3 comments|Clipboard unavailable/)
+  }
 })

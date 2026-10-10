@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
-import { copyRequestButtonLabel, copyRequestMessage } from '../review/comment-copy-request.js'
+import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { idleTransientRequest } from '../review/transient-request.js'
 import Overlay from './Overlay.jsx'
@@ -40,7 +40,6 @@ export default function CommentsOverlay({
   const busy = saving || deletingId !== null
   const canCopy = status === 'success' && comments.length > 0 &&
     copyRequest.status !== RequestStatus.LOADING && typeof onCopyComments === 'function'
-  const copyMessage = copyRequestMessage(copyRequest)
   const canCreate = status === 'success' && typeof onCreateComment === 'function'
   const canEdit = status === 'success' && typeof onEditComment === 'function'
   const canDelete = status === 'success' && typeof onDeleteComment === 'function'
@@ -201,15 +200,6 @@ export default function CommentsOverlay({
           Close
         </button>
       </header>
-      {copyMessage && (
-        <p
-          className={`comments-status copy-status ${copyRequest.status}`}
-          role={copyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
-          title={copyMessage}
-        >
-          {copyMessage}
-        </p>
-      )}
       {creating && (
         <div className="comments-editor">
           <CommentComposer

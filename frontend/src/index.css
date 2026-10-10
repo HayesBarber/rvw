@@ -794,15 +794,6 @@ textarea {
   border-bottom: 1px solid #303033;
 }
 
-.comments-dialog > .copy-status {
-  flex: 0 0 auto;
-  max-width: none;
-  margin: 0;
-  padding: 8px 16px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 .comments-header h2 {
   margin-right: auto;
   margin: 0;
