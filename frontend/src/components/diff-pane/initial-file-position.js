@@ -1,4 +1,29 @@
-/** Position a new file or an explicit search target after the layout pass.
+export function lineNavigationCursor(target, instance) {
+  return {
+    lineNumber: target.lineNumber,
+    side: target.side === 'old' && instance?.type === 'file-diff' ? 'deletions' : 'additions',
+  }
+}
+
+/** Pierre reveals context by new-side line number. Translate old-side gaps. */
+export function navigationRevealLine(instance, target) {
+  if (target.lineNumber === 0) return null
+  if (target.side !== 'old' || instance.type !== 'file-diff') return target.lineNumber
+  let oldEnd = 1
+  let newEnd = 1
+  for (const hunk of instance.fileDiff.hunks) {
+    const oldStart = hunk.deletionStart + (hunk.deletionCount === 0 ? 1 : 0)
+    const newStart = hunk.additionStart + (hunk.additionCount === 0 ? 1 : 0)
+    if (target.lineNumber < oldStart) return newStart - oldStart + target.lineNumber
+    oldEnd = oldStart + hunk.deletionCount
+    newEnd = newStart + hunk.additionCount
+    // Lines inside a hunk are already visible, including deleted lines.
+    if (target.lineNumber < oldEnd) return null
+  }
+  return newEnd - oldEnd + target.lineNumber
+}
+
+/** Position a new file or an explicit location after the layout pass.
  * A new target object requests navigation even when its line has not changed.
  * onPostRender runs inside the virtualizer's render pass, before scroll anchoring
  * and height reconciliation. A synchronous scroll reset there can be undone.
@@ -45,7 +70,8 @@ export function createInitialFilePosition({
         if (!node.shadowRoot?.querySelector('pre') || container.clientHeight === 0) return
         if (target) {
           // Expansion changes virtual row positions. Wait for its layout pass.
-          if (instance.revealLine?.(target.lineNumber)) {
+          const revealLine = navigationRevealLine(instance, target)
+          if (revealLine !== null && instance.revealLine?.(revealLine)) {
             schedule()
             return
           }

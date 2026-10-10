@@ -45,3 +45,24 @@ test('Tab between controls stays native and other keys do not move focus', () =>
   dialog.querySelectorAll = () => []
   trapOverlayFocus({ key: 'Tab', preventDefault }, dialog)
 })
+
+test('an empty comments panel keeps both Tab directions on its Close button', () => {
+  let focused = 0
+  const close = { focus: () => { focused += 1 } }
+  const list = {}
+  const dialog = {
+    ownerDocument: { activeElement: list },
+    querySelectorAll: () => [close],
+  }
+  for (const activeElement of [list, close]) {
+    dialog.ownerDocument.activeElement = activeElement
+    for (const shiftKey of [false, true]) {
+      let prevented = false
+      trapOverlayFocus({
+        key: 'Tab', shiftKey, preventDefault: () => { prevented = true },
+      }, dialog, list)
+      assert.equal(prevented, true)
+    }
+  }
+  assert.equal(focused, 4)
+})

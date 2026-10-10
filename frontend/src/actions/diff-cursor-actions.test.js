@@ -449,6 +449,25 @@ test('centering scrolls the side-aware diff row to the viewport midpoint', () =>
   assert.deepEqual(cursor, { lineNumber: 12, side: DiffCursorSide.DELETIONS })
 })
 
+test('centering uses the rendered row when comment annotations change its estimated position', () => {
+  let top
+  const viewport = {
+    scrollTop: 200, clientHeight: 600, scrollHeight: 2000,
+    getBoundingClientRect: () => ({ top: 0 }),
+    scrollTo: (options) => { top = options.top },
+  }
+  const instance = {
+    getEditorViewport: () => viewport,
+    getLinePosition: () => ({ top: 300, height: 20 }),
+  }
+  const node = {
+    getBoundingClientRect: () => ({ top: -200 }),
+    shadowRoot: { querySelectorAll: () => [{ getBoundingClientRect: () => ({ top: 680, bottom: 700 }) }] },
+  }
+  assert.equal(centerDiffCursor(instance, node, { lineNumber: 306, side: 'deletions' }), true)
+  assert.equal(top, 590)
+})
+
 test('centering is a no-op without a cursor or a scrollable viewport', () => {
   const scrolls = []
   const viewport = {

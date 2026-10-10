@@ -3,11 +3,12 @@ import { compileBindings, VimMode } from '../vim/machine.js'
 import { isNormalizedVimKey } from '../vim/keyboard.js'
 
 /** Binding scopes identify conflicts during keymap compilation, not dispatch.
- * An omitted scope applies to all workspace surfaces.
+ * An omitted scope applies to all binding surfaces.
  */
 export const ActionScope = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
+  COMMENTS_LIST: 'comments_list',
 })
 
 export const ActionGroup = Object.freeze({
@@ -112,6 +113,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.DIFF_WRAP_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'w')),
   [ApplicationAction.COPY_FILE_PATH_RELATIVE]: actionBindings(keySequence(LEADER_KEY, 'y')),
   [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
+  [ApplicationAction.OPEN_COMMENTS]: actionBindings(keySequence(LEADER_KEY, 'c')),
+  [ApplicationAction.OPEN_COMMENT_LOCATION]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),
@@ -131,16 +134,13 @@ const visualActions = new Set([
   ApplicationAction.VISUAL_LINE,
 ])
 
-const workspaceSurfaces = Object.freeze([
-  ActionScope.FILE_TREE,
-  ActionScope.DIFF_PANE,
-])
+const bindingSurfaces = Object.freeze(Object.values(ActionScope))
 
 function actionBindingSurfaces(action) {
   const definition = applicationActionCatalog[action]
   if (!definition) return []
-  if (workspaceSurfaces.includes(definition.scope)) return [definition.scope]
-  return workspaceSurfaces
+  if (definition.scope !== undefined) return [definition.scope]
+  return bindingSurfaces
 }
 
 function haveDisjointBindingSurfaces(actions) {

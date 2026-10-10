@@ -22,7 +22,7 @@ import {
   commentTargetAtCursor,
 } from '../../actions/comment-actions.js'
 import { normalizeCommentRange } from './comment-annotations.js'
-import { createInitialFilePosition } from './initial-file-position.js'
+import { createInitialFilePosition, lineNavigationCursor } from './initial-file-position.js'
 
 export default function useDiffCursor({
   comments,
@@ -129,7 +129,7 @@ export default function useDiffCursor({
         comment.target.kind === 'file' && comment.target.path === pathRef.current
       )),
     })
-    const cursor = { lineNumber: target.lineNumber, side: 'additions' }
+    const cursor = lineNavigationCursor(target, renderInstanceRef.current)
     activateCursor(cursor)
     centerCursor(cursor)
   }, [activateCursor, centerCursor])

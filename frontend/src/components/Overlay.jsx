@@ -15,6 +15,8 @@ export default function Overlay({
   className,
   backdropClassName,
   nativeDialog = false,
+  modal = true,
+  trapFocus = modal,
   onKeyDown,
   children,
 }) {
@@ -49,7 +51,7 @@ export default function Overlay({
       onClose()
       return
     }
-    trapOverlayFocus(event, dialogRef.current, navigationRef?.current)
+    if (trapFocus) trapOverlayFocus(event, dialogRef.current, navigationRef?.current)
   }
 
   if (nativeDialog) {
@@ -88,7 +90,7 @@ export default function Overlay({
         ref={dialogRef}
         className={className}
         role="dialog"
-        aria-modal="true"
+        aria-modal={modal ? 'true' : undefined}
         aria-labelledby={labelledBy}
         tabIndex={-1}
         data-vim-capture

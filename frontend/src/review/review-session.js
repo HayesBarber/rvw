@@ -261,6 +261,14 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     dispatchWorkspace({ type: 'finder_closed' })
   }, [dispatchWorkspace])
 
+  const openCommentLocation = useCallback((location) => {
+    if (!overview || !location) return false
+    const changed = changedPaths.has(location.path)
+    if (!changed && allFilesRequest.status === RequestStatus.IDLE) allFilesRequest.load()
+    dispatchWorkspace({ type: 'comment_location_opened', location, changed })
+    return true
+  }, [allFilesRequest, changedPaths, dispatchWorkspace, overview])
+
   const createReviewComment = useCallback(async (body, commentType, target, beforeCommit) => {
     const comment = await commentsRequest.create(body, commentType, target, beforeCommit)
     copyRequest.reset()
@@ -352,6 +360,8 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     clearRequest,
     closeFileFinder,
     comments: commentsRequest.data,
+    commentsStatus: commentsRequest.status,
+    commentsError: commentsRequest.error,
     copyComments,
     copyRequest,
     createReviewComment,
@@ -372,6 +382,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     openFileFinder,
     openFileFinderAll,
     openFinderFile,
+    openCommentLocation,
     overview,
     overviewRequest,
     reloadRequest,
