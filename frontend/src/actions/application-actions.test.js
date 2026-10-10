@@ -89,6 +89,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_FILE_PATH_ABSOLUTE], [['<leader>', 'Y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_COMMENTS], [['<leader>', 'c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_COMMENT_LOCATION], [['<Enter>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_REVIEW_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_FILE_COMMENT], [['C']])
@@ -106,7 +107,7 @@ test('contextual bindings are inferred from action scopes', () => {
     keys: ['c'],
     command: APPLICATION_DISPATCH_COMMAND,
     args: {
-      actions: [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT],
+      actions: [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_REVIEW_COMMENT, ApplicationAction.ADD_COMMENT],
     },
   })
   const locationBinding = defaultApplicationBindings.find((binding) => (

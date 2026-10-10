@@ -22,6 +22,7 @@ export function normalizeCommentRange(path, range, isDiff) {
 }
 
 export function commentTargetLabel(target) {
+  if (target.kind === 'review') return 'Review comment'
   if (target.kind === 'file') return `File comment on ${target.path}`
 
   const side = target.side === 'old' ? 'old' : 'new'

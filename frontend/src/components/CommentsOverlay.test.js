@@ -19,6 +19,9 @@ function render(comments = [], extra = {}) {
   return renderToStaticMarkup(createElement(CommentsOverlay, {
     comments,
     status: 'success',
+    onCreateComment: async () => {},
+    onEditComment: async () => {},
+    onDeleteComment: async () => {},
     onClose: () => {},
     registerActionAdapter: () => {},
     ...extra,
@@ -33,6 +36,7 @@ test('empty comments remain a non-modal panel with a keyboard-accessible close c
   assert.match(html, /aria-label="Close comments"/)
   assert.match(html, /role="listbox" aria-label="Saved comments" tabindex="-1"/)
   assert.match(html, /No saved comments in this review/)
+  assert.match(html, /<button type="button" data-vim-ignore="true">Add review comment<\/button>/)
   assert.doesNotMatch(html, /role="option"|aria-activedescendant/)
   assert.doesNotMatch(render([{ id: 'review', body: 'Summary', target: { kind: 'review' } }]), /<a /)
 })
@@ -59,7 +63,14 @@ test('all saved comments appear with groups, target labels, types, and one initi
   assert.equal((html.match(/role="option"/g) ?? []).length, 4)
   assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1)
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
-  assert.doesNotMatch(html, /Edit|Delete/)
+  assert.equal((html.match(/class="comments-item-delete"/g) ?? []).length, 4)
+  assert.match(html, /aria-label="Delete review comment"/)
+  assert.match(html, /aria-label="Delete file comment on a.zig"/)
+  assert.match(html, /aria-label="Delete old lines 3–5 on z.zig"/)
+  assert.equal((html.match(/class="comments-item-edit"/g) ?? []).length, 4)
+  assert.match(html, /aria-label="Edit review comment"/)
+  assert.match(html, /aria-label="Edit file comment on a.zig"/)
+  assert.match(html, /aria-label="Edit old lines 3–5 on z.zig"/)
   assert.equal((html.match(/class="comment-location-link"/g) ?? []).length, 3)
   assert.match(html, /aria-label="Open old lines 3–5 on z.zig"/)
 })
@@ -71,4 +82,7 @@ test('loading and errors do not report an empty review', () => {
   const error = render([], { status: 'error', error: 'Request failed' })
   assert.match(error, /role="alert">Unable to load comments: Request failed/)
   assert.doesNotMatch(error, /No saved comments/)
+  for (const html of [loading, error]) {
+    assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Add review comment<\/button>/)
+  }
 })

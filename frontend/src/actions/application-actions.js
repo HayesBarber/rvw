@@ -115,6 +115,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
   [ApplicationAction.OPEN_COMMENTS]: actionBindings(keySequence(LEADER_KEY, 'c')),
   [ApplicationAction.OPEN_COMMENT_LOCATION]: actionBindings(keySequence('<Enter>')),
+  [ApplicationAction.ADD_REVIEW_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.ADD_FILE_COMMENT]: actionBindings(keySequence('C')),

@@ -1,7 +1,7 @@
 export function trapOverlayFocus(event, dialog, navigationTarget) {
   if (event.key !== 'Tab') return
   const focusable = [...dialog.querySelectorAll(
-    'input, button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
   )]
   if (focusable.length === 0) return
   const first = focusable[0]

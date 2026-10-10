@@ -774,22 +774,35 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid #303033;
 }
 
 .comments-header h2 {
+  margin-right: auto;
   margin: 0;
   font-size: 0.95rem;
 }
 
-.comments-header button {
+.comments-header button,
+.comments-item-edit,
+.comments-item-delete {
   padding: 5px 10px;
   border: 1px solid #414145;
   border-radius: 4px;
   background: #202022;
   color: inherit;
   cursor: pointer;
+}
+
+.comments-item-edit {
+  margin-left: auto;
+}
+
+.comments-editor {
+  min-height: 0;
+  overflow: auto;
 }
 
 .comments-list {
@@ -829,6 +842,8 @@ textarea {
 }
 
 .comments-item:focus-visible,
+.comments-item-edit:focus-visible,
+.comments-item-delete:focus-visible,
 .comments-header button:focus-visible {
   outline: 2px solid #6686d5;
   outline-offset: 2px;
@@ -836,6 +851,7 @@ textarea {
 
 .comments-item header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   color: #adadb1;

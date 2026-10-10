@@ -7,10 +7,12 @@ import {
 } from './comment-keyboard.js'
 import CommentTypeSelect from './CommentTypeSelect.jsx'
 import { scrollCommentIntoView } from './scroll-comment-into-view.js'
+import useCommentDraft from './useCommentDraft.js'
 
-export default function CommentEditor({ comment, commentTypes, onCancel, onSave }) {
-  const [body, setBody] = useState(comment.body)
-  const [commentType, setCommentType] = useState(comment.commentType ?? null)
+export default function CommentEditor({ comment, commentTypes, draft, onDraftChange, onCancel, onSave }) {
+  const { body, commentType, setBody, setCommentType } = useCommentDraft(
+    comment.body, comment.commentType, draft, onDraftChange,
+  )
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const formRef = useRef(null)
@@ -63,8 +65,8 @@ export default function CommentEditor({ comment, commentTypes, onCancel, onSave 
       action === CommentKeyboardAction.CYCLE_PREVIOUS_TYPE
     ) {
       event.preventDefault()
-      setCommentType((current) => cycleCommentType(
-        current,
+      setCommentType(cycleCommentType(
+        commentType,
         commentTypes,
         action === CommentKeyboardAction.CYCLE_NEXT_TYPE ? 1 : -1,
       ))

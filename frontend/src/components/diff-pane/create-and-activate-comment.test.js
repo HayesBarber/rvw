@@ -3,6 +3,29 @@ import test from 'node:test'
 
 import { createAndActivateComment } from './create-and-activate-comment.js'
 
+test('multiple review comments are saved and selected without a file or line target', async () => {
+  const saved = []
+  let selected = null
+  for (const body of ['Summary', 'Design question']) {
+    await createAndActivateComment({
+      activate: (id) => { selected = id },
+      body,
+      commentType: 'QUESTION',
+      target: { kind: 'review' },
+      create: async (body, commentType, target) => {
+        const comment = { id: `review-${saved.length}`, body, commentType, target }
+        saved.push(comment)
+        return comment
+      },
+    })
+  }
+  assert.deepEqual(saved, [
+    { id: 'review-0', body: 'Summary', commentType: 'QUESTION', target: { kind: 'review' } },
+    { id: 'review-1', body: 'Design question', commentType: 'QUESTION', target: { kind: 'review' } },
+  ])
+  assert.equal(selected, 'review-1')
+})
+
 test('a newly created comment becomes the active keyboard context', async () => {
   const target = { kind: 'line', path: 'src/main.zig', side: 'new', startLine: 8, endLine: 8 }
   const calls = []
