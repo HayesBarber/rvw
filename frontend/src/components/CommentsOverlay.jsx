@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
@@ -11,6 +11,8 @@ import CommentComposer from './diff-pane/CommentComposer.jsx'
 import CommentEditor from './diff-pane/CommentEditor.jsx'
 import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
 import { deleteAndSelectComment } from './delete-and-select-comment.js'
+
+const CLEAR_CONFIRMATION_TIMEOUT_MS = 5000
 
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
@@ -29,6 +31,7 @@ export default function CommentsOverlay({
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
+  const [clearConfirmation, setClearConfirmation] = useState(null)
   const deletingIdRef = useRef(null)
   const copying = copyRequest.status === RequestStatus.LOADING
   const clearing = clearRequest.status === RequestStatus.LOADING
@@ -42,10 +45,19 @@ export default function CommentsOverlay({
   const canDelete = status === 'success' && typeof onDeleteComment === 'function'
   const editingComment = comments.find((comment) => comment.id === editingId)
   const editorOpen = creating || Boolean(editingComment)
+  const confirmingClear = canClear && !editorOpen &&
+    clearConfirmation?.comments === comments && clearConfirmation?.request === clearRequest
   const groups = useMemo(() => createCommentGroups(comments), [comments])
   const orderedComments = useMemo(() => groups.flatMap((group) => group.comments), [groups])
   const selected = orderedComments.find((comment) => comment.id === selectedId)
     ?? orderedComments[0]
+
+  useEffect(() => {
+    if (!clearConfirmation) return
+    const timeout = setTimeout(() => setClearConfirmation(null),
+      Math.max(0, clearConfirmation.expiresAt - Date.now()))
+    return () => clearTimeout(timeout)
+  }, [clearConfirmation])
 
   useLayoutEffect(() => {
     selectedIdRef.current = selected?.id ?? null
@@ -63,16 +75,27 @@ export default function CommentsOverlay({
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
   const copyComments = useCallback(() => {
     if (!canCopy) return false
+    setClearConfirmation(null)
     return onCopyComments()
   }, [canCopy, onCopyComments])
   const clearComments = useCallback(() => {
-    if (!canClear) return false
+    if (!canClear || editorOpen) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     listRef.current?.focus({ preventScroll: true })
     return onClearComments()
-  }, [canClear, onClearComments])
+  }, [canClear, editorOpen, onClearComments])
+  const confirmClearComments = useCallback(() => {
+    if (!canClear || editorOpen) return false
+    if (!confirmingClear || Date.now() >= clearConfirmation.expiresAt) {
+      setClearConfirmation({ comments, request: clearRequest, expiresAt: Date.now() + CLEAR_CONFIRMATION_TIMEOUT_MS })
+      return true
+    }
+    return clearComments()
+  }, [canClear, editorOpen, confirmingClear, clearConfirmation, comments, clearRequest, clearComments])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     setEditingId(null)
     setCreating(true)
@@ -80,6 +103,7 @@ export default function CommentsOverlay({
   }, [canCreate])
   const beginEdit = useCallback((comment) => {
     if (!canEdit) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     setSelectedId(comment.id)
     setCreating(false)
@@ -118,6 +142,7 @@ export default function CommentsOverlay({
   }, [onEditComment, onEditDraftChange, selectComment])
   const deleteComment = useCallback((comment) => {
     if (!canDelete || deletingIdRef.current !== null) return false
+    setClearConfirmation(null)
     deletingIdRef.current = comment.id
     setDeletingId(comment.id)
     setDeleteError(null)
@@ -262,10 +287,12 @@ export default function CommentsOverlay({
             type="button"
             className="comments-clear-button"
             disabled={!canClear || editorOpen}
-            onClick={clearComments}
+            onClick={(event) => event.detail === 0 ? clearComments() : confirmClearComments()}
             data-vim-ignore
+            aria-live="polite"
+            title={confirmingClear ? 'Press again within 5 seconds to clear all comments' : undefined}
           >
-            {clearing ? 'Clearing…' : 'Clear all comments'}
+            {clearing ? 'Clearing…' : confirmingClear ? 'Are you sure?' : 'Clear all comments'}
           </button>
         )}
         <button

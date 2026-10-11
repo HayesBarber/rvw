@@ -136,14 +136,14 @@ test('panel copy keeps button feedback and retry without duplicate status messag
 test('panel clear is available only for a loaded list with saved comments', () => {
   assert.doesNotMatch(render([], { onClearComments: () => true }), /Clear all comments/)
   const enabled = render([copyComment], { onClearComments: () => true })
-  assert.match(enabled, /<button type="button" class="comments-clear-button" data-vim-ignore="true">Clear all comments<\/button>/)
+  assert.match(enabled, /<button type="button" class="comments-clear-button" data-vim-ignore="true" aria-live="polite">Clear all comments<\/button>/)
   for (const html of [
     render([copyComment]),
     render([copyComment], { status: 'loading', onClearComments: () => true }),
     render([copyComment], { status: 'error', onClearComments: () => true }),
     render([copyComment], { copyRequest: { status: 'loading' }, onClearComments: () => true }),
   ]) {
-    assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true">Clear all comments<\/button>/)
+    assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true" aria-live="polite">Clear all comments<\/button>/)
   }
 })
 
@@ -153,7 +153,7 @@ test('clearing blocks panel actions and reports progress only on its button', ()
     onCopyComments: () => true,
     clearRequest: { status: 'loading' },
   })
-  assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true">Clearing…<\/button>/)
+  assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true" aria-live="polite">Clearing…<\/button>/)
   for (const label of ['Copy comments', 'Add review comment']) {
     assert.match(html, new RegExp(`<button type="button"(?: class="comments-copy-button")? disabled="" data-vim-ignore="true">${label}<\\/button>`))
   }
@@ -169,7 +169,7 @@ test('a failed clear keeps comments, selection, and the retry control', () => {
   })
   assert.match(html, /Saved summary/)
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
-  assert.match(html, /<button type="button" class="comments-clear-button" data-vim-ignore="true">Clear all comments<\/button>/)
+  assert.match(html, /<button type="button" class="comments-clear-button" data-vim-ignore="true" aria-live="polite">Clear all comments<\/button>/)
   assert.doesNotMatch(html, /Clear failed/)
 })
 

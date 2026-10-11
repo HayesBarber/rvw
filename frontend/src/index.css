@@ -859,13 +859,11 @@ textarea {
 }
 
 .comments-footer .comments-clear-button {
-  border-color: #e15b55;
-  background: #842f2c;
-  color: #fafafa;
+  color: #ff6762;
 }
 
 .comments-footer .comments-clear-button:hover:not(:disabled) {
-  background: #9e3834;
+  background: #303033;
 }
 
 .comments-header button:disabled,
