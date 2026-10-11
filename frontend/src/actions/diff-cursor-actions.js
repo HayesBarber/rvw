@@ -112,7 +112,7 @@ function collectDefaultDiffLines(fileDiff) {
   return { additions, deletions }
 }
 
-function fileLineCount(contents) {
+export function fileLineCount(contents) {
   if (contents.length === 0) return 0
   const newlineCount = contents.split('\n').length - 1
   return newlineCount + (contents.endsWith('\n') ? 0 : 1)

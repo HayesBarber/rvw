@@ -9,6 +9,7 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from '../actions/codebase-search-actions.js'
+import { createCurrentFileLineNavigation } from '../actions/line-navigation.js'
 import { createOverlayActionRegistry } from '../actions/overlay-actions.js'
 import { closeApplication } from '../review/api.js'
 import { ActiveSurface, TreeMode } from './workspace.js'
@@ -85,6 +86,13 @@ export function useApplicationActions({
       .get(ActiveSurface.DIFF_PANE)?.[ApplicationAction.ADD_FILE_COMMENT]
     return typeof action === 'function' && action()
   }, [surfaceActions])
+
+  const navigateToLine = useCallback((lineNumber) => createCurrentFileLineNavigation({
+    getTarget: (lineNumber) => surfaceActions.get(ActiveSurface.DIFF_PANE)
+      ?.getLineNavigationTarget?.(lineNumber),
+    dispatchWorkspace,
+    focusDiffPane,
+  })(lineNumber), [surfaceActions, dispatchWorkspace, focusDiffPane])
 
   const globalActions = useMemo(() => ({
     [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
@@ -169,6 +177,7 @@ export function useApplicationActions({
     dispatchApplicationAction,
     activateSurface,
     addFileComment,
+    navigateToLine,
     diffPaneRef,
     fileTreePaneRef,
     focusDiffPane,

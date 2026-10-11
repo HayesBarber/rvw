@@ -140,6 +140,15 @@ function reduceWorkspace(state, action) {
         finderMode: null,
         activeSurface: ActiveSurface.DIFF_PANE,
       }
+    case 'line_navigation_requested':
+      if (!state.selectedPath || action.location?.path !== state.selectedPath ||
+          !Number.isSafeInteger(action.location.lineNumber) || action.location.lineNumber < 1 ||
+          !['old', 'new'].includes(action.location.side)) return state
+      return {
+        ...state,
+        lineNavigation: { ...action.location },
+        activeSurface: ActiveSurface.DIFF_PANE,
+      }
     case 'comments_opened':
       return state.commentsOpen ? state : { ...state, commentsOpen: true }
     case 'comments_closed':

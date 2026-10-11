@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseDiffFromFile } from '@pierre/diffs'
+import { currentFileLineTarget } from '../../actions/line-navigation.js'
 import { createInitialFilePosition, lineNavigationCursor, navigationRevealLine } from './initial-file-position.js'
 
 test('comment navigation selects its diff side and keeps full-file and search navigation on the new side', () => {
@@ -221,4 +222,27 @@ test('a newer result cancels an earlier pending line target', () => {
   stale()
   flush()
   assert.deepEqual(navigated, [20])
+})
+
+test('current-file navigation reveals context before moving the cursor on either side', () => {
+  for (const side of ['additions', 'deletions']) {
+    const { position, flush, file } = setup()
+    const { node, instance } = file()
+    const oldFile = { name: 'a.txt', contents: Array.from({ length: 300 }, (_, i) => `${i + 1}\n`).join('') }
+    const newFile = { name: 'a.txt', contents: `inserted\n${oldFile.contents}` }
+    instance.type = 'file-diff'
+    instance.fileDiff = parseDiffFromFile(oldFile, newFile)
+    const target = currentFileLineTarget({ path: 'a.txt', content: { kind: 'diff' },
+      parsedDiff: instance.fileDiff }, { side }, 212)
+    const reveals = []
+    instance.revealLine = (line) => { reveals.push(line); return reveals.length === 1 }
+    const cursors = []
+    const navigate = (location) => cursors.push(lineNavigationCursor(location, instance))
+    position.rendered(node, instance, target, navigate)
+    flush()
+    assert.deepEqual(cursors, [])
+    flush()
+    assert.deepEqual(reveals, side === 'deletions' ? [213, 213] : [212, 212])
+    assert.deepEqual(cursors, [{ lineNumber: 212, side }])
+  }
 })
