@@ -103,10 +103,28 @@ test('footer shows clear progress, success, and errors beside copy and Comments'
       copyRequest: { status: 'success' }, copyMessage: 'Copied 3 comments',
     })
     const left = html.slice(html.indexOf('class="footer-left"'), html.indexOf('class="repository-context"'))
-    const comments = html.slice(html.indexOf('class="footer-comments-action"'))
+    const messages = html.slice(html.indexOf('class="footer-comments-status"'), html.indexOf('class="footer-actions"'))
     assert.doesNotMatch(left, /clear-status|copy-status/)
-    assert.match(comments, new RegExp(`class="clear-status ${status}" role="${role}"[^>]*>${message}`))
-    assert.match(comments, /class="copy-status success"/)
-    assert.match(comments, /class="comments-button"/)
+    assert.match(messages, new RegExp(`class="clear-status ${status}" role="${role}"[^>]*>${message}`))
+    assert.match(messages, /class="copy-status success"/)
+    assert.match(html.slice(html.indexOf('class="footer-comments-action"')), /class="comments-button"/)
+  }
+})
+
+test('footer keeps a message container before More actions and Comments in all request states', () => {
+  for (const extra of [
+    {},
+    { copyRequest: { status: 'loading' }, copyMessage: 'Copying…' },
+    { clearStatus: 'success', clearMessage: 'Cleared 3 comments' },
+    { copyRequest: { status: 'error' }, copyMessage: 'Copy failed', clearStatus: 'error', clearMessage: 'Clear failed' },
+  ]) {
+    const html = render([], extra)
+    const actions = html.indexOf('class="footer-actions"')
+    const messages = html.indexOf('class="footer-comments-status"')
+    const comments = html.indexOf('class="footer-comments-action"')
+    assert(messages >= 0 && messages < actions && actions < comments)
+    if (!extra.copyMessage && !extra.clearMessage) {
+      assert.match(html, /<span class="footer-comments-status"><\/span>/)
+    }
   }
 })

@@ -100,9 +100,22 @@ textarea {
 
 .footer-comments-action {
   display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.footer-comments-status {
+  display: flex;
+  flex: 0 1 220px;
+  width: 220px;
   min-width: 0;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
+}
+
+.footer-comments-status > span {
+  min-width: 0;
 }
 
 .repository-context {
@@ -347,8 +360,8 @@ textarea {
 }
 
 .application-status .reload-status,
-.footer-comments-action .clear-status,
-.footer-comments-action .copy-status {
+.footer-comments-status .clear-status,
+.footer-comments-status .copy-status {
   max-width: 220px;
 }
 
@@ -538,9 +551,14 @@ textarea {
   }
 
   .application-status .reload-status,
-  .footer-comments-action .clear-status,
-  .footer-comments-action .copy-status {
+  .footer-comments-status .clear-status,
+  .footer-comments-status .copy-status {
     max-width: 120px;
+  }
+
+  .footer-comments-status {
+    flex-basis: 120px;
+    width: 120px;
   }
 }
 
