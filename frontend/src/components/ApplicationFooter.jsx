@@ -149,12 +149,7 @@ export default function ApplicationFooter({
       <span className="footer-right">
         {repositoryName && (
           <>
-            <FooterActions
-              onReload={onReload}
-              onSearchText={onSearchText}
-              reloadDisabled={reloadDisabled}
-            />
-            <span className="footer-comments-action">
+            <span className="footer-comments-status">
               {clearMessage && (
                 <span
                   className={`clear-status ${clearStatus}`}
@@ -173,6 +168,13 @@ export default function ApplicationFooter({
                   {copyMessage}
                 </span>
               )}
+            </span>
+            <FooterActions
+              onReload={onReload}
+              onSearchText={onSearchText}
+              reloadDisabled={reloadDisabled}
+            />
+            <span className="footer-comments-action">
               <button
                 className="comments-button"
                 type="button"

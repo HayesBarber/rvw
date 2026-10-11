@@ -1,24 +1,18 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
 import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { idleTransientRequest } from '../review/transient-request.js'
+import CommentsGroup from './CommentsGroup.jsx'
 import Overlay from './Overlay.jsx'
 import CommentComposer from './diff-pane/CommentComposer.jsx'
 import CommentEditor from './diff-pane/CommentEditor.jsx'
 import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
 import { deleteAndSelectComment } from './delete-and-select-comment.js'
 
-function targetLabel(target) {
-  if (target.kind === 'review') return 'Review comment'
-  if (target.kind === 'file') return 'File comment'
-  const lines = target.startLine === target.endLine
-    ? `Line ${target.startLine}`
-    : `Lines ${target.startLine}–${target.endLine}`
-  return `${target.side === 'old' ? 'Old' : 'New'} ${lines.toLowerCase()}`
-}
+const CLEAR_CONFIRMATION_TIMEOUT_MS = 5000
 
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
@@ -37,6 +31,7 @@ export default function CommentsOverlay({
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
+  const [clearConfirmation, setClearConfirmation] = useState(null)
   const deletingIdRef = useRef(null)
   const copying = copyRequest.status === RequestStatus.LOADING
   const clearing = clearRequest.status === RequestStatus.LOADING
@@ -50,10 +45,19 @@ export default function CommentsOverlay({
   const canDelete = status === 'success' && typeof onDeleteComment === 'function'
   const editingComment = comments.find((comment) => comment.id === editingId)
   const editorOpen = creating || Boolean(editingComment)
+  const confirmingClear = canClear && !editorOpen &&
+    clearConfirmation?.comments === comments && clearConfirmation?.request === clearRequest
   const groups = useMemo(() => createCommentGroups(comments), [comments])
   const orderedComments = useMemo(() => groups.flatMap((group) => group.comments), [groups])
   const selected = orderedComments.find((comment) => comment.id === selectedId)
     ?? orderedComments[0]
+
+  useEffect(() => {
+    if (!clearConfirmation) return
+    const timeout = setTimeout(() => setClearConfirmation(null),
+      Math.max(0, clearConfirmation.expiresAt - Date.now()))
+    return () => clearTimeout(timeout)
+  }, [clearConfirmation])
 
   useLayoutEffect(() => {
     selectedIdRef.current = selected?.id ?? null
@@ -71,16 +75,27 @@ export default function CommentsOverlay({
   const getSelectedId = useCallback(() => selectedIdRef.current, [])
   const copyComments = useCallback(() => {
     if (!canCopy) return false
+    setClearConfirmation(null)
     return onCopyComments()
   }, [canCopy, onCopyComments])
   const clearComments = useCallback(() => {
-    if (!canClear) return false
+    if (!canClear || editorOpen) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     listRef.current?.focus({ preventScroll: true })
     return onClearComments()
-  }, [canClear, onClearComments])
+  }, [canClear, editorOpen, onClearComments])
+  const confirmClearComments = useCallback(() => {
+    if (!canClear || editorOpen) return false
+    if (!confirmingClear || Date.now() >= clearConfirmation.expiresAt) {
+      setClearConfirmation({ comments, request: clearRequest, expiresAt: Date.now() + CLEAR_CONFIRMATION_TIMEOUT_MS })
+      return true
+    }
+    return clearComments()
+  }, [canClear, editorOpen, confirmingClear, clearConfirmation, comments, clearRequest, clearComments])
   const beginCreate = useCallback(() => {
     if (!canCreate) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     setEditingId(null)
     setCreating(true)
@@ -88,6 +103,7 @@ export default function CommentsOverlay({
   }, [canCreate])
   const beginEdit = useCallback((comment) => {
     if (!canEdit) return false
+    setClearConfirmation(null)
     setDeleteError(null)
     setSelectedId(comment.id)
     setCreating(false)
@@ -126,6 +142,7 @@ export default function CommentsOverlay({
   }, [onEditComment, onEditDraftChange, selectComment])
   const deleteComment = useCallback((comment) => {
     if (!canDelete || deletingIdRef.current !== null) return false
+    setClearConfirmation(null)
     deletingIdRef.current = comment.id
     setDeletingId(comment.id)
     setDeleteError(null)
@@ -196,29 +213,14 @@ export default function CommentsOverlay({
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>
-        <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
-          Add review comment
-        </button>
-        <button
-          type="button"
-          disabled={!canCopy || editorOpen || busy}
-          onClick={copyComments}
-          data-vim-ignore
-          title={comments.length === 0 ? 'Add a comment before copying' : undefined}
-        >
-          {copyRequestButtonLabel(copyRequest)}
-        </button>
-        <button
-          type="button"
-          disabled={!canClear || editorOpen}
-          onClick={clearComments}
-          data-vim-ignore
-        >
-          {clearing ? 'Clearing…' : 'Clear all comments'}
-        </button>
-        <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
-          Close
-        </button>
+        <div className="comments-header-actions">
+          <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
+            Add review comment
+          </button>
+          <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
+            Close
+          </button>
+        </div>
       </header>
       {creating && (
         <div className="comments-editor">
@@ -263,72 +265,47 @@ export default function CommentsOverlay({
           <p className="comments-status" role="status">No saved comments in this review.</p>
         )}
         {groups.map((group, index) => (
-          <section
+          <CommentsGroup
             key={group.kind === 'review' ? 'review' : group.path}
-            role="group"
-            aria-labelledby={`comments-group-${index}`}
-            className="comments-group"
-          >
-            <h3 id={`comments-group-${index}`}>
-              {group.kind === 'review' ? 'Review comments' : group.path}
-            </h3>
-            {group.comments.map((comment) => (
-              <article
-                id={`saved-comment-${comment.id}`}
-                key={comment.id}
-                role="option"
-                aria-selected={selected?.id === comment.id}
-                tabIndex={0}
-                className="comments-item"
-                onFocus={() => { if (!busy) setSelectedId(comment.id) }}
-                onClick={() => { if (!busy) setSelectedId(comment.id) }}
-              >
-                <header>
-                  <span>{targetLabel(comment.target)}</span>
-                  {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
-                  {comment.target.kind !== 'review' && (
-                    <a
-                      className="comment-location-link"
-                      href={`#${encodeURIComponent(comment.target.path)}`}
-                      data-vim-ignore
-                      aria-disabled={busy || undefined}
-                      aria-label={`Open ${targetLabel(comment.target).toLowerCase()} on ${comment.target.path}`}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        if (busy) return
-                        onOpenLocation(commentLocation(comment))
-                      }}
-                    >
-                      Open location
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    className="comments-item-edit"
-                    data-vim-ignore
-                    disabled={!canEdit || busy}
-                    aria-label={`Edit ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
-                    onClick={() => beginEdit(comment)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="comments-item-delete"
-                    data-vim-ignore
-                    disabled={!canDelete || busy}
-                    aria-label={`Delete ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
-                    onClick={() => deleteComment(comment)}
-                  >
-                    {deletingId === comment.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                </header>
-                <p>{comment.body}</p>
-              </article>
-            ))}
-          </section>
+            group={group}
+            headingId={`comments-group-${index}`}
+            selectedId={selected?.id}
+            busy={busy}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            deletingId={deletingId}
+            onSelectComment={setSelectedId}
+            onOpenLocation={onOpenLocation}
+            onEditComment={beginEdit}
+            onDeleteComment={deleteComment}
+          />
         ))}
       </div>}
+      <footer className="comments-footer">
+        {comments.length > 0 && (
+          <button
+            type="button"
+            className="comments-clear-button"
+            disabled={!canClear || editorOpen}
+            onClick={(event) => event.detail === 0 ? clearComments() : confirmClearComments()}
+            data-vim-ignore
+            aria-live="polite"
+            title={confirmingClear ? 'Press again within 5 seconds to clear all comments' : undefined}
+          >
+            {clearing ? 'Clearing…' : confirmingClear ? 'Are you sure?' : 'Clear all comments'}
+          </button>
+        )}
+        <button
+          type="button"
+          className="comments-copy-button"
+          disabled={!canCopy || editorOpen || busy}
+          onClick={copyComments}
+          data-vim-ignore
+          title={comments.length === 0 ? 'Add a comment before copying' : undefined}
+        >
+          {copyRequestButtonLabel(copyRequest)}
+        </button>
+      </footer>
     </Overlay>
   )
 }
