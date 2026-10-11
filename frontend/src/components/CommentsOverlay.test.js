@@ -6,12 +6,14 @@ import { createServer } from 'vite'
 
 let server
 let CommentsOverlay
+let CommentsGroup
 before(async () => {
   server = await createServer({
     configFile: false,
     server: { middlewareMode: true, hmr: false, watch: null },
   })
   CommentsOverlay = (await server.ssrLoadModule('/src/components/CommentsOverlay.jsx')).default
+  CommentsGroup = (await server.ssrLoadModule('/src/components/CommentsGroup.jsx')).default
 })
 after(async () => { await server?.close() })
 
@@ -158,4 +160,58 @@ test('a failed clear keeps comments, selection, and the retry control', () => {
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
   assert.match(html, /<button type="button" data-vim-ignore="true">Clear all comments<\/button>/)
   assert.doesNotMatch(html, /Clear failed/)
+})
+
+function findElement(node, predicate) {
+  if (Array.isArray(node)) {
+    return node.map((child) => findElement(child, predicate)).find(Boolean)
+  }
+  if (!node?.props) return undefined
+  if (predicate(node)) return node
+  return findElement(node.props.children, predicate)
+}
+
+test('comment groups route selection, location, edit, and delete actions', () => {
+  const comment = { id: 'line', body: 'Saved', target: {
+    kind: 'line', path: 'src/a.js', side: 'old', startLine: 3, endLine: 5,
+  } }
+  const calls = []
+  const props = {
+    group: { kind: 'file', path: comment.target.path, comments: [comment] },
+    headingId: 'group-heading', selectedId: comment.id,
+    busy: false, canEdit: true, canDelete: true,
+    onSelectComment: (id) => calls.push(['select', id]),
+    onOpenLocation: (location) => calls.push(['open', location]),
+    onEditComment: (value) => calls.push(['edit', value]),
+    onDeleteComment: (value) => calls.push(['delete', value]),
+  }
+  const tree = CommentsGroup(props)
+  const item = findElement(tree, (node) => node.props.role === 'option')
+  assert.equal(item.props['aria-selected'], true)
+  item.props.onFocus()
+  item.props.onClick()
+  const link = findElement(tree, (node) => node.type === 'a')
+  link.props.onClick({ preventDefault: () => calls.push(['preventDefault']) })
+  findElement(tree, (node) => node.props.className === 'comments-item-edit').props.onClick()
+  findElement(tree, (node) => node.props.className === 'comments-item-delete').props.onClick()
+  assert.deepEqual(calls, [
+    ['select', comment.id], ['select', comment.id], ['preventDefault'],
+    ['open', { path: 'src/a.js', lineNumber: 5, side: 'old' }],
+    ['edit', comment], ['delete', comment],
+  ])
+
+  calls.length = 0
+  const busyTree = CommentsGroup({ ...props, busy: true, deletingId: comment.id })
+  const busyItem = findElement(busyTree, (node) => node.props.role === 'option')
+  busyItem.props.onFocus()
+  busyItem.props.onClick()
+  const busyLink = findElement(busyTree, (node) => node.type === 'a')
+  assert.equal(busyLink.props['aria-disabled'], true)
+  busyLink.props.onClick({ preventDefault: () => calls.push(['preventDefault']) })
+  const edit = findElement(busyTree, (node) => node.props.className === 'comments-item-edit')
+  const remove = findElement(busyTree, (node) => node.props.className === 'comments-item-delete')
+  assert.equal(edit.props.disabled, true)
+  assert.equal(remove.props.disabled, true)
+  assert.equal(remove.props.children, 'Deleting…')
+  assert.deepEqual(calls, [['preventDefault']])
 })

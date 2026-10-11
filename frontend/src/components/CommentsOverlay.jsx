@@ -1,24 +1,16 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { commentLocation, createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
+import { createCommentsListActionAdapter, pageCommentSelection, revealSelectedComment } from '../actions/comments-list-actions.js'
 import { blockingOverlayActions, OverlayKind } from '../actions/overlay-actions.js'
 import { createCommentGroups } from '../review/comment-list.js'
 import { copyRequestButtonLabel } from '../review/comment-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { idleTransientRequest } from '../review/transient-request.js'
+import CommentsGroup from './CommentsGroup.jsx'
 import Overlay from './Overlay.jsx'
 import CommentComposer from './diff-pane/CommentComposer.jsx'
 import CommentEditor from './diff-pane/CommentEditor.jsx'
 import { createAndActivateComment } from './diff-pane/create-and-activate-comment.js'
 import { deleteAndSelectComment } from './delete-and-select-comment.js'
-
-function targetLabel(target) {
-  if (target.kind === 'review') return 'Review comment'
-  if (target.kind === 'file') return 'File comment'
-  const lines = target.startLine === target.endLine
-    ? `Line ${target.startLine}`
-    : `Lines ${target.startLine}–${target.endLine}`
-  return `${target.side === 'old' ? 'Old' : 'New'} ${lines.toLowerCase()}`
-}
 
 export default function CommentsOverlay({
   comments, status, error, commentTypes, defaultCommentType,
@@ -263,70 +255,20 @@ export default function CommentsOverlay({
           <p className="comments-status" role="status">No saved comments in this review.</p>
         )}
         {groups.map((group, index) => (
-          <section
+          <CommentsGroup
             key={group.kind === 'review' ? 'review' : group.path}
-            role="group"
-            aria-labelledby={`comments-group-${index}`}
-            className="comments-group"
-          >
-            <h3 id={`comments-group-${index}`}>
-              {group.kind === 'review' ? 'Review comments' : group.path}
-            </h3>
-            {group.comments.map((comment) => (
-              <article
-                id={`saved-comment-${comment.id}`}
-                key={comment.id}
-                role="option"
-                aria-selected={selected?.id === comment.id}
-                tabIndex={0}
-                className="comments-item"
-                onFocus={() => { if (!busy) setSelectedId(comment.id) }}
-                onClick={() => { if (!busy) setSelectedId(comment.id) }}
-              >
-                <header>
-                  <span>{targetLabel(comment.target)}</span>
-                  {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
-                  {comment.target.kind !== 'review' && (
-                    <a
-                      className="comment-location-link"
-                      href={`#${encodeURIComponent(comment.target.path)}`}
-                      data-vim-ignore
-                      aria-disabled={busy || undefined}
-                      aria-label={`Open ${targetLabel(comment.target).toLowerCase()} on ${comment.target.path}`}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        if (busy) return
-                        onOpenLocation(commentLocation(comment))
-                      }}
-                    >
-                      Open location
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    className="comments-item-edit"
-                    data-vim-ignore
-                    disabled={!canEdit || busy}
-                    aria-label={`Edit ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
-                    onClick={() => beginEdit(comment)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="comments-item-delete"
-                    data-vim-ignore
-                    disabled={!canDelete || busy}
-                    aria-label={`Delete ${targetLabel(comment.target).toLowerCase()}${comment.target.path ? ` on ${comment.target.path}` : ''}`}
-                    onClick={() => deleteComment(comment)}
-                  >
-                    {deletingId === comment.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                </header>
-                <p>{comment.body}</p>
-              </article>
-            ))}
-          </section>
+            group={group}
+            headingId={`comments-group-${index}`}
+            selectedId={selected?.id}
+            busy={busy}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            deletingId={deletingId}
+            onSelectComment={setSelectedId}
+            onOpenLocation={onOpenLocation}
+            onEditComment={beginEdit}
+            onDeleteComment={deleteComment}
+          />
         ))}
       </div>}
     </Overlay>
