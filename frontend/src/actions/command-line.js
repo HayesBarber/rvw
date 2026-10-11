@@ -5,13 +5,19 @@ const COMMAND_HISTORY_LIMIT = 1000
 export function resolveCommand(input, aliases = {}) {
   const name = input.trim()
   if (!name) return { kind: 'empty' }
+  if (!Object.hasOwn(aliases, name) && /^[0-9]+$/.test(name)) {
+    const lineNumber = Number(name)
+    if (Number.isSafeInteger(lineNumber) && lineNumber > 0) {
+      return { kind: 'line', lineNumber }
+    }
+  }
   const action = Object.hasOwn(aliases, name) ? aliases[name] : name
   return Object.hasOwn(applicationActionCatalog, action)
     ? { kind: 'action', action }
     : { kind: 'unknown', name }
 }
 
-/** Input lifecycle; execution is supplied by the shared application dispatcher. */
+/** Input lifecycle for application actions and current-file line navigation. */
 export function createCommandLine({ getFocus, setMode, onChange }) {
   let open = false
   let submitting = false
@@ -49,7 +55,7 @@ export function createCommandLine({ getFocus, setMode, onChange }) {
       historyIndex++
       return historyIndex === history.length ? historyDraft : history[historyIndex]
     },
-    submit(input, aliases, dispatch, focusInput) {
+    submit(input, aliases, dispatch, focusInput, navigateToLine = () => false) {
       if (!open || submitting) return false
       const result = resolveCommand(input, aliases)
       if (result.kind === 'empty') { close(); return true }
@@ -66,14 +72,19 @@ export function createCommandLine({ getFocus, setMode, onChange }) {
         // editors/overlays inherit workspace focus, never the disappearing input.
         setMode('normal')
         if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
-        if (dispatch(result.action)) {
+        const handled = result.kind === 'line'
+          ? navigateToLine(result.lineNumber)
+          : dispatch(result.action)
+        if (handled) {
           open = false
           onChange({ open: false, error: null })
           return true
         }
         focusInput()
         setMode('command')
-        onChange({ open: true, error: `Action unavailable: ${result.action}` })
+        onChange({ open: true, error: result.kind === 'line'
+          ? `Line unavailable: ${result.lineNumber}`
+          : `Action unavailable: ${result.action}` })
         return false
       } finally {
         submitting = false

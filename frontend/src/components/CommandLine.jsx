@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { handleCommandLineKey } from '../actions/command-line.js'
 
-export default function CommandLine({ controller, aliases, dispatch, error }) {
+export default function CommandLine({ controller, aliases, dispatch, navigateToLine, error }) {
   const inputRef = useRef(null)
   const [value, setValue] = useState('')
   useLayoutEffect(() => { inputRef.current?.focus({ preventScroll: true }) }, [])
@@ -23,7 +23,7 @@ export default function CommandLine({ controller, aliases, dispatch, error }) {
           cancel: controller.cancel,
           recallPrevious: () => setValue(controller.recallPrevious(value)),
           recallNext: () => setValue(controller.recallNext(value)),
-          submit: () => controller.submit(value, aliases, dispatch, () => inputRef.current?.focus()),
+          submit: () => controller.submit(value, aliases, dispatch, () => inputRef.current?.focus(), navigateToLine),
         })}
       />
     </div>

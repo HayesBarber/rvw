@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseDiffFromFile } from '@pierre/diffs'
+import { currentFileLineTarget } from '../../actions/line-navigation.js'
 import { createInitialFilePosition, lineNavigationCursor, navigationRevealLine } from './initial-file-position.js'
 
 test('comment navigation selects its diff side and keeps full-file and search navigation on the new side', () => {
@@ -221,4 +222,60 @@ test('a newer result cancels an earlier pending line target', () => {
   stale()
   flush()
   assert.deepEqual(navigated, [20])
+})
+
+test('current-file navigation reveals context before moving the cursor on either side', () => {
+  for (const side of ['additions', 'deletions']) {
+    const { position, flush, file } = setup()
+    const { node, instance } = file()
+    const oldFile = { name: 'a.txt', contents: Array.from({ length: 300 }, (_, i) => `${i + 1}\n`).join('') }
+    const newFile = { name: 'a.txt', contents: `inserted\n${oldFile.contents}` }
+    instance.type = 'file-diff'
+    instance.fileDiff = parseDiffFromFile(oldFile, newFile)
+    const target = currentFileLineTarget({ path: 'a.txt', content: { kind: 'diff' },
+      parsedDiff: instance.fileDiff }, { side }, 212)
+    const reveals = []
+    instance.revealLine = (line) => { reveals.push(line); return reveals.length === 1 }
+    const cursors = []
+    const navigate = (location) => cursors.push(lineNavigationCursor(location, instance))
+    position.rendered(node, instance, target, navigate)
+    flush()
+    assert.deepEqual(cursors, [])
+    flush()
+    assert.deepEqual(reveals, side === 'deletions' ? [213, 213] : [212, 212])
+    assert.deepEqual(cursors, [{ lineNumber: 212, side }])
+  }
+})
+
+test('navigation can center again after scrolling resolves virtual row heights', () => {
+  const { position, flush, file } = setup()
+  const { node, instance, container } = file()
+  let rowTop = 800
+  let centers = 0
+  const center = () => { centers++; container.scrollTop = rowTop - container.clientHeight / 2 }
+  position.rendered(node, instance, { lineNumber: 212 }, () => {
+    center()
+    return center
+  })
+  flush()
+  assert.equal(centers, 1)
+  // The virtualizer measures wrapped rows only after the first scroll.
+  rowTop = 1200
+  flush()
+  assert.equal(centers, 2)
+  assert.equal(container.scrollTop, 880)
+})
+
+test('a new target or unmount cancels pending navigation settlement', () => {
+  for (const interrupt of ['target', 'unmount']) {
+    const { position, flush, file, frames } = setup()
+    const { node, instance } = file()
+    position.rendered(node, instance, { lineNumber: 212 }, () => () => assert.fail('stale settlement'))
+    flush()
+    const stale = [...frames.values()][0]
+    if (interrupt === 'unmount') position.unmounted(instance)
+    else position.rendered(node, instance, { lineNumber: 1 }, () => {})
+    stale()
+    flush()
+  }
 })

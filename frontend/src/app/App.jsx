@@ -132,6 +132,7 @@ export default function App() {
   const {
     activateSurface,
     dispatchApplicationAction,
+    navigateToLine,
     addFileComment: handleAddFileComment,
     diffPaneRef,
     fileTreePaneRef,
@@ -416,6 +417,7 @@ export default function App() {
             controller={commandLine}
             aliases={keyboardConfiguration.commandAliases}
             dispatch={dispatchApplicationAction}
+            navigateToLine={navigateToLine}
             error={commandState.error}
           />
         )}

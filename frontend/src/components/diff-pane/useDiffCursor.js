@@ -130,8 +130,15 @@ export default function useDiffCursor({
       )),
     })
     const cursor = lineNavigationCursor(target, renderInstanceRef.current)
-    activateCursor(cursor)
+    const instance = renderInstanceRef.current
+    activateCursor(cursor, false)
     centerCursor(cursor)
+    // Scrolling virtual content can replace estimated heights with real heights.
+    return () => {
+      if (renderInstanceRef.current === instance && cursorRef.current === cursor) {
+        centerCursor(cursor)
+      }
+    }
   }, [activateCursor, centerCursor])
 
   const handlePostRender = useCallback((node, instance, phase) => {

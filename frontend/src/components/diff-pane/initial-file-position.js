@@ -25,6 +25,7 @@ export function navigationRevealLine(instance, target) {
 
 /** Position a new file or an explicit location after the layout pass.
  * A new target object requests navigation even when its line has not changed.
+ * A navigation callback can return a function to center after virtual layout settles.
  * onPostRender runs inside the virtualizer's render pass, before scroll anchoring
  * and height reconciliation. A synchronous scroll reset there can be undone.
  */
@@ -75,7 +76,13 @@ export function createInitialFilePosition({
             schedule()
             return
           }
-          navigate(target)
+          const settle = navigate(target)
+          if (typeof settle === 'function') {
+            pending.frame = requestFrame(() => {
+              pending.frame = null
+              if (current === pending && node.isConnected) settle()
+            })
+          }
         } else {
           container.scrollTo({ top: 0, left: 0, behavior: 'instant' })
         }

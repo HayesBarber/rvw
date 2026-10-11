@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import useVisualSelection from './diff-pane/useVisualSelection.js'
+import { currentFileLineTarget } from '../actions/line-navigation.js'
 import { ApplicationAction } from '../actions/application-actions.js'
 import { createCommentActionAdapter, openFileCommentTarget } from '../actions/comment-actions.js'
 import { createDiffCursorActionAdapter } from '../actions/diff-cursor-actions.js'
@@ -77,7 +78,15 @@ export default function DiffPane({
     setExpandUnchanged((expanded) => !expanded)
   }, [])
 
+  const { getCursor, getInstance } = cursor
+  const getLineNavigationTarget = useCallback((lineNumber) => (
+    loading || error || !getInstance()
+      ? null
+      : currentFileLineTarget(fileDiff, getCursor(), lineNumber)
+  ), [loading, error, getInstance, fileDiff, getCursor])
+
   useEffect(() => registerActionAdapter({
+    getLineNavigationTarget,
     [ApplicationAction.VISUAL_LINE]: visual.toggle,
     [ApplicationAction.FOCUS_FILE_TREE]: onFocusFileTree,
     ...createDiffFilePathActionAdapter({ filePath, copyFilePath: onCopyFilePath }),
@@ -121,6 +130,7 @@ export default function DiffPane({
     cursor.getInstance,
     cursor.guardNextLayoutRender,
     fileDiff,
+    getLineNavigationTarget,
     filePath,
     onCopyFilePath,
     onFocusFileTree,
