@@ -88,6 +88,12 @@ Set `comments.showReviewSource` to `false` to omit this header. It defaults to `
 
 Press `:` in Normal mode to enter an action name or alias, then press `<Enter>` to run it.
 Names are case-sensitive. Press `<Esc>` to cancel.
+To go to a source line in the current file, enter `:<line number>`.
+For example, enter `:212` and press `<Enter>` to go to line 212.
+Line numbers start at 1. Use decimal digits. The command uses the active diff side.
+If no diff cursor is active, it uses the new side. Hidden context is revealed.
+An unavailable line leaves the command input open with an error.
+A configured numeric alias takes priority over line navigation.
 In the command input, use Up Arrow and Down Arrow to move through command history.
 Use `commandLine.aliases` to map aliases to action identifiers from the table above.
 Alias names must be non-empty, contain no whitespace, and differ from all action identifiers.

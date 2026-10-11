@@ -246,3 +246,36 @@ test('current-file navigation reveals context before moving the cursor on either
     assert.deepEqual(cursors, [{ lineNumber: 212, side }])
   }
 })
+
+test('navigation can center again after scrolling resolves virtual row heights', () => {
+  const { position, flush, file } = setup()
+  const { node, instance, container } = file()
+  let rowTop = 800
+  let centers = 0
+  const center = () => { centers++; container.scrollTop = rowTop - container.clientHeight / 2 }
+  position.rendered(node, instance, { lineNumber: 212 }, () => {
+    center()
+    return center
+  })
+  flush()
+  assert.equal(centers, 1)
+  // The virtualizer measures wrapped rows only after the first scroll.
+  rowTop = 1200
+  flush()
+  assert.equal(centers, 2)
+  assert.equal(container.scrollTop, 880)
+})
+
+test('a new target or unmount cancels pending navigation settlement', () => {
+  for (const interrupt of ['target', 'unmount']) {
+    const { position, flush, file, frames } = setup()
+    const { node, instance } = file()
+    position.rendered(node, instance, { lineNumber: 212 }, () => () => assert.fail('stale settlement'))
+    flush()
+    const stale = [...frames.values()][0]
+    if (interrupt === 'unmount') position.unmounted(instance)
+    else position.rendered(node, instance, { lineNumber: 1 }, () => {})
+    stale()
+    flush()
+  }
+})
