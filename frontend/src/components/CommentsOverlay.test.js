@@ -91,16 +91,27 @@ test('loading and errors do not report an empty review', () => {
 
 const copyComment = { id: 'review', body: 'Saved summary', target: { kind: 'review' } }
 
+test('panel groups Add and Close in the header and Clear and Copy in the footer', () => {
+  const html = render([copyComment], { onClearComments: () => true, onCopyComments: () => true })
+  const header = html.slice(html.indexOf('<header class="comments-header">'), html.indexOf('</header>'))
+  assert.match(header, /class="comments-header-actions"/)
+  assert(header.indexOf('Add review comment') < header.indexOf('Close comments'))
+  assert.doesNotMatch(header, /Copy comments|Clear all comments/)
+  const footer = html.slice(html.indexOf('<footer class="comments-footer">'))
+  assert(footer.indexOf('Clear all comments') < footer.indexOf('Copy comments'))
+  assert(html.indexOf('Saved summary') < html.indexOf('<footer class="comments-footer">'))
+})
+
 test('panel copy requires saved comments, a loaded list, and a copy handler', () => {
   const enabled = render([copyComment], { onCopyComments: () => true })
-  assert.match(enabled, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
+  assert.match(enabled, /<button type="button" class="comments-copy-button" data-vim-ignore="true">Copy comments<\/button>/)
   for (const html of [
     render([], { onCopyComments: () => true }),
     render([copyComment]),
     render([copyComment], { status: 'loading', onCopyComments: () => true }),
     render([copyComment], { status: 'error', onCopyComments: () => true }),
   ]) {
-    assert.match(html, /<button type="button" disabled="" data-vim-ignore="true"[^>]*>Copy comments<\/button>/)
+    assert.match(html, /<button type="button" class="comments-copy-button" disabled="" data-vim-ignore="true"[^>]*>Copy comments<\/button>/)
   }
 })
 
@@ -108,31 +119,31 @@ test('panel copy keeps button feedback and retry without duplicate status messag
   const progress = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'loading' },
   })
-  assert.match(progress, /<button type="button" disabled="" data-vim-ignore="true">Copying…<\/button>/)
+  assert.match(progress, /<button type="button" class="comments-copy-button" disabled="" data-vim-ignore="true">Copying…<\/button>/)
   const success = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'success', data: { commentCount: 3 } },
   })
-  assert.match(success, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
+  assert.match(success, /<button type="button" class="comments-copy-button" data-vim-ignore="true">Copy comments<\/button>/)
   const failure = render([copyComment], {
     onCopyComments: () => true, copyRequest: { status: 'error', error: 'Clipboard unavailable' },
   })
-  assert.match(failure, /<button type="button" data-vim-ignore="true">Copy comments<\/button>/)
+  assert.match(failure, /<button type="button" class="comments-copy-button" data-vim-ignore="true">Copy comments<\/button>/)
   for (const html of [progress, success, failure]) {
     assert.doesNotMatch(html, /copy-status|Copied|Clipboard unavailable/)
   }
 })
 
 test('panel clear is available only for a loaded list with saved comments', () => {
+  assert.doesNotMatch(render([], { onClearComments: () => true }), /Clear all comments/)
   const enabled = render([copyComment], { onClearComments: () => true })
-  assert.match(enabled, /<button type="button" data-vim-ignore="true">Clear all comments<\/button>/)
+  assert.match(enabled, /<button type="button" class="comments-clear-button" data-vim-ignore="true">Clear all comments<\/button>/)
   for (const html of [
-    render([], { onClearComments: () => true }),
     render([copyComment]),
     render([copyComment], { status: 'loading', onClearComments: () => true }),
     render([copyComment], { status: 'error', onClearComments: () => true }),
     render([copyComment], { copyRequest: { status: 'loading' }, onClearComments: () => true }),
   ]) {
-    assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Clear all comments<\/button>/)
+    assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true">Clear all comments<\/button>/)
   }
 })
 
@@ -142,9 +153,9 @@ test('clearing blocks panel actions and reports progress only on its button', ()
     onCopyComments: () => true,
     clearRequest: { status: 'loading' },
   })
-  assert.match(html, /<button type="button" disabled="" data-vim-ignore="true">Clearing…<\/button>/)
+  assert.match(html, /<button type="button" class="comments-clear-button" disabled="" data-vim-ignore="true">Clearing…<\/button>/)
   for (const label of ['Copy comments', 'Add review comment']) {
-    assert.match(html, new RegExp(`<button type="button" disabled="" data-vim-ignore="true">${label}<\\/button>`))
+    assert.match(html, new RegExp(`<button type="button"(?: class="comments-copy-button")? disabled="" data-vim-ignore="true">${label}<\\/button>`))
   }
   assert.match(html, /disabled="" aria-label="Edit review comment"/)
   assert.match(html, /disabled="" aria-label="Delete review comment"/)
@@ -158,7 +169,7 @@ test('a failed clear keeps comments, selection, and the retry control', () => {
   })
   assert.match(html, /Saved summary/)
   assert.match(html, /aria-activedescendant="saved-comment-review"/)
-  assert.match(html, /<button type="button" data-vim-ignore="true">Clear all comments<\/button>/)
+  assert.match(html, /<button type="button" class="comments-clear-button" data-vim-ignore="true">Clear all comments<\/button>/)
   assert.doesNotMatch(html, /Clear failed/)
 })
 

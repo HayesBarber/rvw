@@ -188,29 +188,14 @@ export default function CommentsOverlay({
     >
       <header className="comments-header">
         <h2 id="comments-title">Comments ({comments.length})</h2>
-        <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
-          Add review comment
-        </button>
-        <button
-          type="button"
-          disabled={!canCopy || editorOpen || busy}
-          onClick={copyComments}
-          data-vim-ignore
-          title={comments.length === 0 ? 'Add a comment before copying' : undefined}
-        >
-          {copyRequestButtonLabel(copyRequest)}
-        </button>
-        <button
-          type="button"
-          disabled={!canClear || editorOpen}
-          onClick={clearComments}
-          data-vim-ignore
-        >
-          {clearing ? 'Clearing…' : 'Clear all comments'}
-        </button>
-        <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
-          Close
-        </button>
+        <div className="comments-header-actions">
+          <button type="button" disabled={!canCreate || editorOpen || busy} onClick={beginCreate} data-vim-ignore>
+            Add review comment
+          </button>
+          <button type="button" disabled={busy} onClick={close} data-vim-ignore aria-label="Close comments">
+            Close
+          </button>
+        </div>
       </header>
       {creating && (
         <div className="comments-editor">
@@ -271,6 +256,29 @@ export default function CommentsOverlay({
           />
         ))}
       </div>}
+      <footer className="comments-footer">
+        {comments.length > 0 && (
+          <button
+            type="button"
+            className="comments-clear-button"
+            disabled={!canClear || editorOpen}
+            onClick={clearComments}
+            data-vim-ignore
+          >
+            {clearing ? 'Clearing…' : 'Clear all comments'}
+          </button>
+        )}
+        <button
+          type="button"
+          className="comments-copy-button"
+          disabled={!canCopy || editorOpen || busy}
+          onClick={copyComments}
+          data-vim-ignore
+          title={comments.length === 0 ? 'Add a comment before copying' : undefined}
+        >
+          {copyRequestButtonLabel(copyRequest)}
+        </button>
+      </footer>
     </Overlay>
   )
 }

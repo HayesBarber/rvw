@@ -774,8 +774,8 @@ textarea {
 .comments-dialog {
   display: flex;
   flex-direction: column;
-  width: min(520px, calc(100vw - 32px));
-  max-height: min(600px, calc(100vh - 80px));
+  width: min(650px, calc(100vw - 32px));
+  max-height: min(660px, calc(100vh - 80px));
   pointer-events: auto;
   overflow: hidden;
   border: 1px solid #414145;
@@ -790,17 +790,35 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-shrink: 0;
   padding: 12px 16px;
   border-bottom: 1px solid #303033;
 }
 
 .comments-header h2 {
-  margin-right: auto;
   margin: 0;
   font-size: 0.95rem;
 }
 
+.comments-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.comments-footer {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #303033;
+}
+
 .comments-header button,
+.comments-footer button,
 .comments-item-edit,
 .comments-item-delete {
   padding: 5px 10px;
@@ -811,6 +829,33 @@ textarea {
   cursor: pointer;
 }
 
+.comments-footer .comments-copy-button {
+  margin-left: auto;
+  border-color: #3da765;
+  background: #246b3d;
+  color: #fafafa;
+}
+
+.comments-footer .comments-copy-button:hover:not(:disabled) {
+  background: #2b8049;
+}
+
+.comments-footer .comments-clear-button {
+  border-color: #e15b55;
+  background: #842f2c;
+  color: #fafafa;
+}
+
+.comments-footer .comments-clear-button:hover:not(:disabled) {
+  background: #9e3834;
+}
+
+.comments-header button:disabled,
+.comments-footer button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .comments-item-edit {
   margin-left: auto;
 }
@@ -818,6 +863,13 @@ textarea {
 .comments-editor {
   min-height: 0;
   overflow: auto;
+  padding: 14px;
+}
+
+.comments-editor .comment-composer {
+  width: 100%;
+  margin: 0;
+  padding: 12px;
 }
 
 .comments-list {
@@ -859,7 +911,8 @@ textarea {
 .comments-item:focus-visible,
 .comments-item-edit:focus-visible,
 .comments-item-delete:focus-visible,
-.comments-header button:focus-visible {
+.comments-header button:focus-visible,
+.comments-footer button:focus-visible {
   outline: 2px solid #6686d5;
   outline-offset: 2px;
 }
