@@ -54,10 +54,14 @@ export function selectVisibleFiles(overview, filesModeEntries, treeMode) {
     : (overview?.files ?? [])
 }
 
-export function selectActivePath(visibleFiles, selectedPath, initialPath, retainSelection = false) {
+export function selectActivePath(visibleFiles, selectedPath, initialPath, retainSelection = false, preferRootFile = false) {
   const visiblePaths = new Set(visibleFiles.map((file) => file.path))
   if (selectedPath && (retainSelection || visiblePaths.has(selectedPath))) return selectedPath
   if (initialPath && visiblePaths.has(initialPath)) return initialPath
+  if (preferRootFile) {
+    const rootFile = visibleFiles.find((file) => !file.path.includes('/'))
+    if (rootFile) return rootFile.path
+  }
   return visibleFiles[0]?.path ?? null
 }
 
@@ -117,6 +121,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       workspace.selectedPath,
       overview?.initialPath,
       workspace.treeMode === TreeMode.FILES && workspace.fileHistoryIndex >= 0,
+      overview?.files.length === 0,
     ),
     [overview, visibleFiles, workspace.selectedPath, workspace.treeMode, workspace.fileHistoryIndex],
   )

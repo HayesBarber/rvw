@@ -121,3 +121,35 @@ test('history selections remain active while a missing file reports its error', 
   assert.equal(selectActivePath(files, 'B', 'A', true), 'B')
   assert.equal(selectActivePath(files, null, 'A', true), 'A')
 })
+
+test('empty reviews prefer the first sorted root file without changing file order', () => {
+  const entries = createFilesModeEntries({ files: [] }, [
+    'z.txt', 'assets/a.txt', 'README.md', 'build.zig',
+  ])
+  const paths = entries.map((file) => file.path)
+  assert.equal(paths[0], 'assets/a.txt')
+  assert.equal(selectActivePath(entries, null, null, false, true), 'build.zig')
+  assert.deepEqual(entries.map((file) => file.path), paths)
+  assert.equal(selectActivePath(entries, null, null), 'assets/a.txt')
+})
+
+test('empty reviews keep hidden and ignored root files eligible', () => {
+  for (const rootPath of ['.hidden', 'ignored.cache']) {
+    const entries = createFilesModeEntries({ files: [] }, ['a/nested.txt', rootPath])
+    assert.equal(selectActivePath(entries, null, null, false, true), rootPath)
+  }
+})
+
+test('empty reviews fall back to the first nested file or no file', () => {
+  const entries = createFilesModeEntries({ files: [] }, ['z/file.txt', 'a/file.txt'])
+  assert.equal(selectActivePath(entries, null, null, false, true), 'a/file.txt')
+  assert.equal(selectActivePath([], null, null, false, true), null)
+})
+
+test('root preference preserves selected, initial, and history paths', () => {
+  const entries = createFilesModeEntries({ files: [] }, ['a/file.txt', 'root.txt'])
+  assert.equal(selectActivePath(entries, 'a/file.txt', null, false, true), 'a/file.txt')
+  assert.equal(selectActivePath(entries, null, 'a/file.txt', false, true), 'a/file.txt')
+  assert.equal(selectActivePath(entries, 'missing.txt', null, true, true), 'missing.txt')
+  assert.equal(selectActivePath(entries, 'missing.txt', null, false, true), 'root.txt')
+})
