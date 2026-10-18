@@ -75,6 +75,10 @@ test('all saved comments appear with groups, target labels, types, and one initi
   assert.match(html, /aria-label="Edit old lines 3–5 on z.zig"/)
   assert.equal((html.match(/class="comment-location-link"/g) ?? []).length, 3)
   assert.match(html, /aria-label="Open old lines 3–5 on z.zig"/)
+  for (const label of ['File comment', 'Old lines 3–5', 'New line 7']) {
+    assert.match(html, new RegExp(`>${label}</a>`))
+  }
+  assert.doesNotMatch(html, /Open location/)
 })
 
 test('loading and errors do not report an empty review', () => {
