@@ -21,7 +21,7 @@ async function createReadyRenderer(expandUnchanged) {
     diffStyle: 'split',
     expandUnchanged,
     tokenizeMaxLength: 0,
-  }, markReady)
+  }, undefined, markReady)
   const immediate = renderer.renderDiff(diff)
   if (!immediate) await ready
   return renderer
