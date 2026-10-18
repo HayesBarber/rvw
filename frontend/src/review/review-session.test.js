@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { TreeMode } from '../app/workspace.js'
+import { selectActivePath } from '../app/file-selection.js'
 import {
   createFilesModeEntries,
   includeSelectedFile,
-  selectActivePath,
   selectEmptyReviewTreeMode,
   selectVisibleFiles,
 } from './review-session.js'

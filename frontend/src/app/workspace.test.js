@@ -13,6 +13,63 @@ test('initial active surface is the diff pane', () => {
   assert.equal(initialWorkspaceState.activeSurface, ActiveSurface.DIFF_PANE)
 })
 
+test('returning from empty Changes uses the root default in Files', () => {
+  const visiblePaths = ['assets/a.txt', 'README.md', 'z.txt']
+  for (const selectedPath of ['README.md', 'assets/a.txt']) {
+    const started = workspaceReducer(initialWorkspaceState, {
+      type: 'file_selected', path: selectedPath,
+    })
+    const changes = workspaceReducer(started, {
+      type: 'tree_mode_changed', mode: TreeMode.CHANGES,
+      visiblePaths: [], initialPath: null, preferRootFile: false,
+    })
+    assert.equal(changes.selectedPath, null)
+    const files = workspaceReducer(changes, {
+      type: 'tree_mode_changed', mode: TreeMode.FILES,
+      visiblePaths, initialPath: null, preferRootFile: true,
+    })
+    assert.equal(files.selectedPath, 'README.md')
+    assert.equal(files.fileHistory[files.fileHistoryIndex], 'README.md')
+  }
+})
+
+test('Files mode root fallback includes hidden and ignored files and handles missing root files', () => {
+  const scenarios = [
+    { visiblePaths: ['.config/nested', '.hidden'], expected: '.hidden' },
+    { visiblePaths: ['a/nested.txt', 'ignored.cache'], expected: 'ignored.cache' },
+    { visiblePaths: ['a/file.txt', 'z/file.txt'], expected: 'a/file.txt' },
+    { visiblePaths: [], expected: null },
+  ]
+  for (const { visiblePaths, expected } of scenarios) {
+    const files = workspaceReducer(initialWorkspaceState, {
+      type: 'tree_mode_changed', mode: TreeMode.FILES,
+      visiblePaths, initialPath: null, preferRootFile: true,
+    })
+    assert.equal(files.selectedPath, expected)
+  }
+})
+
+test('mode changes preserve valid selections and initial paths before root fallback', () => {
+  const visiblePaths = ['assets/a.txt', 'root.txt']
+  const selected = workspaceReducer(initialWorkspaceState, {
+    type: 'file_selected', path: 'assets/a.txt',
+  })
+  const toFiles = {
+    type: 'tree_mode_changed', mode: TreeMode.FILES,
+    visiblePaths, initialPath: null, preferRootFile: true,
+  }
+  assert.equal(workspaceReducer(selected, toFiles).selectedPath, 'assets/a.txt')
+  assert.equal(workspaceReducer(initialWorkspaceState, {
+    ...toFiles, initialPath: 'assets/a.txt',
+  }).selectedPath, 'assets/a.txt')
+  assert.equal(workspaceReducer(initialWorkspaceState, {
+    ...toFiles, preferRootFile: false,
+  }).selectedPath, 'assets/a.txt')
+  assert.equal(workspaceReducer(initialWorkspaceState, {
+    ...toFiles, preferRootFile: undefined,
+  }).selectedPath, 'assets/a.txt')
+})
+
 test('file-tree width starts at the existing layout width', () => {
   assert.equal(initialWorkspaceState.fileTreeWidth, 320)
   assert.equal(initialWorkspaceState.fileTreeWidth, FILE_TREE_WIDTH.INITIAL)

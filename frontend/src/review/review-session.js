@@ -3,6 +3,7 @@ import { createReviewFileCache } from './file-cache.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { fileHistoryTarget, FinderMode, TreeMode } from '../app/workspace.js'
+import { selectActivePath } from '../app/file-selection.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
 import {
   orderedFilePaths,
@@ -52,17 +53,6 @@ export function selectVisibleFiles(overview, filesModeEntries, treeMode) {
   return treeMode === TreeMode.FILES
     ? filesModeEntries
     : (overview?.files ?? [])
-}
-
-export function selectActivePath(visibleFiles, selectedPath, initialPath, retainSelection = false, preferRootFile = false) {
-  const visiblePaths = new Set(visibleFiles.map((file) => file.path))
-  if (selectedPath && (retainSelection || visiblePaths.has(selectedPath))) return selectedPath
-  if (initialPath && visiblePaths.has(initialPath)) return initialPath
-  if (preferRootFile) {
-    const rootFile = visibleFiles.find((file) => !file.path.includes('/'))
-    if (rootFile) return rootFile.path
-  }
-  return visibleFiles[0]?.path ?? null
 }
 
 export function selectEmptyReviewTreeMode(overview, treeMode) {
@@ -187,6 +177,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       mode: nextMode,
       visiblePaths: nextFiles.map((file) => file.path),
       initialPath: overview.initialPath,
+      preferRootFile: nextMode === TreeMode.FILES && overview.files.length === 0,
     })
     if (
       nextMode === TreeMode.FILES &&

@@ -1,4 +1,6 @@
 // Owns state and transitions for the application workspace shell.
+import { selectActivePath } from './file-selection.js'
+
 export const ActiveSurface = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
@@ -37,12 +39,6 @@ export const initialWorkspaceState = Object.freeze({
   relativeLineNumbers: false,
   wrapLines: true,
 })
-
-function validPath(selectedPath, visiblePaths, initialPath) {
-  if (selectedPath && visiblePaths.includes(selectedPath)) return selectedPath
-  if (initialPath && visiblePaths.includes(initialPath)) return initialPath
-  return visiblePaths[0] ?? null
-}
 
 function reduceWorkspace(state, action) {
   switch (action.type) {
@@ -84,10 +80,12 @@ function reduceWorkspace(state, action) {
       return {
         ...state,
         treeMode: action.mode,
-        selectedPath: validPath(
+        selectedPath: selectActivePath(
+          action.visiblePaths.map((path) => ({ path })),
           state.selectedPath,
-          action.visiblePaths,
           action.initialPath,
+          false,
+          action.preferRootFile,
         ),
       }
     case 'file_tree_resized': {
