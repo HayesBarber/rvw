@@ -81,17 +81,17 @@ fn addAppArtifacts(context: Context) AppArtifacts {
         "-framework", "WebKit",
     });
     for ([_][]const u8{
-        "macos/main.swift",
-        "macos/launch_configuration.swift",
-        "macos/application_menu.swift",
-        "macos/native_host.swift",
-        "macos/native_request_router.swift",
-        "macos/native_bridge.swift",
-        "macos/bundled_assets.swift",
-        "macos/asset_handler.swift",
-        "macos/navigation_policy.swift",
-        "macos/window_lifecycle.swift",
-        "macos/application_controller.swift",
+        "macos/app/main.swift",
+        "macos/app/launch_configuration.swift",
+        "macos/app/application_menu.swift",
+        "macos/bridge/native_host.swift",
+        "macos/bridge/native_request_router.swift",
+        "macos/bridge/native_bridge.swift",
+        "macos/web/bundled_assets.swift",
+        "macos/web/asset_handler.swift",
+        "macos/web/navigation_policy.swift",
+        "macos/app/window_lifecycle.swift",
+        "macos/app/application_controller.swift",
     }) |source| swift.addFileArg(b.path(source));
     swift.addFileArg(aligned_library);
     swift.addArg("-o");
@@ -111,12 +111,12 @@ fn addNativeCoreTests(context: Context, library: std.Build.LazyPath) void {
     // cannot detect failures in child processes started from a DispatchQueue.
     const compile = b.addSystemCommand(&.{ "xcrun", "swiftc", "-I", "include", "-framework", "WebKit" });
     for ([_][]const u8{
-        "macos/launch_configuration.swift",
-        "macos/native_host.swift",
-        "macos/native_request_router.swift",
-        "macos/native_bridge.swift",
-        "macos/test_support.swift",
-        "macos/native_core_tests.swift",
+        "macos/app/launch_configuration.swift",
+        "macos/bridge/native_host.swift",
+        "macos/bridge/native_request_router.swift",
+        "macos/bridge/native_bridge.swift",
+        "macos/testing/test_support.swift",
+        "macos/bridge/native_core_tests.swift",
     }) |source| compile.addFileArg(b.path(source));
     compile.addFileArg(library);
     compile.addArg("-o");
@@ -131,19 +131,19 @@ fn addSwiftTests(context: Context) void {
     const b = context.b;
     const swift_tests = b.addSystemCommand(&.{ "xcrun", "swiftc" });
     for ([_][]const u8{
-        "macos/launch_configuration.swift",
-        "macos/native_host.swift",
-        "macos/native_request_router.swift",
-        "macos/bundled_assets.swift",
-        "macos/navigation_policy.swift",
-        "macos/window_lifecycle.swift",
-        "macos/test_support.swift",
-        "macos/launch_configuration_tests.swift",
-        "macos/bundled_assets_tests.swift",
-        "macos/navigation_policy_tests.swift",
-        "macos/window_lifecycle_tests.swift",
-        "macos/native_host_tests.swift",
-        "macos/native_request_router_tests.swift",
+        "macos/app/launch_configuration.swift",
+        "macos/bridge/native_host.swift",
+        "macos/bridge/native_request_router.swift",
+        "macos/web/bundled_assets.swift",
+        "macos/web/navigation_policy.swift",
+        "macos/app/window_lifecycle.swift",
+        "macos/testing/test_support.swift",
+        "macos/app/launch_configuration_tests.swift",
+        "macos/web/bundled_assets_tests.swift",
+        "macos/web/navigation_policy_tests.swift",
+        "macos/app/window_lifecycle_tests.swift",
+        "macos/bridge/native_host_tests.swift",
+        "macos/bridge/native_request_router_tests.swift",
     }) |source| swift_tests.addFileArg(b.path(source));
     swift_tests.addArg("-o");
     const swift_test_executable = swift_tests.addOutputFileArg("NativeHostTests");
@@ -171,13 +171,13 @@ fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
         "Rvw.app/Contents/MacOS/rvw-cli",
     );
     const install_plist = b.addInstallFileWithDir(
-        b.path("macos/Info.plist"),
+        b.path("macos/resources/Info.plist"),
         .prefix,
         "Rvw.app/Contents/Info.plist",
     );
-    const install_icon = if (std.Io.Dir.cwd().access(b.graph.io, "macos/Rvw.icns", .{}))
+    const install_icon = if (std.Io.Dir.cwd().access(b.graph.io, "macos/resources/Rvw.icns", .{}))
         b.addInstallFileWithDir(
-            b.path("macos/Rvw.icns"),
+            b.path("macos/resources/Rvw.icns"),
             .prefix,
             "Rvw.app/Contents/Resources/Rvw.icns",
         )

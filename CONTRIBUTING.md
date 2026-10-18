@@ -73,8 +73,12 @@ Key areas of the repository:
 - `frontend/src/review/` owns request helpers and review-session state;
   `frontend/src/actions/` and `frontend/src/components/` implement UI behavior
   and presentation.
-- `macos/` contains the Swift host, window lifecycle, WebKit handling, and
-  native request bridge.
+- `macos/app/` contains application startup, menus, and window lifecycle code.
+- `macos/bridge/` connects native requests to the Zig core.
+- `macos/web/` handles bundled web assets and navigation.
+- `macos/resources/` contains the application plist and icon.
+- macOS tests are beside their source files. `macos/testing/` contains shared
+  test helpers.
 - `build/` assembles the macOS bundle and installation artifacts.
 
 Keep changes at the appropriate boundary: define new user operations in
