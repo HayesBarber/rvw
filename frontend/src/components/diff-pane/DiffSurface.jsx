@@ -6,12 +6,12 @@ import { File, FileDiff, Virtualizer } from '@pierre/diffs/react'
 const diffCursorCSS = `
   [data-line][data-editor-active-line],
   [data-column-number][data-editor-active-line] {
-    --diffs-editor-active-line-source-mix: 68%;
+    --diffs-editor-active-line-source-mix: 85%;
   }
 
   [data-line][data-editor-active-line] {
-    box-shadow: inset 0 1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent),
-      inset 0 -1px color-mix(in lab, var(--diffs-modified-base) 45%, transparent);
+    box-shadow: inset 0 1px color-mix(in lab, var(--diffs-modified-base) 35%, transparent),
+      inset 0 -1px color-mix(in lab, var(--diffs-modified-base) 35%, transparent);
   }
 
   [data-diffs-header] {
