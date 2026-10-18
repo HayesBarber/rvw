@@ -34,9 +34,9 @@ export default function CommentsGroup({
           onClick={() => { if (!busy) onSelectComment(comment.id) }}
         >
           <header>
-            <span>{targetLabel(comment.target)}</span>
-            {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
-            {comment.target.kind !== 'review' && (
+            {comment.target.kind === 'review' ? (
+              <span>{targetLabel(comment.target)}</span>
+            ) : (
               <a
                 className="comment-location-link"
                 href={`#${encodeURIComponent(comment.target.path)}`}
@@ -49,9 +49,10 @@ export default function CommentsGroup({
                   onOpenLocation(commentLocation(comment))
                 }}
               >
-                Open location
+                {targetLabel(comment.target)}
               </a>
             )}
+            {comment.commentType && <span className="comment-type-badge">{comment.commentType}</span>}
             <button
               type="button"
               className="comments-item-edit"
