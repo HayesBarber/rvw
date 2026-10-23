@@ -53,7 +53,6 @@ pub const GitProvider = struct {
             .source = source,
             .sourceLabel = labels.full,
             .compactSourceLabel = labels.compact,
-            .initialPath = if (summaries.items.len == 0) null else summaries.items[0].path,
             .files = try summaries.toOwnedSlice(allocator),
         };
 
@@ -148,7 +147,6 @@ test "Git provider builds a deterministic working-tree review from a temporary r
     try std.testing.expectEqualStrings(std.fs.path.basename(fixture.root), overview.repository.name);
     try std.testing.expectEqualStrings("working tree", overview.sourceLabel);
     try std.testing.expectEqualStrings("working tree", overview.compactSourceLabel);
-    try std.testing.expectEqualStrings("deleted.txt", overview.initialPath.?);
     try std.testing.expectEqual(@as(usize, 3), overview.files.len);
     try expectSummary(overview.files[0], "deleted.txt", .deleted, 0, 1);
     try expectSummary(overview.files[1], "modified.txt", .modified, 1, 1);

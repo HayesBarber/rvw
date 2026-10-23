@@ -179,7 +179,6 @@ pub const DiffOverview = struct {
     source: DiffSource,
     sourceLabel: []const u8 = "",
     compactSourceLabel: []const u8 = "",
-    initialPath: ?[]const u8,
     files: []const FileSummary,
 };
 

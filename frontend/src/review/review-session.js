@@ -60,6 +60,14 @@ export function selectEmptyReviewTreeMode(overview, treeMode) {
   return treeMode
 }
 
+/** Changes use tree order; Files keep the first backend path as their default. */
+export function selectDefaultReviewPath(overview, treeMode) {
+  const files = overview?.files ?? []
+  return treeMode === TreeMode.FILES
+    ? files[0]?.path ?? null
+    : orderedFilePaths(files)[0] ?? null
+}
+
 export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft }) {
   const [fileCache] = useState(createReviewFileCache)
   const [generation, setGeneration] = useState(0)
@@ -74,15 +82,20 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   const loadedReview = useRef(null)
   const sessionKey = overview ? JSON.stringify([overview.repository, overview.source]) : null
 
+  const defaultPath = useMemo(
+    () => selectDefaultReviewPath(overview, workspace.treeMode),
+    [overview, workspace.treeMode],
+  )
+
   useEffect(() => {
     if (!overview) return
     if (loadedReview.current === sessionKey) return
     loadedReview.current = sessionKey
     dispatchWorkspace({
       type: 'review_loaded',
-      initialPath: overview.initialPath,
+      defaultPath,
     })
-  }, [dispatchWorkspace, overview, sessionKey])
+  }, [defaultPath, dispatchWorkspace, overview, sessionKey])
 
   const changedPaths = useMemo(
     () => new Set(overview?.files.map((file) => file.path) ?? []),
@@ -109,11 +122,11 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     () => selectActivePath(
       visibleFiles,
       workspace.selectedPath,
-      overview?.initialPath,
+      defaultPath,
       workspace.treeMode === TreeMode.FILES && workspace.fileHistoryIndex >= 0,
       overview?.files.length === 0,
     ),
-    [overview, visibleFiles, workspace.selectedPath, workspace.treeMode, workspace.fileHistoryIndex],
+    [defaultPath, overview, visibleFiles, workspace.selectedPath, workspace.treeMode, workspace.fileHistoryIndex],
   )
   const visibleFilePaths = useMemo(
     () => orderedFilePaths(visibleFiles),
@@ -176,7 +189,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       type: 'tree_mode_changed',
       mode: nextMode,
       visiblePaths: nextFiles.map((file) => file.path),
-      initialPath: overview.initialPath,
+      defaultPath: selectDefaultReviewPath(overview, nextMode),
       preferRootFile: nextMode === TreeMode.FILES && overview.files.length === 0,
     })
     if (

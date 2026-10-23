@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { TreeMode } from '../app/workspace.js'
+import { initialWorkspaceState, TreeMode, workspaceReducer } from '../app/workspace.js'
 import { selectActivePath } from '../app/file-selection.js'
 import {
   createFilesModeEntries,
   includeSelectedFile,
+  selectDefaultReviewPath,
   selectEmptyReviewTreeMode,
   selectVisibleFiles,
 } from './review-session.js'
@@ -18,7 +19,6 @@ const changedFile = {
   deletions: 1,
 }
 const overview = {
-  initialPath: changedFile.path,
   files: [changedFile],
 }
 
@@ -146,10 +146,72 @@ test('empty reviews fall back to the first nested file or no file', () => {
   assert.equal(selectActivePath([], null, null, false, true), null)
 })
 
-test('root preference preserves selected, initial, and history paths', () => {
+test('root preference preserves selected, default, and history paths', () => {
   const entries = createFilesModeEntries({ files: [] }, ['a/file.txt', 'root.txt'])
   assert.equal(selectActivePath(entries, 'a/file.txt', null, false, true), 'a/file.txt')
   assert.equal(selectActivePath(entries, null, 'a/file.txt', false, true), 'a/file.txt')
   assert.equal(selectActivePath(entries, 'missing.txt', null, true, true), 'missing.txt')
   assert.equal(selectActivePath(entries, 'missing.txt', null, false, true), 'root.txt')
+})
+
+const selectionScenarios = [
+  { paths: ['README.md', 'src/app.js'], expected: 'src/app.js' },
+  { paths: ['README.md', 'src/app.js', 'src/lib/z.js', 'src/lib/deep/a.js'], expected: 'src/lib/deep/a.js' },
+  { paths: ['Z.txt', 'a.txt'], expected: 'a.txt' },
+  { paths: [], expected: null },
+]
+
+test('Changes startup selects the first tree file and records it in history', () => {
+  for (const { paths, expected } of selectionScenarios) {
+    const review = { files: paths.map((path) => ({ path })) }
+    const defaultPath = selectDefaultReviewPath(review, TreeMode.CHANGES)
+    const loaded = workspaceReducer(initialWorkspaceState, { type: 'review_loaded', defaultPath })
+    assert.equal(loaded.selectedPath, expected)
+    assert.deepEqual(loaded.fileHistory, expected ? [expected] : [])
+    assert.equal(selectActivePath(review.files, null, defaultPath), expected)
+  }
+  assert.equal(selectDefaultReviewPath(null, TreeMode.CHANGES), null)
+})
+
+test('Changes fallback uses tree order when the selected file leaves the change set', () => {
+  for (const { paths, expected } of selectionScenarios) {
+    const review = { files: paths.map((path) => ({ path })) }
+    const defaultPath = selectDefaultReviewPath(review, TreeMode.CHANGES)
+    assert.equal(selectActivePath(review.files, 'removed.txt', defaultPath), expected)
+    for (const path of paths) {
+      assert.equal(selectActivePath(review.files, path, defaultPath), path)
+    }
+  }
+})
+
+test('switching to Changes preserves changed selections and uses tree order for other selections', () => {
+  for (const { paths, expected } of selectionScenarios) {
+    const review = { files: paths.map((path) => ({ path })) }
+    const action = {
+      type: 'tree_mode_changed', mode: TreeMode.CHANGES,
+      visiblePaths: paths, defaultPath: selectDefaultReviewPath(review, TreeMode.CHANGES),
+    }
+    const filesState = { ...initialWorkspaceState, treeMode: TreeMode.FILES }
+    const fallback = workspaceReducer({ ...filesState, selectedPath: 'unchanged.txt' }, action)
+    assert.equal(fallback.selectedPath, expected)
+    for (const path of paths) {
+      const selected = { ...filesState, selectedPath: path }
+      assert.equal(workspaceReducer(selected, action).selectedPath, path)
+    }
+  }
+})
+
+test('Files defaults retain backend path order and prefer changed files over repository files', () => {
+  const review = { files: [{ path: 'README.md' }, { path: 'src/app.js' }] }
+  const entries = createFilesModeEntries(review, ['a/unchanged.js', 'README.md', 'src/app.js'])
+  const defaultPath = selectDefaultReviewPath(review, TreeMode.FILES)
+  assert.equal(defaultPath, 'README.md')
+  assert.equal(selectActivePath(entries, null, defaultPath), 'README.md')
+  assert.equal(selectActivePath(entries, 'src/app.js', defaultPath), 'src/app.js')
+  const switched = workspaceReducer(initialWorkspaceState, {
+    type: 'tree_mode_changed', mode: TreeMode.FILES,
+    visiblePaths: entries.map((file) => file.path), defaultPath,
+  })
+  assert.equal(switched.selectedPath, 'README.md')
+  assert.equal(selectDefaultReviewPath({ files: [] }, TreeMode.FILES), null)
 })

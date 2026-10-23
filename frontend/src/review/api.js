@@ -20,7 +20,6 @@
  * @property {{ kind: 'working-tree', base: string } | { kind: 'commit-range', base: string, head: string } | { kind: 'pull-request', number: number }} source
  * @property {string} sourceLabel
  * @property {string} compactSourceLabel
- * @property {string | null} initialPath
  * @property {FileSummary[]} files
  */
 
