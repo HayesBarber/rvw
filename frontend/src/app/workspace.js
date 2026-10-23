@@ -45,10 +45,10 @@ function reduceWorkspace(state, action) {
     case 'review_loaded':
       return {
         ...state,
-        selectedPath: action.initialPath,
+        selectedPath: action.defaultPath,
         lineNavigation: null,
-        fileHistory: action.initialPath ? [action.initialPath] : [],
-        fileHistoryIndex: action.initialPath ? 0 : -1,
+        fileHistory: action.defaultPath ? [action.defaultPath] : [],
+        fileHistoryIndex: action.defaultPath ? 0 : -1,
         unavailablePaths: [],
       }
     case 'file_unavailable':
@@ -83,7 +83,7 @@ function reduceWorkspace(state, action) {
         selectedPath: selectActivePath(
           action.visiblePaths.map((path) => ({ path })),
           state.selectedPath,
-          action.initialPath,
+          action.defaultPath,
           false,
           action.preferRootFile,
         ),

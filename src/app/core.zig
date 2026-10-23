@@ -493,13 +493,11 @@ test "core reload replaces the review snapshot without touching comments and pre
                 .id = "snapshot-1",
                 .repository = .{ .name = "repository" },
                 .source = .{ .working_tree = .{ .base = "base" } },
-                .initialPath = "before.txt",
                 .files = &first_files,
             } else .{
                 .id = "snapshot-2",
                 .repository = .{ .name = "repository" },
                 .source = .{ .working_tree = .{ .base = "base" } },
-                .initialPath = "after.txt",
                 .files = &second_files,
             };
         }
@@ -597,7 +595,6 @@ test "core edits and deletes only the requested comment with useful errors" {
                 .id = "empty-review",
                 .repository = .{ .name = "rvw" },
                 .source = .{ .working_tree = .{ .base = "HEAD" } },
-                .initialPath = null,
                 .files = &.{},
             };
         }
@@ -689,7 +686,6 @@ test "core edits and deletes only the requested comment with useful errors" {
             try std.testing.expect(edited.target == .review);
             const overview = (try core.dispatch(.get_diff_overview)).diff_overview;
             try std.testing.expectEqual(@as(usize, 0), overview.files.len);
-            try std.testing.expect(overview.initialPath == null);
         } else {
             try std.testing.expectEqualStrings("README.md", edited.target.file.path);
         }
@@ -851,7 +847,6 @@ test "core copies configured comment text and still rejects an empty comment lis
                 .source = .{ .working_tree = .{ .base = "HEAD" } },
                 .sourceLabel = "working tree",
                 .compactSourceLabel = "working tree",
-                .initialPath = null,
                 .files = &.{},
             };
         }

@@ -21,12 +21,12 @@ test('returning from empty Changes uses the root default in Files', () => {
     })
     const changes = workspaceReducer(started, {
       type: 'tree_mode_changed', mode: TreeMode.CHANGES,
-      visiblePaths: [], initialPath: null, preferRootFile: false,
+      visiblePaths: [], defaultPath: null, preferRootFile: false,
     })
     assert.equal(changes.selectedPath, null)
     const files = workspaceReducer(changes, {
       type: 'tree_mode_changed', mode: TreeMode.FILES,
-      visiblePaths, initialPath: null, preferRootFile: true,
+      visiblePaths, defaultPath: null, preferRootFile: true,
     })
     assert.equal(files.selectedPath, 'README.md')
     assert.equal(files.fileHistory[files.fileHistoryIndex], 'README.md')
@@ -43,24 +43,24 @@ test('Files mode root fallback includes hidden and ignored files and handles mis
   for (const { visiblePaths, expected } of scenarios) {
     const files = workspaceReducer(initialWorkspaceState, {
       type: 'tree_mode_changed', mode: TreeMode.FILES,
-      visiblePaths, initialPath: null, preferRootFile: true,
+      visiblePaths, defaultPath: null, preferRootFile: true,
     })
     assert.equal(files.selectedPath, expected)
   }
 })
 
-test('mode changes preserve valid selections and initial paths before root fallback', () => {
+test('mode changes preserve valid selections and default paths before root fallback', () => {
   const visiblePaths = ['assets/a.txt', 'root.txt']
   const selected = workspaceReducer(initialWorkspaceState, {
     type: 'file_selected', path: 'assets/a.txt',
   })
   const toFiles = {
     type: 'tree_mode_changed', mode: TreeMode.FILES,
-    visiblePaths, initialPath: null, preferRootFile: true,
+    visiblePaths, defaultPath: null, preferRootFile: true,
   }
   assert.equal(workspaceReducer(selected, toFiles).selectedPath, 'assets/a.txt')
   assert.equal(workspaceReducer(initialWorkspaceState, {
-    ...toFiles, initialPath: 'assets/a.txt',
+    ...toFiles, defaultPath: 'assets/a.txt',
   }).selectedPath, 'assets/a.txt')
   assert.equal(workspaceReducer(initialWorkspaceState, {
     ...toFiles, preferRootFile: false,
@@ -190,7 +190,7 @@ test('file-tree width survives normal workspace transitions', () => {
       type: 'tree_mode_changed',
       mode: TreeMode.FILES,
       visiblePaths: ['src/main.zig'],
-      initialPath: 'src/main.zig',
+      defaultPath: 'src/main.zig',
     },
     { type: 'file_selected', path: 'src/main.zig' },
     { type: 'finder_opened' },
@@ -200,7 +200,7 @@ test('file-tree width survives normal workspace transitions', () => {
       changed: false,
     },
     { type: 'surface_activated', surface: ActiveSurface.FILE_TREE },
-    { type: 'review_loaded', initialPath: 'build.zig' },
+    { type: 'review_loaded', defaultPath: 'build.zig' },
   ]
 
   const finalState = transitions.reduce(workspaceReducer, resized)
@@ -414,11 +414,11 @@ test('history skips missing and failed files and can leave an unavailable curren
 test('history restores unchanged files in Files mode and resets for a new session', () => {
   const opened = openHistoryFiles('unchanged', 'A')
   assert.equal(moveHistory(opened, -1).treeMode, TreeMode.FILES)
-  const reset = workspaceReducer(opened, { type: 'review_loaded', initialPath: 'new' })
+  const reset = workspaceReducer(opened, { type: 'review_loaded', defaultPath: 'new' })
   assert.deepEqual(reset.fileHistory, ['new'])
   assert.equal(reset.fileHistoryIndex, 0)
   assert.equal(moveHistory(reset, -1), reset)
-  const empty = workspaceReducer(reset, { type: 'review_loaded', initialPath: null })
+  const empty = workspaceReducer(reset, { type: 'review_loaded', defaultPath: null })
   assert.deepEqual(empty.fileHistory, [])
   assert.equal(empty.fileHistoryIndex, -1)
 })
