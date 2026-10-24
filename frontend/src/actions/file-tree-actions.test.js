@@ -173,7 +173,7 @@ for (const expanded of [true, false]) {
       [ApplicationAction.COPY_FILE_PATH_ABSOLUTE, 'absolute'],
     ]) {
       assert.equal(actions[action](), true)
-      assert.deepEqual(copies.at(-1), ['src', format])
+      assert.deepEqual(copies.at(-1), ['src/', format])
       assert.equal(directory.isExpanded(), expanded)
       assert.equal(model.getFocusedPath(), 'src/')
       assert.deepEqual(model.getSelectedPaths(), ['README.md'])

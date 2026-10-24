@@ -288,7 +288,9 @@ fn validRepositoryRelativePath(path: []const u8) bool {
         std.mem.indexOfScalar(u8, path, '\\') != null or
         std.mem.indexOfScalar(u8, path, 0) != null) return false;
 
-    var components = std.mem.splitScalar(u8, path, '/');
+    // A final separator identifies a directory; internal empty components remain invalid.
+    const components_path = if (path[path.len - 1] == '/') path[0 .. path.len - 1] else path;
+    var components = std.mem.splitScalar(u8, components_path, '/');
     while (components.next()) |component| {
         if (component.len == 0 or
             std.mem.eql(u8, component, ".") or
@@ -814,12 +816,33 @@ test "core copies validated file paths exactly without accessing the file" {
         dependencies.copied[0..dependencies.copied_len],
     );
 
+    for ([_][]const u8{ "nested/", "nested/directory ü/" }) |directory_path| {
+        for ([_]model.FilePathFormat{ .relative, .absolute }) |format| {
+            const result = (try core.dispatch(.{ .copy_file_path = .{
+                .path = directory_path,
+                .format = format,
+            } })).copy_file_path_result;
+            const expected = if (format == .absolute)
+                try std.fmt.allocPrint(std.testing.allocator, "/repo root/{s}", .{directory_path})
+            else
+                try std.testing.allocator.dupe(u8, directory_path);
+            defer std.testing.allocator.free(expected);
+            try std.testing.expectEqualStrings(expected, dependencies.copied[0..dependencies.copied_len]);
+            try std.testing.expectEqualStrings(directory_path, result.path);
+            try std.testing.expectEqual(format, result.format);
+        }
+    }
+
     const invalid_paths = [_][]const u8{
         "",
         "/etc/passwd",
         "../secret",
         "nested/../secret",
         "nested//file",
+        "nested//",
+        "nested/../",
+        "nested/./",
+        "/",
         "nested\\file",
     };
     for (&invalid_paths) |path| {
