@@ -8,6 +8,7 @@ import {
   fileTreeFocusCSS,
   focusFileTreePath,
 } from '../actions/file-tree-actions.js'
+import { updateFileTreeData } from './file-tree-data.js'
 
 export default function FileTreePane({
   files,
@@ -57,6 +58,15 @@ export default function FileTreePane({
     onSelectionChange: handleSelectionChange,
     unsafeCSS: fileTreeFocusCSS,
   })
+
+  useEffect(() => {
+    synchronizingSelectionRef.current = true
+    try {
+      updateFileTreeData(model, [...filePaths], gitStatus)
+    } finally {
+      synchronizingSelectionRef.current = false
+    }
+  }, [filePaths, gitStatus, model])
 
   useEffect(
     () => registerActionAdapter(createFileTreeActionAdapter(
