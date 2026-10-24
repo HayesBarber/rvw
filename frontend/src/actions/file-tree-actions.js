@@ -78,11 +78,11 @@ export function createFileTreeActionAdapter(
     [ApplicationAction.SHOW_FILES]: showFiles,
     [ApplicationAction.COPY_FILE_PATH_RELATIVE]: () => {
       const item = model.getFocusedItem()
-      return Boolean(item && !item.isDirectory() && copyFilePath(item.getPath(), 'relative'))
+      return Boolean(item && copyFilePath(item.getPath().replace(/\/$/, ''), 'relative'))
     },
     [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: () => {
       const item = model.getFocusedItem()
-      return Boolean(item && !item.isDirectory() && copyFilePath(item.getPath(), 'absolute'))
+      return Boolean(item && copyFilePath(item.getPath().replace(/\/$/, ''), 'absolute'))
     },
     [ApplicationAction.CURSOR_UP]: (count) => moveFocus(
       model,
