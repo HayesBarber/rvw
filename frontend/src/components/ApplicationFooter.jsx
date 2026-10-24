@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { reviewSourceLabel } from '../review/source-label.js'
 import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
+import { filePathCopyRequestMessage } from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 
 function diagnosticText(diagnostic) {
@@ -94,6 +95,7 @@ export default function ApplicationFooter({
   onReload,
   onSearchText,
   overview,
+  pathCopyRequest,
   reloadDisabled = false,
   reloadMessage,
   reloadMessageIsError = false,
@@ -101,6 +103,7 @@ export default function ApplicationFooter({
   repositoryName,
   vimState,
 }) {
+  const pathCopyMessage = pathCopyRequest ? filePathCopyRequestMessage(pathCopyRequest) : ''
   const pending = vimState.pendingKeys.join(' ')
   const problem = diagnosticText(diagnostic)
   const copyIsError = copyRequest?.status === RequestStatus.ERROR
@@ -124,6 +127,14 @@ export default function ApplicationFooter({
           {problem && (
             <span className="keyboard-diagnostic" role="alert" title={problem}>
               {problem}
+            </span>
+          )}
+          {pathCopyMessage && (
+            <span
+              className={`file-path-copy-status ${pathCopyRequest.status}`}
+              role={pathCopyRequest.status === RequestStatus.ERROR ? 'alert' : 'status'}
+            >
+              {pathCopyMessage}
             </span>
           )}
           {reloadMessage && (

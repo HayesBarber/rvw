@@ -119,7 +119,8 @@ export default function App() {
     handleClearComments(() => setCommentEditDrafts({}))
   ), [handleClearComments])
   const copyMessage = copyRequestMessage(copyRequest)
-  const filePathCopyRequest = useCopyFilePath()
+  const diffPathCopyRequest = useCopyFilePath()
+  const treePathCopyRequest = useCopyFilePath()
   const clearMessage = clearRequestMessage(clearRequest)
   const reloadMessage = reloadRequestMessage(reloadRequest)
   const reloadMessageIsError = reloadRequest.status === RequestStatus.ERROR
@@ -164,10 +165,10 @@ export default function App() {
   const renderFilePathCopyControl = useCallback(() => (
     <FilePathCopyControl
       path={activePath}
-      request={filePathCopyRequest}
-      onCopy={filePathCopyRequest.copy}
+      request={diffPathCopyRequest}
+      onCopy={diffPathCopyRequest.copy}
     />
-  ), [activePath, filePathCopyRequest])
+  ), [activePath, diffPathCopyRequest])
   const renderFileHeaderActions = useCallback(() => (
     <FileHeaderActions
       canCommentOnFile={canCommentOnFile}
@@ -281,7 +282,7 @@ export default function App() {
             isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
             mode={workspace.treeMode}
             onFocusDiffPane={focusDiffPane}
-            onCopyFilePath={filePathCopyRequest.copy}
+            onCopyFilePath={treePathCopyRequest.copy}
             selectedPath={activePath}
             onSelectFile={handleTreeFileSelect}
             onShowChanges={showChanges}
@@ -328,7 +329,7 @@ export default function App() {
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
             onDraftStateChange={setHasUnsavedDraft}
-            onCopyFilePath={filePathCopyRequest.copy}
+            onCopyFilePath={diffPathCopyRequest.copy}
             onFocusFileTree={focusFileTree}
             onToggleRelativeLineNumbers={toggleRelativeLineNumbers}
             onToggleWrapLines={toggleWrapLines}
@@ -428,6 +429,7 @@ export default function App() {
         copyMessage={copyMessage}
         copyRequest={copyRequest}
         diagnostic={configurationDiagnostic}
+        pathCopyRequest={treePathCopyRequest}
         onToggleComments={() => {
           if (workspace.commentsOpen) dispatchWorkspace({ type: 'comments_closed' })
           else dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)

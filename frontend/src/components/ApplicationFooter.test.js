@@ -128,3 +128,22 @@ test('footer keeps a message container before More actions and Comments in all r
     }
   }
 })
+
+
+test('tree path copy progress, success, and failures appear in the footer', () => {
+  for (const [request, message, role] of [
+    [{ status: 'idle' }, '', 'status'],
+    [{ status: 'loading' }, 'Copying path…', 'status'],
+    [{ status: 'success', data: { format: 'relative' } }, 'Path copied', 'status'],
+    [{ status: 'success', data: { format: 'absolute' } }, 'Absolute path copied', 'status'],
+    [{ status: 'error', error: 'Clipboard unavailable' }, 'Clipboard unavailable', 'alert'],
+  ]) {
+    const html = render([], { pathCopyRequest: request })
+    const left = html.slice(html.indexOf('class="footer-left"'), html.indexOf('class="repository-context"'))
+    if (message) {
+      assert.match(left, new RegExp(`class="file-path-copy-status ${request.status}" role="${role}">${message}`))
+    } else {
+      assert.doesNotMatch(left, /file-path-copy-status/)
+    }
+  }
+})

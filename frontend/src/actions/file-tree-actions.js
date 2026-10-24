@@ -76,6 +76,7 @@ export function createFileTreeActionAdapter(
     [ApplicationAction.FOCUS_DIFF_PANE]: focusDiffPane,
     [ApplicationAction.SHOW_CHANGES]: showChanges,
     [ApplicationAction.SHOW_FILES]: showFiles,
+    // Tree directory paths end with /; core copy requests require no final slash.
     [ApplicationAction.COPY_FILE_PATH_RELATIVE]: () => {
       const item = model.getFocusedItem()
       return Boolean(item && copyFilePath(item.getPath().replace(/\/$/, ''), 'relative'))
