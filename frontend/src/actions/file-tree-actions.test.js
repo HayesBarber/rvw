@@ -152,21 +152,48 @@ test('path actions copy the live focused file without opening or selecting it', 
   assert.deepEqual(model.getSelectedPaths(), [])
 })
 
-test('path actions ignore focused directories and empty trees', (t) => {
-  const model = createTree()
-  const empty = createTree([])
-  t.after(() => {
-    model.cleanUp()
-    empty.cleanUp()
-  })
-  const copyFilePath = () => assert.fail('copy should not be attempted')
-  const actions = createFileTreeActionAdapter(model, () => {}, { copyFilePath })
-  const emptyActions = createFileTreeActionAdapter(empty, () => {}, { copyFilePath })
+for (const expanded of [true, false]) {
+  test(`path actions copy the ${expanded ? 'expanded' : 'collapsed'} directory without changing tree state`, (t) => {
+    const model = createTree()
+    t.after(() => model.cleanUp())
+    const copies = []
+    const actions = createFileTreeActionAdapter(model, () => {
+      assert.fail('copy must not open an item')
+    }, {
+      copyFilePath: (...args) => (copies.push(args), true),
+    })
 
-  model.focusPath('src/')
+    model.getItem('README.md').select()
+    model.focusPath('src/')
+    const directory = model.getFocusedItem()
+    if (!expanded) directory.collapse()
+
+    for (const [action, format] of [
+      [ApplicationAction.COPY_FILE_PATH_RELATIVE, 'relative'],
+      [ApplicationAction.COPY_FILE_PATH_ABSOLUTE, 'absolute'],
+    ]) {
+      assert.equal(actions[action](), true)
+      assert.deepEqual(copies.at(-1), ['src/', format])
+      assert.equal(directory.isExpanded(), expanded)
+      assert.equal(model.getFocusedPath(), 'src/')
+      assert.deepEqual(model.getSelectedPaths(), ['README.md'])
+    }
+    assert.equal(copies.length, 2)
+  })
+}
+
+test('path actions do nothing when no item has focus', (t) => {
+  const model = createTree([])
+  t.after(() => model.cleanUp())
+  const actions = createFileTreeActionAdapter(model, () => {
+    assert.fail('copy must not open an item')
+  }, {
+    copyFilePath: () => assert.fail('copy should not be attempted'),
+  })
+
+  assert.equal(model.getFocusedItem(), null)
   assert.equal(actions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), false)
   assert.equal(actions[ApplicationAction.COPY_FILE_PATH_ABSOLUTE](), false)
-  assert.equal(emptyActions[ApplicationAction.COPY_FILE_PATH_RELATIVE](), false)
 })
 
 test('half-page actions use the live viewport, scale counts, clamp, and keep focus semantics', (t) => {
