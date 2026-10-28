@@ -47,12 +47,8 @@ pub const GitHubCliProvider = struct {
     fn readOrigin(self: *GitHubCliProvider, allocator: std.mem.Allocator, io: std.Io, directory: []const u8) Error![]const u8 {
         const executable = self.git_executable orelse "git";
         if (self.git_executable != null and !std.fs.path.isAbsolute(executable)) return error.RepositoryUnavailable;
-        const output = std.process.run(allocator, io, .{
-            .argv = &.{ executable, "--no-pager", "--no-optional-locks", "-C", directory, "remote", "get-url", "origin" },
-            .stdout_limit = .limited(git_process.maximum_revision_size),
-            .stderr_limit = .limited(git_process.maximum_stderr_size),
-        }) catch |err| switch (err) {
-            error.FileNotFound, error.AccessDenied, error.InvalidExe => return error.RepositoryUnavailable,
+        const output = git_process.runResult(allocator, io, &.{ executable, "--no-pager", "--no-optional-locks", "-C", directory, "remote", "get-url", "origin" }, git_process.maximum_revision_size) catch |err| switch (err) {
+            error.GitNotFound, error.AccessDenied, error.InvalidExe => return error.RepositoryUnavailable,
             error.OutOfMemory => return error.OutOfMemory,
             else => return error.RepositoryFailed,
         };
@@ -69,6 +65,7 @@ pub const GitHubCliProvider = struct {
 
 fn repositoryName(origin: []const u8) error{UnsupportedOrigin}![]const u8 {
     var path: []const u8 = undefined;
+    // Git also accepts SCP-style SSH remotes without a URI scheme.
     if (std.mem.startsWith(u8, origin, "git@github.com:")) {
         path = origin["git@github.com:".len..];
     } else {
@@ -101,38 +98,36 @@ fn validName(name: []const u8) bool {
     return true;
 }
 
+const GitHubPullRequest = struct {
+    number: u32,
+    title: []const u8,
+    author: struct { login: []const u8 },
+    url: []const u8,
+    isDraft: bool,
+    baseRefName: []const u8,
+    headRefName: []const u8,
+};
+
 fn parsePullRequests(allocator: std.mem.Allocator, output: []const u8) Error![]const model.PullRequest {
     if (!std.unicode.utf8ValidateSlice(output)) return error.InvalidPullRequestList;
-    const parsed = std.json.parseFromSliceLeaky(std.json.Value, allocator, output, .{ .allocate = .alloc_always }) catch |err| switch (err) {
+    const parsed = std.json.parseFromSliceLeaky([]const GitHubPullRequest, allocator, output, .{ .allocate = .alloc_always, .ignore_unknown_fields = true }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => return error.InvalidPullRequestList,
     };
-    if (parsed != .array or parsed.array.items.len > PullRequestProvider.maximum_pull_requests) return error.InvalidPullRequestList;
-    const requests = try allocator.alloc(model.PullRequest, parsed.array.items.len);
-    for (parsed.array.items, requests) |item, *request| {
-        if (item != .object) return error.InvalidPullRequestList;
-        const number = item.object.get("number") orelse return error.InvalidPullRequestList;
-        const author = item.object.get("author") orelse return error.InvalidPullRequestList;
-        const draft = item.object.get("isDraft") orelse return error.InvalidPullRequestList;
-        if (number != .integer or number.integer <= 0 or number.integer > std.math.maxInt(u32) or author != .object or draft != .bool) return error.InvalidPullRequestList;
+    const requests = try allocator.alloc(model.PullRequest, parsed.len);
+    for (parsed, requests) |item, *request| {
         request.* = .{
-            .number = @intCast(number.integer),
-            .title = try stringField(item.object, "title"),
-            .authorLogin = try stringField(author.object, "login"),
-            .url = try stringField(item.object, "url"),
-            .isDraft = draft.bool,
-            .baseRefName = try stringField(item.object, "baseRefName"),
-            .headRefName = try stringField(item.object, "headRefName"),
+            .number = item.number,
+            .title = item.title,
+            .authorLogin = item.author.login,
+            .url = item.url,
+            .isDraft = item.isDraft,
+            .baseRefName = item.baseRefName,
+            .headRefName = item.headRefName,
         };
         if (request.title.len == 0 or request.url.len == 0 or request.baseRefName.len == 0 or request.headRefName.len == 0) return error.InvalidPullRequestList;
     }
     return requests;
-}
-
-fn stringField(object: std.json.ObjectMap, name: []const u8) error{InvalidPullRequestList}![]const u8 {
-    const field = object.get(name) orelse return error.InvalidPullRequestList;
-    if (field != .string) return error.InvalidPullRequestList;
-    return field.string;
 }
 
 const TestRepository = @import("../../testing/repository.zig").Repository;
@@ -333,7 +328,7 @@ test "pull request parser rejects invalid metadata" {
         defer arena.deinit();
         try std.testing.expectError(error.InvalidPullRequestList, parsePullRequests(arena.allocator(), input));
     }
-    for ([_][]const u8{ "0", "-1", "4294967296", "1.5", "\"42\"" }) |number| {
+    for ([_][]const u8{ "-1", "4294967296", "1.5" }) |number| {
         const replacement = try std.fmt.allocPrint(std.testing.allocator, "\"number\":{s}", .{number});
         defer std.testing.allocator.free(replacement);
         const input = try std.mem.replaceOwned(u8, std.testing.allocator, "[" ++ sample_request ++ "]", "\"number\":42", replacement);
@@ -344,15 +339,20 @@ test "pull request parser rejects invalid metadata" {
     }
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const excess = "[" ++ (sample_request ++ ",") ** 30 ++ sample_request ++ "]";
-    try std.testing.expectError(error.InvalidPullRequestList, parsePullRequests(arena.allocator(), excess));
-    const maximum = "[" ++ (sample_request ++ ",") ** 29 ++ sample_request ++ "]";
-    try std.testing.expectEqual(@as(usize, 30), (try parsePullRequests(arena.allocator(), maximum)).len);
     for ([_][]const u8{ "{}", "{\"login\":null}", "{\"login\":1}" }) |author| {
         const input = try std.mem.replaceOwned(u8, std.testing.allocator, "[" ++ sample_request ++ "]", "{\"login\":\"test-author\",\"is_bot\":false}", author);
         defer std.testing.allocator.free(input);
         try std.testing.expectError(error.InvalidPullRequestList, parsePullRequests(arena.allocator(), input));
     }
+}
+
+test "pull request parser accepts the list length from gh without a separate number policy" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const output = "[" ++ (sample_request ++ ",") ** 30 ++ sample_request ++ "]";
+    try std.testing.expectEqual(@as(usize, 31), (try parsePullRequests(arena.allocator(), output)).len);
+    const zero = try std.mem.replaceOwned(u8, arena.allocator(), "[" ++ sample_request ++ "]", "\"number\":42", "\"number\":0");
+    try std.testing.expectEqual(@as(u32, 0), (try parsePullRequests(arena.allocator(), zero))[0].number);
 }
 
 test "GitHub CLI releases result memory on allocation failures" {

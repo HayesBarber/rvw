@@ -5,8 +5,6 @@ pub const PullRequestProvider = struct {
     context: *anyopaque,
     vtable: *const VTable,
 
-    pub const maximum_pull_requests = 30;
-
     pub const Error = error{
         MissingOrigin,
         UnsupportedOrigin,
