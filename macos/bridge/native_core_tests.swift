@@ -163,12 +163,53 @@ private func testNativeReviewComments() throws {
     }
 }
 
+private func testNativeCommitHistory() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        let commit = ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
+                      "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m"]
+        try git(directory, commit + ["first"])
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+        let router = routerBlockingTermination(core)
+        let first = try response(router, ["type": "list_commits"])
+        let initial = first["commits"] as? [[String: Any]]
+        expect(initial?.count == 1, "native history should include HEAD")
+        expect(initial?.first?["subject"] as? String == "first", "native history should return the subject")
+        expect(initial?.first?["authorName"] as? String == "rvw tests", "native history should return the author")
+        expect((initial?.first?["sha"] as? String)?.count == 40, "native history should return the full SHA")
+        expect(initial?.first?["commitDate"] is String, "native history should return the commit date")
+
+        try git(directory, ["checkout", "--quiet", "--detach"])
+        try git(directory, commit + ["second\nnext line"])
+        let next = try response(router, ["type": "list_commits"])
+        let current = next["commits"] as? [[String: Any]]
+        expect(current?.count == 2, "later native requests should read the current detached HEAD")
+        expect(current?.first?["subject"] as? String == "second", "subjects should contain only the first message line")
+        expect(current?.last?["sha"] as? String == initial?.first?["sha"] as? String,
+               "native history should retain reachable parents")
+
+        try git(directory, ["symbolic-ref", "HEAD", "refs/heads/unborn"])
+        let empty = try response(router, ["type": "list_commits"])
+        expect((empty["commits"] as? [Any])?.isEmpty == true, "an unborn branch should return an empty list")
+        try "invalid HEAD\n".write(to: directory.appendingPathComponent(".git/HEAD"), atomically: true, encoding: .utf8)
+        do {
+            _ = try response(router, ["type": "list_commits"])
+            fatalError("invalid HEAD should fail")
+        } catch {
+            expect(error.localizedDescription == "Unable to read repository history",
+                   "repository failures should reach the native queue")
+        }
+        _ = try response(router, ["type": "get_configuration"])
+    }
+}
+
 @main
 struct NativeCoreTests {
     static func main() {
         do {
             try testNativeTextSearch()
             try testNativeReviewComments()
+            try testNativeCommitHistory()
             print("Native core tests passed")
         } catch {
             FileHandle.standardError.write(Data("Native core test failed: \(error)\n".utf8))

@@ -12,6 +12,75 @@ pub const FileStatus = enum {
 
 pub const Repository = struct { name: []const u8 };
 
+pub const Commit = struct {
+    /// Full commit object ID.
+    sha: []const u8,
+    /// First line of the commit message.
+    subject: []const u8,
+    authorName: []const u8,
+    /// Committer date in ISO 8601 format, with a UTC offset.
+    commitDate: []const u8,
+};
+
+pub const CommitListResult = struct {
+    commits: []const Commit,
+    /// Storage for this result; null for static results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    /// Call once after use, including when serialization fails.
+    pub fn deinit(self: CommitListResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: CommitListResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .commits = self.commits });
+    }
+};
+
+test "commit list serialization preserves fields and releases owned storage" {
+    const result: CommitListResult = result: {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        errdefer arena.deinit();
+        const allocator = arena.allocator();
+        const commits = try allocator.alloc(Commit, 1);
+        commits[0] = .{
+            .sha = try allocator.dupe(u8, "0123456789abcdef0123456789abcdef01234567"),
+            .subject = try allocator.dupe(u8, "Fix \"quoted\" text and 雪"),
+            .authorName = try allocator.dupe(u8, "Test Author"),
+            .commitDate = try allocator.dupe(u8, "2026-10-27T18:30:00-04:00"),
+        };
+        break :result .{ .commits = commits, .arena = arena };
+    };
+    defer result.deinit();
+
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    try std.testing.expectError(error.OutOfMemory, std.json.Stringify.valueAlloc(failing.allocator(), result, .{}));
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
+    defer std.testing.allocator.free(encoded);
+    const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, encoded, .{});
+    defer parsed.deinit();
+    try std.testing.expectEqual(@as(usize, 1), parsed.value.object.count());
+    const items = parsed.value.object.get("commits").?.array.items;
+    try std.testing.expectEqual(@as(usize, 1), items.len);
+    const item = items[0].object;
+    try std.testing.expectEqual(@as(usize, 4), item.count());
+    try std.testing.expectEqualStrings(result.commits[0].sha, item.get("sha").?.string);
+    try std.testing.expectEqualStrings(result.commits[0].subject, item.get("subject").?.string);
+    try std.testing.expectEqualStrings(result.commits[0].authorName, item.get("authorName").?.string);
+    try std.testing.expectEqualStrings(result.commits[0].commitDate, item.get("commitDate").?.string);
+}
+
+test "empty commit list supports static storage" {
+    const result: CommitListResult = .{ .commits = &.{} };
+    defer result.deinit();
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("{\"commits\":[]}", encoded);
+}
+
 pub const DiffSource = union(enum) {
     pull_request: struct { number: u32 },
     working_tree: struct { base: []const u8 },
@@ -298,6 +367,7 @@ pub const Request = union(enum) {
     get_configuration,
     reload_review,
     get_diff_overview,
+    list_commits,
     get_files,
     get_files_not_ignored,
     search_text: TextSearchRequest,
@@ -361,6 +431,7 @@ pub const Response = union(enum) {
     configuration: config.Snapshot,
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
+    commit_list: CommitListResult,
     files: []const []const u8,
     text_search: TextSearchResult,
     file: FileDiff,
@@ -371,6 +442,18 @@ pub const Response = union(enum) {
     copy_comments_result: CopyCommentsResult,
     copy_file_path_result: CopyFilePathResult,
     clear_comments_result: ClearCommentsResult,
+
+    /// Release request-owned results after use, including serialization failure.
+    pub fn deinit(self: Response) void {
+        switch (self) {
+            inline else => |value| switch (@typeInfo(@TypeOf(value))) {
+                .@"struct", .@"union", .@"enum", .@"opaque" => {
+                    if (@hasDecl(@TypeOf(value), "deinit")) value.deinit();
+                },
+                else => {},
+            },
+        }
+    }
 };
 
 pub const AppError = error{
@@ -385,6 +468,9 @@ pub const AppError = error{
     InvalidSearchQuery,
     SearchUnavailable,
     SearchFailed,
+    RepositoryUnavailable,
+    RepositoryFailed,
+    InvalidCommitHistory,
 };
 
 pub const ErrorCode = enum {
@@ -401,6 +487,9 @@ pub const ErrorCode = enum {
     invalid_search_query,
     search_unavailable,
     search_failed,
+    repository_unavailable,
+    repository_failed,
+    invalid_commit_history,
     file_path_clipboard_unavailable,
     clipboard_unavailable,
     internal_error,
@@ -418,6 +507,9 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.InvalidSearchQuery => .invalid_search_query,
         error.SearchUnavailable => .search_unavailable,
         error.SearchFailed => .search_failed,
+        error.RepositoryUnavailable => .repository_unavailable,
+        error.RepositoryFailed => .repository_failed,
+        error.InvalidCommitHistory => .invalid_commit_history,
         error.ReloadUnavailable => .reload_unavailable,
         error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
         error.ClipboardCommandFailed,
@@ -443,6 +535,9 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .invalid_search_query => "Search query must be valid UTF-8 without NUL or line breaks",
         .search_unavailable => "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH",
         .search_failed => "Search failed; check directory access and try again",
+        .repository_unavailable => "Git is unavailable",
+        .repository_failed => "Unable to read repository history",
+        .invalid_commit_history => "Repository history data is invalid",
         .reload_unavailable => "Unable to reload the review snapshot",
         .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",

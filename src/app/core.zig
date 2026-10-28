@@ -13,6 +13,7 @@ pub const Core = struct {
     allocator: Allocator,
     io: Io,
     review_provider: provider_module.review.ReviewProvider,
+    repository_provider: provider_module.repository.RepositoryProvider,
     text_search_ignore_aware_provider: provider_module.text_search.TextSearchProvider,
     text_search_all_files_provider: provider_module.text_search.TextSearchProvider,
     comment_provider: provider_module.comment.CommentProvider,
@@ -25,6 +26,7 @@ pub const Core = struct {
         allocator: Allocator,
         io: Io,
         review_provider: provider_module.review.ReviewProvider,
+        repository_provider: provider_module.repository.RepositoryProvider,
         text_search_ignore_aware_provider: provider_module.text_search.TextSearchProvider,
         text_search_all_files_provider: provider_module.text_search.TextSearchProvider,
         comment_provider: provider_module.comment.CommentProvider,
@@ -36,6 +38,7 @@ pub const Core = struct {
             .allocator = allocator,
             .io = io,
             .review_provider = review_provider,
+            .repository_provider = repository_provider,
             .text_search_ignore_aware_provider = text_search_ignore_aware_provider,
             .text_search_all_files_provider = text_search_all_files_provider,
             .comment_provider = comment_provider,
@@ -78,6 +81,7 @@ pub const Core = struct {
                 break :blk .{ .reload_review_result = .{ .generation = self.review_generation } };
             },
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
+            .list_commits => .{ .commit_list = try self.repository_provider.listCommits(self.io, self.review_provider.repositoryRoot()) },
             .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
             .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
             .search_text => |details| blk: {
@@ -199,6 +203,7 @@ fn operationName(request: model.Request) []const u8 {
         .get_configuration => "get_configuration",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
+        .list_commits => "list_commits",
         .get_files => "get_files",
         .get_files_not_ignored => "get_files_not_ignored",
         .search_text => "search_text",
@@ -406,12 +411,14 @@ test "core routes file listings and text search through their providers" {
     };
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
     var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
     var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         review.interface(),
+        repository.interface(),
         search_ignore_aware.interface(),
         search_all_files.interface(),
         comments.interface(),
@@ -540,12 +547,14 @@ test "core reload replaces the review snapshot without touching comments and pre
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
     var context: u8 = 0;
+    var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
     var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
     var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &review, .vtable = &ReviewStub.vtable },
+        repository.interface(),
         search_ignore_aware.interface(),
         search_all_files.interface(),
         comments.interface(),
@@ -576,6 +585,100 @@ test "core reload replaces the review snapshot without touching comments and pre
     try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
     try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
     try std.testing.expectEqualStrings("keep review", (try core.dispatch(.get_comments)).comments[1].body);
+}
+
+test "core lists current commits without changing working-tree, range, or PR reviews" {
+    const TestRepository = @import("../testing/repository.zig").Repository;
+    const ReviewState = struct {
+        fn encode(core: *Core) ![]u8 {
+            const overview = (try core.dispatch(.get_diff_overview)).diff_overview;
+            return std.json.Stringify.valueAlloc(std.testing.allocator, .{
+                .overview = overview,
+                .file = (try core.dispatch(.{ .get_file_diff = .{ .diff_id = overview.id, .path = "tracked.txt" } })).file_diff,
+                .comments = (try core.dispatch(.get_comments)).comments,
+            }, .{});
+        }
+    };
+    for ([_]struct { range: ?[]const u8, pr: ?u32 }{
+        .{ .range = null, .pr = null },
+        .{ .range = "HEAD~1..HEAD", .pr = null },
+        .{ .range = "HEAD~1..HEAD", .pr = 100 },
+    }) |source| {
+        var fixture = try TestRepository.init(std.testing.allocator);
+        defer fixture.deinit();
+        try fixture.write("tracked.txt", "base\n");
+        try fixture.commit("first");
+        try fixture.write("tracked.txt", "head\n");
+        try fixture.commit("second");
+        try fixture.write("tracked.txt", "review snapshot\n");
+
+        var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr);
+        defer review.deinit();
+        var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
+        var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+        defer comments.deinit();
+        var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+        var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
+        var context: u8 = 0;
+        var core = Core.init(
+            std.testing.allocator,
+            std.testing.io,
+            review.interface(),
+            repository.interface(),
+            search_ignore_aware.interface(),
+            search_all_files.interface(),
+            comments.interface(),
+            .{ .context = &context, .vtable = &noop_clipboard_vtable },
+            .{ .allocator = std.testing.allocator, .context = &context, .vtable = &silent_logger_vtable },
+            .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+        );
+        core.review_generation = 4;
+        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review comment", .target = .review } });
+        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep file comment", .target = .{ .file = .{ .path = "tracked.txt" } } } });
+        const before_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(before_review);
+
+        const first = (try core.dispatch(.list_commits)).commit_list;
+        defer first.deinit();
+        try std.testing.expectEqual(@as(usize, 2), first.commits.len);
+        try std.testing.expectEqualStrings("second", first.commits[0].subject);
+
+        try fixture.commit("third");
+        try fixture.write("tracked.txt", "staged\n");
+        try fixture.git(&.{ "add", "tracked.txt" });
+        try fixture.write("tracked.txt", "unstaged\n");
+        try fixture.write("untracked.txt", "untracked\n");
+        const before_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(before_head);
+        const paths = [_][]const u8{ ".git/index", "tracked.txt", "untracked.txt" };
+        var before_files: [paths.len][]const u8 = undefined;
+        for (paths, &before_files) |path, *contents| {
+            contents.* = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+        }
+        defer for (before_files) |contents| std.testing.allocator.free(contents);
+
+        const current = (try core.dispatch(.list_commits)).commit_list;
+        defer current.deinit();
+        try std.testing.expectEqual(@as(usize, 3), current.commits.len);
+        try std.testing.expectEqualStrings(before_head, current.commits[0].sha);
+        try std.testing.expectEqualStrings("third", current.commits[0].subject);
+        try std.testing.expectEqualStrings(first.commits[0].sha, current.commits[1].sha);
+
+        repository.executable = "/rvw-missing-git";
+        try std.testing.expectError(error.RepositoryUnavailable, core.dispatch(.list_commits));
+        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
+        const after_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(after_review);
+        try std.testing.expectEqualStrings(before_review, after_review);
+        const after_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(after_head);
+        try std.testing.expectEqualStrings(before_head, after_head);
+        for (paths, before_files) |path, before| {
+            const after = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+            defer std.testing.allocator.free(after);
+            try std.testing.expectEqualSlices(u8, before, after);
+        }
+    }
 }
 
 const noop_clipboard_vtable: output.Clipboard.VTable = .{
@@ -642,12 +745,14 @@ test "core edits and deletes only the requested comment with useful errors" {
         var context: u8 = 0;
         var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
         defer comments.deinit();
+        var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
         var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
         var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
         var core = Core.init(
             std.testing.allocator,
             threaded.io(),
             .{ .context = &context, .vtable = &TestDependencies.review_vtable },
+            repository.interface(),
             search_ignore_aware.interface(),
             search_all_files.interface(),
             comments.interface(),
@@ -780,12 +885,14 @@ test "core copies validated file paths exactly without accessing the file" {
     var dependencies: TestDependencies = .{};
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
     var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
     var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var core = Core.init(
         std.testing.allocator,
         threaded.io(),
         .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
+        repository.interface(),
         search_ignore_aware.interface(),
         search_all_files.interface(),
         comments.interface(),
@@ -910,6 +1017,7 @@ test "core copies configured comment text and still rejects an empty comment lis
     var dependencies: TestDependencies = .{};
     var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
     defer comments.deinit();
+    var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
     var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
     var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -921,6 +1029,7 @@ test "core copies configured comment text and still rejects an empty comment lis
         std.testing.allocator,
         threaded.io(),
         .{ .context = &dependencies, .vtable = &TestDependencies.review_vtable },
+        repository.interface(),
         search_ignore_aware.interface(),
         search_all_files.interface(),
         comments.interface(),

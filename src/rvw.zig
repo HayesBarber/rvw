@@ -22,6 +22,8 @@ test {
     _ = @import("app/json_protocol.zig");
     _ = @import("provider/text_search/ripgrep.zig");
     _ = @import("provider/comment/memory.zig");
+    _ = @import("provider/repository/interface.zig");
+    _ = @import("provider/repository/git.zig");
     _ = @import("provider/diff/git.zig");
     _ = @import("provider/file/filesystem.zig");
     _ = @import("provider/filetree/walk.zig");
