@@ -446,9 +446,12 @@ pub const Response = union(enum) {
     /// Release request-owned results after use, including serialization failure.
     pub fn deinit(self: Response) void {
         switch (self) {
-            .commit_list => |result| result.deinit(),
-            .text_search => |result| result.deinit(),
-            else => {},
+            inline else => |value| switch (@typeInfo(@TypeOf(value))) {
+                .@"struct", .@"union", .@"enum", .@"opaque" => {
+                    if (@hasDecl(@TypeOf(value), "deinit")) value.deinit();
+                },
+                else => {},
+            },
         }
     }
 };
