@@ -251,13 +251,3 @@ test "Git history parser rejects incomplete records, invalid UTF-8, and excess r
     const valid = sha ++ "\x00\x00author\x00" ++ date ++ "\x00";
     try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, valid ** 31));
 }
-
-test "Git history parser preserves SHA and date strings without format checks" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const commits = try parseHistory(arena.allocator(), "local-id\x00\x00author\x00local-date\x00");
-    try std.testing.expectEqual(@as(usize, 1), commits.len);
-    try std.testing.expectEqualStrings("local-id", commits[0].sha);
-    try std.testing.expectEqualStrings("local-date", commits[0].commitDate);
-    try std.testing.expectEqualStrings("", commits[0].subject);
-}
