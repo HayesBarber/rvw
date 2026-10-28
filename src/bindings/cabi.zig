@@ -7,6 +7,7 @@ const RvwCore = struct {
     threaded: std.Io.Threaded,
     review: rvw.provider.review.git.GitReviewProvider,
     repository: rvw.provider.repository.git.GitProvider,
+    pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider,
     comments: rvw.provider.comment.memory.MemoryProvider,
     clipboard: rvw.output.SystemClipboard,
     default_logger: rvw.log.DefaultLogger,
@@ -86,6 +87,7 @@ pub export fn rvw_core_create(
     };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
     handle.repository = .{ .allocator = allocator };
+    handle.pull_requests = .{ .allocator = allocator };
     handle.clipboard = .{};
     handle.search_ignore_aware = .{ .allocator = allocator, .mode = .@"ignore-aware", .executable = environmentVariable("RVW_RIPGREP") };
     handle.search_all_files = .{ .allocator = allocator, .mode = .@"all-files", .executable = environmentVariable("RVW_RIPGREP") };
@@ -94,6 +96,7 @@ pub export fn rvw_core_create(
         handle.threaded.io(),
         handle.review.interface(),
         handle.repository.interface(),
+        handle.pull_requests.interface(),
         handle.search_ignore_aware.interface(),
         handle.search_all_files.interface(),
         handle.comments.interface(),
