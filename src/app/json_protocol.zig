@@ -52,6 +52,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "list_commits")) return .list_commits;
+    if (std.mem.eql(u8, operation, "list_open_pull_requests")) return .list_open_pull_requests;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
     if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
     if (std.mem.eql(u8, operation, "search_text")) {
@@ -390,6 +391,33 @@ test "native commit responses release result storage when serialization fails" {
         fn run(allocator: Allocator) !void {
             var context: u8 = 0;
             const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, "{\"type\":\"list_commits\"}");
+            defer allocator.free(encoded);
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+}
+
+test "native pull request responses release result storage when serialization fails" {
+    const Test = struct {
+        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
+            try std.testing.expect(request == .list_open_pull_requests);
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            errdefer arena.deinit();
+            const requests = try arena.allocator().alloc(model.PullRequest, 1);
+            requests[0] = .{
+                .number = 42,
+                .title = "Draft PR",
+                .authorLogin = "author",
+                .url = "https://github.com/owner/repo/pull/42",
+                .isDraft = true,
+                .baseRefName = "main",
+                .headRefName = "feature",
+            };
+            return .{ .pull_request_list = .{ .pullRequests = requests, .arena = arena } };
+        }
+        fn run(allocator: Allocator) !void {
+            var context: u8 = 0;
+            const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, "{\"type\":\"list_open_pull_requests\"}");
             defer allocator.free(encoded);
         }
     };

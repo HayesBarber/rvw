@@ -107,6 +107,14 @@ export async function getDiffOverview() {
   return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
+/**
+ * Lists open pull requests for the repository's origin.
+ * @returns {Promise<{ pullRequests: { number: number, title: string, authorLogin: string, url: string, isDraft: boolean, baseRefName: string, headRefName: string }[] }>}
+ */
+export async function listOpenPullRequests() {
+  return requestJson('/api/repository/pull-requests', { type: 'list_open_pull_requests' })
+}
+
 /** Rebuilds the repository-backed review snapshot without changing comments. */
 export async function reloadReview() {
   const request = { type: 'reload_review' }

@@ -203,6 +203,75 @@ private func testNativeCommitHistory() throws {
     }
 }
 
+private func testNativePullRequests() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        try git(directory, ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
+                            "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m", "PR fixture"])
+        let bin = directory.appendingPathComponent(".git/test-bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: bin.appendingPathComponent("git").path,
+                                                  withDestinationPath: "/usr/bin/git")
+        let gh = bin.appendingPathComponent("gh")
+        let output = directory.appendingPathComponent(".git/gh-response")
+        try "#!/bin/sh\n/bin/cat .git/gh-response\n".write(to: gh, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path)
+        let previousPath = getenv("PATH").map { String(cString: $0) }
+        setenv("PATH", bin.path, 1)
+        defer {
+            if let previousPath { setenv("PATH", previousPath, 1) } else { unsetenv("PATH") }
+        }
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+        let router = routerBlockingTermination(core)
+        do {
+            _ = try response(router, ["type": "list_open_pull_requests"])
+            fatalError("missing origin should fail")
+        } catch {
+            expect(error.localizedDescription == "Pull request listing requires an origin remote",
+                   "origin failures should reach the native queue")
+        }
+        try git(directory, ["remote", "add", "origin", "https://github.com/owner/repo.git"])
+        try #"[{"number":42,"title":"Draft 雪","author":{"login":"author"},"url":"https://github.com/owner/repo/pull/42","isDraft":true,"baseRefName":"main","headRefName":"feature"}]"#
+            .write(to: output, atomically: true, encoding: .utf8)
+        let first = try response(router, ["type": "list_open_pull_requests"])
+        let requests = first["pullRequests"] as? [[String: Any]]
+        expect(requests?.count == 1, "native listing should return open pull requests")
+        expect(requests?.first?["number"] as? Int == 42, "native listing should return the PR number")
+        expect(requests?.first?["title"] as? String == "Draft 雪", "native listing should preserve Unicode titles")
+        expect(requests?.first?["authorLogin"] as? String == "author", "native listing should return the author login")
+        expect(requests?.first?["url"] as? String == "https://github.com/owner/repo/pull/42", "native listing should return the URL")
+        expect(requests?.first?["isDraft"] as? Bool == true, "native listing should include drafts")
+        expect(requests?.first?["baseRefName"] as? String == "main", "native listing should return the base branch")
+        expect(requests?.first?["headRefName"] as? String == "feature", "native listing should return the head branch")
+        try "[]".write(to: output, atomically: true, encoding: .utf8)
+        let empty = try response(router, ["type": "list_open_pull_requests"])
+        expect((empty["pullRequests"] as? [Any])?.isEmpty == true, "later native requests should read the current list")
+        for (script, message) in [
+            ("#!/bin/sh\nexit 4\n", "GitHub authentication failed; sign in with gh auth login"),
+            ("#!/bin/sh\nexit 1\n", "Unable to list open pull requests"),
+            ("#!/bin/sh\nprintf 'invalid json'\n", "Pull request list data is invalid"),
+        ] {
+            try script.write(to: gh, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path)
+            do {
+                _ = try response(router, ["type": "list_open_pull_requests"])
+                fatalError("native pull request listing should fail")
+            } catch {
+                expect(error.localizedDescription == message, "listing errors should reach the native queue")
+            }
+            _ = try response(router, ["type": "get_configuration"])
+        }
+        try FileManager.default.removeItem(at: gh)
+        do {
+            _ = try response(router, ["type": "list_open_pull_requests"])
+            fatalError("missing gh should fail")
+        } catch {
+            expect(error.localizedDescription == "GitHub CLI is unavailable", "missing gh should reach the native queue")
+        }
+        _ = try response(router, ["type": "get_configuration"])
+    }
+}
+
 @main
 struct NativeCoreTests {
     static func main() {
@@ -210,6 +279,7 @@ struct NativeCoreTests {
             try testNativeTextSearch()
             try testNativeReviewComments()
             try testNativeCommitHistory()
+            try testNativePullRequests()
             print("Native core tests passed")
         } catch {
             FileHandle.standardError.write(Data("Native core test failed: \(error)\n".utf8))

@@ -9,9 +9,48 @@ import {
   editComment,
   getConfiguration,
   getFilesNotIgnored,
+  listOpenPullRequests,
   reloadReview,
   searchText,
 } from './api.js'
+
+test('open pull requests use equivalent native and HTTP requests and preserve results', async () => {
+  const result = { pullRequests: [{
+    number: 42, title: 'Draft PR', authorLogin: 'author',
+    url: 'https://github.com/owner/repo/pull/42', isDraft: true,
+    baseRefName: 'main', headRefName: 'feature',
+  }] }
+  const nativeRequests = []
+  globalThis.window = {
+    webkit: { messageHandlers: { native: { postMessage(request) {
+      nativeRequests.push(request)
+      return Promise.resolve(result)
+    } } } },
+  }
+  try {
+    assert.deepEqual(await listOpenPullRequests(), result)
+    assert.deepEqual(nativeRequests, [{ type: 'list_open_pull_requests' }])
+    globalThis.window = {}
+    const httpRequests = []
+    globalThis.fetch = async (url, options) => {
+      httpRequests.push({ url, options })
+      return { ok: true, status: 200, json: async () => result }
+    }
+    assert.deepEqual(await listOpenPullRequests(), result)
+    assert.equal(httpRequests[0].url, '/api/repository/pull-requests')
+    assert.equal(httpRequests[0].options.headers.Accept, 'application/json')
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ pullRequests: [] }) })
+    assert.deepEqual(await listOpenPullRequests(), { pullRequests: [] })
+    globalThis.fetch = async () => ({
+      ok: false, status: 503,
+      json: async () => ({ error: { message: 'GitHub CLI is unavailable' } }),
+    })
+    await assert.rejects(listOpenPullRequests(), /GitHub CLI is unavailable/)
+  } finally {
+    delete globalThis.fetch
+    delete globalThis.window
+  }
+})
 
 test('review reload uses equivalent native and HTTP requests', async () => {
   const nativeRequests = []

@@ -60,8 +60,10 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .no_comments,
         .invalid_file_path,
         .invalid_search_query,
+        .missing_origin,
+        .unsupported_origin,
         => .bad_request,
-        .search_unavailable, .repository_unavailable => .service_unavailable,
+        .search_unavailable, .repository_unavailable, .pull_request_list_unavailable, .pull_request_authentication_failed => .service_unavailable,
         else => .internal_server_error,
     };
 }
@@ -76,6 +78,10 @@ fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !
 
 fn listCommits(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(res, .list_commits);
+}
+
+fn listOpenPullRequests(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .list_open_pull_requests);
 }
 
 fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -267,6 +273,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/repository/commits", listCommits, .{});
+    router.get("/api/repository/pull-requests", listOpenPullRequests, .{});
     router.post("/api/review/reload", reloadReview, .{});
     router.post("/api/search/text", searchText, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
@@ -473,4 +480,102 @@ test "commit history crosses HTTP and native JSON with matching results and erro
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
     ht.res.arena = failing.allocator();
     try std.testing.expectError(error.OutOfMemory, listCommits(&handler, ht.req, ht.res));
+}
+
+test "open pull requests cross HTTP and native JSON with matching results and errors" {
+    var repository = try @import("../testing/repository.zig").Repository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.git(&.{ "remote", "add", "origin", "https://github.com/owner/repo.git" });
+    try repository.write(".git/fake-gh", "#!/bin/sh\ncat .git/gh-response\n");
+    var executable = try repository.temporary.dir.openFile(std.testing.io, ".git/fake-gh", .{});
+    defer executable.close(std.testing.io);
+    try executable.setPermissions(std.testing.io, .executable_file);
+    const gh = try std.fs.path.join(std.testing.allocator, &.{ repository.root, ".git/fake-gh" });
+    defer std.testing.allocator.free(gh);
+    const PullRequestDispatcher = struct {
+        root: []const u8,
+        provider: @import("../provider/pull_request/github_cli.zig").GitHubCliProvider,
+        failure: ?anyerror = null,
+
+        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            try std.testing.expect(request == .list_open_pull_requests);
+            if (self.failure) |failure| return failure;
+            return .{ .pull_request_list = try self.provider.interface().listOpenPullRequests(std.testing.io, self.root) };
+        }
+    };
+    var context: PullRequestDispatcher = .{ .root = repository.root, .provider = .{ .allocator = std.testing.allocator, .executable = gh } };
+    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = PullRequestDispatcher.dispatch };
+    var handler: Handler = .{ .dispatcher = dispatcher };
+    const input = "{\"type\":\"list_open_pull_requests\"}";
+    const output =
+        \\[{"number":42,"title":"Draft \"quoted\" 雪","author":{"login":"author"},"url":"https://github.com/owner/repo/pull/42","isDraft":true,"baseRefName":"main","headRefName":"feature"},{"number":7,"title":"Ready","author":{"login":"other"},"url":"https://github.com/owner/repo/pull/7","isDraft":false,"baseRefName":"release","headRefName":"fix"}]
+    ;
+    for ([_][]const u8{ "[]", output, "[]" }, [_]usize{ 0, 2, 0 }) |body, count| {
+        try repository.write(".git/gh-response", body);
+        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
+        defer std.testing.allocator.free(native);
+        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        defer envelope.deinit();
+        try std.testing.expect(envelope.value.object.get("ok").?.bool);
+        const data = envelope.value.object.get("data").?;
+        const requests = data.object.get("pullRequests").?.array.items;
+        try std.testing.expectEqual(count, requests.len);
+        try std.testing.expectEqual(@as(usize, 1), data.object.count());
+        if (count != 0) {
+            const draft = requests[0].object;
+            try std.testing.expectEqual(@as(usize, 7), draft.count());
+            try std.testing.expectEqual(@as(i64, 42), draft.get("number").?.integer);
+            try std.testing.expectEqualStrings("Draft \"quoted\" 雪", draft.get("title").?.string);
+            try std.testing.expectEqualStrings("author", draft.get("authorLogin").?.string);
+            try std.testing.expectEqualStrings("https://github.com/owner/repo/pull/42", draft.get("url").?.string);
+            try std.testing.expect(draft.get("isDraft").?.bool);
+            try std.testing.expectEqualStrings("main", draft.get("baseRefName").?.string);
+            try std.testing.expectEqualStrings("feature", draft.get("headRefName").?.string);
+            try std.testing.expectEqual(@as(i64, 7), requests[1].object.get("number").?.integer);
+            try std.testing.expect(!requests[1].object.get("isDraft").?.bool);
+        }
+        const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, data, .{});
+        defer std.testing.allocator.free(expected);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try listOpenPullRequests(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectHeader("content-type", "application/json; charset=utf-8");
+        try ht.expectHeader("cache-control", "no-store");
+        try ht.expectBody(expected);
+    }
+    for ([_]struct { failure: anyerror, code: model.ErrorCode, status: std.http.Status }{
+        .{ .failure = error.MissingOrigin, .code = .missing_origin, .status = .bad_request },
+        .{ .failure = error.UnsupportedOrigin, .code = .unsupported_origin, .status = .bad_request },
+        .{ .failure = error.RepositoryUnavailable, .code = .repository_unavailable, .status = .service_unavailable },
+        .{ .failure = error.RepositoryFailed, .code = .repository_failed, .status = .internal_server_error },
+        .{ .failure = error.PullRequestListUnavailable, .code = .pull_request_list_unavailable, .status = .service_unavailable },
+        .{ .failure = error.PullRequestAuthenticationFailed, .code = .pull_request_authentication_failed, .status = .service_unavailable },
+        .{ .failure = error.PullRequestListFailed, .code = .pull_request_list_failed, .status = .internal_server_error },
+        .{ .failure = error.InvalidPullRequestList, .code = .invalid_pull_request_list, .status = .internal_server_error },
+    }) |failure| {
+        context.failure = failure.failure;
+        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
+        defer std.testing.allocator.free(native);
+        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        defer envelope.deinit();
+        try std.testing.expect(!envelope.value.object.get("ok").?.bool);
+        try std.testing.expectEqualStrings(@tagName(failure.code), envelope.value.object.get("error").?.object.get("code").?.string);
+        try std.testing.expectEqualStrings(model.errorMessage(failure.code), envelope.value.object.get("error").?.object.get("message").?.string);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try listOpenPullRequests(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(failure.status);
+        const expected = try json_protocol.encodeError(std.testing.allocator, failure.code);
+        defer std.testing.allocator.free(expected);
+        try ht.expectBody(expected);
+    }
+    context.failure = null;
+    try repository.write(".git/gh-response", output);
+    var ht = httpz.testing.init(.{});
+    defer ht.deinit();
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    ht.res.arena = failing.allocator();
+    try std.testing.expectError(error.OutOfMemory, listOpenPullRequests(&handler, ht.req, ht.res));
 }
