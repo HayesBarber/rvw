@@ -7,23 +7,25 @@ pub const PullRequestProvider = struct {
 
     pub const maximum_pull_requests = 30;
 
-    pub const VTable = struct {
-        listOpenPullRequests: *const fn (*anyopaque, std.Io, []const u8) anyerror!model.PullRequestListResult,
+    pub const Error = error{
+        MissingOrigin,
+        UnsupportedOrigin,
+        RepositoryUnavailable,
+        RepositoryFailed,
+        PullRequestListUnavailable,
+        PullRequestAuthenticationFailed,
+        PullRequestListFailed,
+        InvalidPullRequestList,
+        OutOfMemory,
     };
 
-    /// Read the current open PRs for the repository's origin on each call.
-    /// Use the default limit of 30. Include drafts and preserve GitHub CLI order.
-    /// Return an empty list if the repository has no open PRs.
-    /// Do not retain selection state or change the active review or comments.
-    /// Do not fetch Git refs or change the index or working-tree files.
-    /// Return MissingOrigin or UnsupportedOrigin for an invalid origin.
-    /// Return RepositoryUnavailable or RepositoryFailed for Git failures.
-    /// Return PullRequestListUnavailable if gh is absent,
-    /// PullRequestAuthenticationFailed for authentication failures,
-    /// PullRequestListFailed for request failures, or InvalidPullRequestList
-    /// for invalid response data. Propagate allocation failures.
-    /// The caller must call result.deinit() after use or serialization failure.
-    pub fn listOpenPullRequests(self: PullRequestProvider, io: std.Io, directory: []const u8) !model.PullRequestListResult {
+    pub const VTable = struct {
+        listOpenPullRequests: *const fn (*anyopaque, std.Io, []const u8) Error!model.PullRequestListResult,
+    };
+
+    /// List the current open PRs for the repository at directory.
+    /// The caller must call result.deinit() after use.
+    pub fn listOpenPullRequests(self: PullRequestProvider, io: std.Io, directory: []const u8) Error!model.PullRequestListResult {
         return self.vtable.listOpenPullRequests(self.context, io, directory);
     }
 };
@@ -31,12 +33,12 @@ pub const PullRequestProvider = struct {
 test "pull request provider forwards each request and defined failures" {
     const Stub = struct {
         calls: usize = 0,
-        failure: ?anyerror = null,
+        failure: ?PullRequestProvider.Error = null,
 
-        fn listOpenPullRequests(context: *anyopaque, _: std.Io, directory: []const u8) !model.PullRequestListResult {
+        fn listOpenPullRequests(context: *anyopaque, _: std.Io, directory: []const u8) PullRequestProvider.Error!model.PullRequestListResult {
             const self: *@This() = @ptrCast(@alignCast(context));
             self.calls += 1;
-            try std.testing.expectEqualStrings("/repository", directory);
+            std.debug.assert(std.mem.eql(u8, "/repository", directory));
             if (self.failure) |failure| return failure;
             return .{ .pullRequests = &.{} };
         }
@@ -48,7 +50,7 @@ test "pull request provider forwards each request and defined failures" {
         defer result.deinit();
         try std.testing.expectEqual(@as(usize, 0), result.pullRequests.len);
     }
-    const failures = [_]anyerror{
+    const failures = [_]PullRequestProvider.Error{
         error.MissingOrigin,
         error.UnsupportedOrigin,
         error.RepositoryUnavailable,

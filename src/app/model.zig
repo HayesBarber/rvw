@@ -540,115 +540,69 @@ pub const Response = union(enum) {
     }
 };
 
-pub const AppError = error{
-    UnknownDiff,
-    UnknownFile,
-    InvalidComment,
-    InvalidCommentId,
-    UnknownComment,
-    NoComments,
-    InvalidFilePath,
-    ReloadUnavailable,
-    InvalidSearchQuery,
-    SearchUnavailable,
-    SearchFailed,
-    RepositoryUnavailable,
-    RepositoryFailed,
-    InvalidCommitHistory,
-    MissingOrigin,
-    UnsupportedOrigin,
-    PullRequestListUnavailable,
-    PullRequestAuthenticationFailed,
-    PullRequestListFailed,
-    InvalidPullRequestList,
+const ErrorDefinition = struct {
+    errors: []const anyerror = &.{},
+    message: []const u8,
 };
 
-pub const ErrorCode = enum {
-    malformed_request,
-    unknown_operation,
-    unknown_diff,
-    unknown_file,
-    invalid_comment,
-    invalid_comment_id,
-    unknown_comment,
-    no_comments,
-    invalid_file_path,
-    reload_unavailable,
-    invalid_search_query,
-    search_unavailable,
-    search_failed,
-    repository_unavailable,
-    repository_failed,
-    invalid_commit_history,
-    missing_origin,
-    unsupported_origin,
-    pull_request_list_unavailable,
-    pull_request_authentication_failed,
-    pull_request_list_failed,
-    invalid_pull_request_list,
-    file_path_clipboard_unavailable,
-    clipboard_unavailable,
-    internal_error,
+const error_definitions = .{
+    .malformed_request = ErrorDefinition{ .message = "Malformed request" },
+    .unknown_operation = ErrorDefinition{ .message = "Unknown operation" },
+    .unknown_diff = ErrorDefinition{ .errors = &.{error.UnknownDiff}, .message = "Unknown diff" },
+    .unknown_file = ErrorDefinition{ .errors = &.{error.UnknownFile}, .message = "Unknown file" },
+    .invalid_comment = ErrorDefinition{ .errors = &.{error.InvalidComment}, .message = "Comment body or target is invalid" },
+    .invalid_comment_id = ErrorDefinition{ .errors = &.{error.InvalidCommentId}, .message = "Comment ID is invalid" },
+    .unknown_comment = ErrorDefinition{ .errors = &.{error.UnknownComment}, .message = "Comment was not found" },
+    .no_comments = ErrorDefinition{ .errors = &.{error.NoComments}, .message = "No review comments to copy" },
+    .invalid_file_path = ErrorDefinition{ .errors = &.{error.InvalidFilePath}, .message = "File path is invalid" },
+    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to reload the review snapshot" },
+    .invalid_search_query = ErrorDefinition{ .errors = &.{error.InvalidSearchQuery}, .message = "Search query must be valid UTF-8 without NUL or line breaks" },
+    .search_unavailable = ErrorDefinition{ .errors = &.{error.SearchUnavailable}, .message = "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH" },
+    .search_failed = ErrorDefinition{ .errors = &.{error.SearchFailed}, .message = "Search failed; check directory access and try again" },
+    .repository_unavailable = ErrorDefinition{ .errors = &.{error.RepositoryUnavailable}, .message = "Git is unavailable" },
+    .repository_failed = ErrorDefinition{ .errors = &.{error.RepositoryFailed}, .message = "Unable to read repository history" },
+    .invalid_commit_history = ErrorDefinition{ .errors = &.{error.InvalidCommitHistory}, .message = "Repository history data is invalid" },
+    .missing_origin = ErrorDefinition{ .errors = &.{error.MissingOrigin}, .message = "Pull request listing requires an origin remote" },
+    .unsupported_origin = ErrorDefinition{ .errors = &.{error.UnsupportedOrigin}, .message = "The origin remote must identify a GitHub repository" },
+    .pull_request_list_unavailable = ErrorDefinition{ .errors = &.{error.PullRequestListUnavailable}, .message = "GitHub CLI is unavailable" },
+    .pull_request_authentication_failed = ErrorDefinition{ .errors = &.{error.PullRequestAuthenticationFailed}, .message = "GitHub authentication failed; sign in with gh auth login" },
+    .pull_request_list_failed = ErrorDefinition{ .errors = &.{error.PullRequestListFailed}, .message = "Unable to list open pull requests" },
+    .invalid_pull_request_list = ErrorDefinition{ .errors = &.{error.InvalidPullRequestList}, .message = "Pull request list data is invalid" },
+    .file_path_clipboard_unavailable = ErrorDefinition{ .errors = &.{error.FilePathClipboardUnavailable}, .message = "Unable to copy the file path to the clipboard" },
+    .clipboard_unavailable = ErrorDefinition{ .errors = &.{ error.ClipboardCommandFailed, error.ClipboardToolNotFound, error.ClipboardWriteFailed, error.UnsupportedPlatform }, .message = "Unable to copy review comments to the clipboard" },
+    .internal_error = ErrorDefinition{ .message = "Internal error" },
 };
+
+pub const ErrorCode = std.meta.FieldEnum(@TypeOf(error_definitions));
 
 pub fn errorCode(err: anyerror) ErrorCode {
-    return switch (err) {
-        error.UnknownDiff => .unknown_diff,
-        error.UnknownFile => .unknown_file,
-        error.InvalidComment => .invalid_comment,
-        error.InvalidCommentId => .invalid_comment_id,
-        error.UnknownComment => .unknown_comment,
-        error.NoComments => .no_comments,
-        error.InvalidFilePath => .invalid_file_path,
-        error.InvalidSearchQuery => .invalid_search_query,
-        error.SearchUnavailable => .search_unavailable,
-        error.SearchFailed => .search_failed,
-        error.RepositoryUnavailable => .repository_unavailable,
-        error.RepositoryFailed => .repository_failed,
-        error.InvalidCommitHistory => .invalid_commit_history,
-        error.MissingOrigin => .missing_origin,
-        error.UnsupportedOrigin => .unsupported_origin,
-        error.PullRequestListUnavailable => .pull_request_list_unavailable,
-        error.PullRequestAuthenticationFailed => .pull_request_authentication_failed,
-        error.PullRequestListFailed => .pull_request_list_failed,
-        error.InvalidPullRequestList => .invalid_pull_request_list,
-        error.ReloadUnavailable => .reload_unavailable,
-        error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
-        error.ClipboardCommandFailed,
-        error.ClipboardToolNotFound,
-        error.ClipboardWriteFailed,
-        error.UnsupportedPlatform,
-        => .clipboard_unavailable,
-        else => .internal_error,
-    };
+    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
+        inline for (@field(error_definitions, field.name).errors) |source| {
+            if (err == source) return @field(ErrorCode, field.name);
+        }
+    }
+    return .internal_error;
 }
 
 pub fn errorMessage(code: ErrorCode) []const u8 {
     return switch (code) {
-        .malformed_request => "Malformed request",
-        .unknown_operation => "Unknown operation",
-        .unknown_diff => "Unknown diff",
-        .unknown_file => "Unknown file",
-        .invalid_comment => "Comment body or target is invalid",
-        .invalid_comment_id => "Comment ID is invalid",
-        .unknown_comment => "Comment was not found",
-        .no_comments => "No review comments to copy",
-        .invalid_file_path => "File path is invalid",
-        .invalid_search_query => "Search query must be valid UTF-8 without NUL or line breaks",
-        .search_unavailable => "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH",
-        .search_failed => "Search failed; check directory access and try again",
-        .repository_unavailable => "Git is unavailable",
-        .repository_failed => "Unable to read repository history",
-        .invalid_commit_history => "Repository history data is invalid",
-        .missing_origin => "Pull request listing requires an origin remote",
-        .unsupported_origin => "The origin remote must identify a GitHub repository",
-        .pull_request_list_unavailable => "GitHub CLI is unavailable",
-        .pull_request_authentication_failed => "GitHub authentication failed; sign in with gh auth login",
-        .pull_request_list_failed => "Unable to list open pull requests",
-        .invalid_pull_request_list => "Pull request list data is invalid",
-        .reload_unavailable => "Unable to reload the review snapshot",
-        .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
-        .clipboard_unavailable => "Unable to copy review comments to the clipboard",
-        .internal_error => "Internal error",
+        inline else => |value| @field(error_definitions, @tagName(value)).message,
     };
+}
+
+test "application error definitions map source errors and preserve wire codes" {
+    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
+        const code = @field(ErrorCode, field.name);
+        const definition = @field(error_definitions, field.name);
+        try std.testing.expect(errorMessage(code).len > 0);
+        const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, code, .{});
+        defer std.testing.allocator.free(encoded);
+        const decoded = try std.json.parseFromSlice([]const u8, std.testing.allocator, encoded, .{});
+        defer decoded.deinit();
+        try std.testing.expectEqualStrings(field.name, decoded.value);
+        for (definition.errors) |source| {
+            try std.testing.expectEqual(code, errorCode(source));
+        }
+    }
+    try std.testing.expectEqual(ErrorCode.internal_error, errorCode(error.OutOfMemory));
 }
