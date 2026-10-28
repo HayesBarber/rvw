@@ -24,6 +24,7 @@ test {
     _ = @import("provider/comment/memory.zig");
     _ = @import("provider/repository/interface.zig");
     _ = @import("provider/pull_request/interface.zig");
+    _ = @import("provider/pull_request/github_cli.zig");
     _ = @import("provider/repository/git.zig");
     _ = @import("provider/diff/git.zig");
     _ = @import("provider/file/filesystem.zig");
