@@ -31,7 +31,7 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
     const response = dispatcher.dispatch(request) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
-    defer if (response == .text_search) response.text_search.deinit();
+    defer response.deinit();
     const encoded = try switch (response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
@@ -51,6 +51,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
+    if (std.mem.eql(u8, operation, "list_commits")) return .list_commits;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
     if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
     if (std.mem.eql(u8, operation, "search_text")) {
@@ -369,4 +370,28 @@ test "review comment requests reject location fields and still require a target"
         defer parsed.deinit();
         try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
     }
+}
+
+test "native commit responses release result storage when serialization fails" {
+    const Test = struct {
+        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
+            try std.testing.expect(request == .list_commits);
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            errdefer arena.deinit();
+            const commits = try arena.allocator().alloc(model.Commit, 1);
+            commits[0] = .{
+                .sha = "0123456789abcdef0123456789abcdef01234567",
+                .subject = "Commit subject",
+                .authorName = "Author",
+                .commitDate = "2026-10-27T18:00:00Z",
+            };
+            return .{ .commit_list = .{ .commits = commits, .arena = arena } };
+        }
+        fn run(allocator: Allocator) !void {
+            var context: u8 = 0;
+            const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, "{\"type\":\"list_commits\"}");
+            defer allocator.free(encoded);
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
 }

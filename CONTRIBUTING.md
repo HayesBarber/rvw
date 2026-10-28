@@ -61,6 +61,9 @@ native transport decodes them and forwards them to `src/app/core.zig` through a
 dispatcher. `Core` coordinates providers for Git diffs, repository files, and 
 comments, then returns typed responses to the frontend.
 
+See the [repository API](docs/repository-api.md) for the HTTP and native
+commit-history operations, response fields, and errors.
+
 Key areas of the repository:
 
 - `src/app/` contains the request/response model, dispatcher, startup, and

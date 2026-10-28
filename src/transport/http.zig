@@ -34,7 +34,7 @@ const Handler = struct {
             const status = errorStatus(code);
             return self.failure(res, status, code);
         };
-        defer if (response == .text_search) response.text_search.deinit();
+        defer response.deinit();
         setJsonHeaders(res);
         res.body = try json_protocol.encodeResponse(res.arena, response);
     }
@@ -61,7 +61,7 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .invalid_file_path,
         .invalid_search_query,
         => .bad_request,
-        .search_unavailable => .service_unavailable,
+        .search_unavailable, .repository_unavailable => .service_unavailable,
         else => .internal_server_error,
     };
 }
@@ -72,6 +72,10 @@ fn getConfiguration(handler: *Handler, _: *httpz.Request, res: *httpz.Response) 
 
 fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(res, .get_diff_overview);
+}
+
+fn listCommits(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(res, .list_commits);
 }
 
 fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -262,6 +266,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.post("/api/log", submitLog, .{});
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
+    router.get("/api/repository/commits", listCommits, .{});
     router.post("/api/review/reload", reloadReview, .{});
     router.post("/api/search/text", searchText, .{});
     router.get("/api/diffs/:diff_id/files", getFileDiff, .{});
@@ -389,4 +394,83 @@ test "real ripgrep results cross HTTP and native JSON transports in both modes" 
             }
         }
     }
+}
+
+test "commit history crosses HTTP and native JSON with matching results and errors" {
+    var repository = try @import("../testing/repository.zig").Repository.init(std.testing.allocator);
+    defer repository.deinit();
+    const CommitDispatcher = struct {
+        root: []const u8,
+        provider: @import("../provider/repository/git.zig").GitProvider = .{ .allocator = std.testing.allocator },
+        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
+            const self: *@This() = @ptrCast(@alignCast(context));
+            try std.testing.expect(request == .list_commits);
+            return .{ .commit_list = try self.provider.interface().listCommits(std.testing.io, self.root) };
+        }
+    };
+    var context: CommitDispatcher = .{ .root = repository.root };
+    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = CommitDispatcher.dispatch };
+    var handler: Handler = .{ .dispatcher = dispatcher };
+    const input = "{\"type\":\"list_commits\"}";
+    for (0..2) |count| {
+        if (count == 1) {
+            try repository.write("tracked.txt", "content\n");
+            try repository.commit("Subject with \"quotes\" and 雪\nsecond line\n\nbody");
+        }
+        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
+        defer std.testing.allocator.free(native);
+        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        defer envelope.deinit();
+        try std.testing.expect(envelope.value.object.get("ok").?.bool);
+        const data = envelope.value.object.get("data").?;
+        const commits = data.object.get("commits").?.array.items;
+        try std.testing.expectEqual(count, commits.len);
+        try std.testing.expectEqual(@as(usize, 1), data.object.count());
+        if (count == 1) {
+            const sha = try repository.revision("HEAD");
+            defer std.testing.allocator.free(sha);
+            const commit = commits[0].object;
+            try std.testing.expectEqual(@as(usize, 4), commit.count());
+            try std.testing.expectEqualStrings(sha, commit.get("sha").?.string);
+            try std.testing.expectEqualStrings("Subject with \"quotes\" and 雪", commit.get("subject").?.string);
+            try std.testing.expectEqualStrings("rvw tests", commit.get("authorName").?.string);
+            try std.testing.expect(commit.get("commitDate").?.string.len > 0);
+        }
+        const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, data, .{});
+        defer std.testing.allocator.free(expected);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try listCommits(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectHeader("content-type", "application/json; charset=utf-8");
+        try ht.expectHeader("cache-control", "no-store");
+        try ht.expectBody(expected);
+    }
+    for ([_]struct { executable: []const u8, code: model.ErrorCode, status: std.http.Status }{
+        .{ .executable = "/rvw-missing-git", .code = .repository_unavailable, .status = .service_unavailable },
+        .{ .executable = "/usr/bin/false", .code = .repository_failed, .status = .internal_server_error },
+        .{ .executable = "/usr/bin/true", .code = .invalid_commit_history, .status = .internal_server_error },
+    }) |failure| {
+        context.provider.executable = failure.executable;
+        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
+        defer std.testing.allocator.free(native);
+        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        defer envelope.deinit();
+        try std.testing.expect(!envelope.value.object.get("ok").?.bool);
+        try std.testing.expectEqualStrings(@tagName(failure.code), envelope.value.object.get("error").?.object.get("code").?.string);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try listCommits(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(failure.status);
+        const expected = try json_protocol.encodeError(std.testing.allocator, failure.code);
+        defer std.testing.allocator.free(expected);
+        try ht.expectBody(expected);
+    }
+    // Result storage uses the testing allocator. A missing deinit leaks here.
+    context.provider.executable = null;
+    var ht = httpz.testing.init(.{});
+    defer ht.deinit();
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    ht.res.arena = failing.allocator();
+    try std.testing.expectError(error.OutOfMemory, listCommits(&handler, ht.req, ht.res));
 }

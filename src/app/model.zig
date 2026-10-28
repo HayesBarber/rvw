@@ -442,6 +442,15 @@ pub const Response = union(enum) {
     copy_comments_result: CopyCommentsResult,
     copy_file_path_result: CopyFilePathResult,
     clear_comments_result: ClearCommentsResult,
+
+    /// Release request-owned results after use, including serialization failure.
+    pub fn deinit(self: Response) void {
+        switch (self) {
+            .commit_list => |result| result.deinit(),
+            .text_search => |result| result.deinit(),
+            else => {},
+        }
+    }
 };
 
 pub const AppError = error{
