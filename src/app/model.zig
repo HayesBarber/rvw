@@ -12,6 +12,90 @@ pub const FileStatus = enum {
 
 pub const Repository = struct { name: []const u8 };
 
+pub const PullRequest = struct {
+    number: u32,
+    title: []const u8,
+    authorLogin: []const u8,
+    url: []const u8,
+    isDraft: bool,
+    baseRefName: []const u8,
+    headRefName: []const u8,
+};
+
+pub const PullRequestListResult = struct {
+    pullRequests: []const PullRequest,
+    /// Storage for this result; null for static results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    /// Call once after use, including when serialization fails.
+    pub fn deinit(self: PullRequestListResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: PullRequestListResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .pullRequests = self.pullRequests });
+    }
+};
+
+test "pull request list preserves metadata and order and releases owned storage" {
+    const Test = struct {
+        fn run(allocator: std.mem.Allocator) !void {
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            // Covers allocation and serialization failures as well as success.
+            const result: PullRequestListResult = result: {
+                errdefer arena.deinit();
+                const storage = arena.allocator();
+                const items = try storage.alloc(PullRequest, 2);
+                items[0] = .{
+                    .number = 42,
+                    .title = try storage.dupe(u8, "Fix \"quoted\" text and 雪"),
+                    .authorLogin = try storage.dupe(u8, "test-author"),
+                    .url = try storage.dupe(u8, "https://github.com/owner/repo/pull/42"),
+                    .isDraft = true,
+                    .baseRefName = try storage.dupe(u8, "main"),
+                    .headRefName = try storage.dupe(u8, "feature/雪"),
+                };
+                items[1] = items[0];
+                items[1].number = 7;
+                items[1].url = try storage.dupe(u8, "https://github.com/owner/repo/pull/7");
+                items[1].isDraft = false;
+                break :result .{ .pullRequests = items, .arena = arena };
+            };
+            defer result.deinit();
+            const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+            defer allocator.free(encoded);
+            const parsed = try std.json.parseFromSlice(std.json.Value, allocator, encoded, .{});
+            defer parsed.deinit();
+            try std.testing.expectEqual(@as(usize, 1), parsed.value.object.count());
+            const items = parsed.value.object.get("pullRequests").?.array.items;
+            try std.testing.expectEqual(@as(usize, 2), items.len);
+            for (items, result.pullRequests) |item, expected| {
+                const fields = item.object;
+                try std.testing.expectEqual(@as(usize, 7), fields.count());
+                try std.testing.expectEqual(@as(i64, expected.number), fields.get("number").?.integer);
+                try std.testing.expectEqualStrings(expected.title, fields.get("title").?.string);
+                try std.testing.expectEqualStrings(expected.authorLogin, fields.get("authorLogin").?.string);
+                try std.testing.expectEqualStrings(expected.url, fields.get("url").?.string);
+                try std.testing.expectEqual(expected.isDraft, fields.get("isDraft").?.bool);
+                try std.testing.expectEqualStrings(expected.baseRefName, fields.get("baseRefName").?.string);
+                try std.testing.expectEqualStrings(expected.headRefName, fields.get("headRefName").?.string);
+            }
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+}
+
+test "empty pull request list supports static storage" {
+    const result: PullRequestListResult = .{ .pullRequests = &.{} };
+    defer result.deinit();
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("{\"pullRequests\":[]}", encoded);
+}
+
 pub const Commit = struct {
     /// Full commit object ID.
     sha: []const u8,
@@ -471,6 +555,12 @@ pub const AppError = error{
     RepositoryUnavailable,
     RepositoryFailed,
     InvalidCommitHistory,
+    MissingOrigin,
+    UnsupportedOrigin,
+    PullRequestListUnavailable,
+    PullRequestAuthenticationFailed,
+    PullRequestListFailed,
+    InvalidPullRequestList,
 };
 
 pub const ErrorCode = enum {
@@ -490,6 +580,12 @@ pub const ErrorCode = enum {
     repository_unavailable,
     repository_failed,
     invalid_commit_history,
+    missing_origin,
+    unsupported_origin,
+    pull_request_list_unavailable,
+    pull_request_authentication_failed,
+    pull_request_list_failed,
+    invalid_pull_request_list,
     file_path_clipboard_unavailable,
     clipboard_unavailable,
     internal_error,
@@ -510,6 +606,12 @@ pub fn errorCode(err: anyerror) ErrorCode {
         error.RepositoryUnavailable => .repository_unavailable,
         error.RepositoryFailed => .repository_failed,
         error.InvalidCommitHistory => .invalid_commit_history,
+        error.MissingOrigin => .missing_origin,
+        error.UnsupportedOrigin => .unsupported_origin,
+        error.PullRequestListUnavailable => .pull_request_list_unavailable,
+        error.PullRequestAuthenticationFailed => .pull_request_authentication_failed,
+        error.PullRequestListFailed => .pull_request_list_failed,
+        error.InvalidPullRequestList => .invalid_pull_request_list,
         error.ReloadUnavailable => .reload_unavailable,
         error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
         error.ClipboardCommandFailed,
@@ -538,6 +640,12 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
         .repository_unavailable => "Git is unavailable",
         .repository_failed => "Unable to read repository history",
         .invalid_commit_history => "Repository history data is invalid",
+        .missing_origin => "Pull request listing requires an origin remote",
+        .unsupported_origin => "The origin remote must identify a GitHub repository",
+        .pull_request_list_unavailable => "GitHub CLI is unavailable",
+        .pull_request_authentication_failed => "GitHub authentication failed; sign in with gh auth login",
+        .pull_request_list_failed => "Unable to list open pull requests",
+        .invalid_pull_request_list => "Pull request list data is invalid",
         .reload_unavailable => "Unable to reload the review snapshot",
         .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
         .clipboard_unavailable => "Unable to copy review comments to the clipboard",
