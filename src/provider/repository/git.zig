@@ -35,7 +35,6 @@ pub const GitProvider = struct {
             return error.RepositoryFailed;
         }
         const head = std.mem.trimEnd(u8, revision.stdout, "\n");
-        if (!validSha(head)) return error.InvalidCommitHistory;
 
         const limit = std.fmt.comptimePrint("--max-count={d}", .{RepositoryProvider.maximum_commits});
         const history = try self.run(allocator, io, directory, &.{
@@ -76,7 +75,6 @@ fn parseHistory(allocator: std.mem.Allocator, output: []const u8) ![]const model
             field.* = remaining[0..end];
             remaining = remaining[end + 1 ..];
         }
-        if (!validSha(fields[0]) or !validDate(fields[3])) return error.InvalidCommitHistory;
         const message = fields[1];
         const first_line = message[0 .. std.mem.indexOfScalar(u8, message, '\n') orelse message.len];
         try commits.append(allocator, .{
@@ -87,29 +85,6 @@ fn parseHistory(allocator: std.mem.Allocator, output: []const u8) ![]const model
         });
     }
     return commits.toOwnedSlice(allocator);
-}
-
-fn validSha(sha: []const u8) bool {
-    if (sha.len != 40 and sha.len != 64) return false;
-    for (sha) |character| {
-        if (!std.ascii.isHex(character) or std.ascii.isUpper(character)) return false;
-    }
-    return true;
-}
-
-fn validDate(date: []const u8) bool {
-    if (date.len != 25 and date.len != 20) return false;
-    for (date, 0..) |character, i| {
-        const valid = switch (i) {
-            4, 7 => character == '-',
-            10 => character == 'T',
-            13, 16, 22 => character == ':',
-            19 => if (date.len == 20) character == 'Z' else character == '+' or character == '-',
-            else => std.ascii.isDigit(character),
-        };
-        if (!valid) return false;
-    }
-    return true;
 }
 
 const TestRepository = @import("../../testing/repository.zig").Repository;
@@ -259,7 +234,7 @@ test "Git history releases request storage after log failures" {
     }
 }
 
-test "Git history parser rejects malformed fields and preserves empty subjects" {
+test "Git history parser rejects incomplete records, invalid UTF-8, and excess results" {
     const sha = "0123456789abcdef0123456789abcdef01234567";
     const date = "2026-10-27T18:00:00-04:00";
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -268,20 +243,21 @@ test "Git history parser rejects malformed fields and preserves empty subjects" 
     for ([_][]const u8{
         "missing delimiters",
         sha ++ "\x00subject\x00author\x00" ++ date,
-        "bad-sha\x00subject\x00author\x00" ++ date ++ "\x00",
-        sha ++ "\x00subject\x00author\x00invalid date\x00",
         sha ++ "\x00subject\x00\xff\x00" ++ date ++ "\x00",
         sha ++ "\x00subject\x00author\x00" ++ date ++ "\x00extra",
     }) |invalid| {
         try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, invalid));
     }
     const valid = sha ++ "\x00\x00author\x00" ++ date ++ "\x00";
-    const empty_subject = try parseHistory(allocator, valid);
-    try std.testing.expectEqualStrings("", empty_subject[0].subject);
-    const utc = try parseHistory(allocator, sha ++ "\x00subject\x00author\x002026-10-27T18:00:00Z\x00");
-    try std.testing.expectEqualStrings("2026-10-27T18:00:00Z", utc[0].commitDate);
     try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, valid ** 31));
-    const sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const long_sha = try parseHistory(allocator, sha256 ++ "\x00subject\x00author\x00" ++ date ++ "\x00");
-    try std.testing.expectEqualStrings(sha256, long_sha[0].sha);
+}
+
+test "Git history parser preserves SHA and date strings without format checks" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const commits = try parseHistory(arena.allocator(), "local-id\x00\x00author\x00local-date\x00");
+    try std.testing.expectEqual(@as(usize, 1), commits.len);
+    try std.testing.expectEqualStrings("local-id", commits[0].sha);
+    try std.testing.expectEqualStrings("local-date", commits[0].commitDate);
+    try std.testing.expectEqualStrings("", commits[0].subject);
 }
