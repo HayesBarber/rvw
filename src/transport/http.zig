@@ -408,32 +408,102 @@ test "real ripgrep results cross HTTP and native JSON transports in both modes" 
     }
 }
 
+const RepositoryTransportTest = struct {
+    root: []const u8,
+    request: model.Request,
+    repository: @import("../provider/repository/git.zig").GitProvider = .{ .allocator = std.testing.allocator },
+    pull_requests: @import("../provider/pull_request/github_cli.zig").GitHubCliProvider = .{ .allocator = std.testing.allocator },
+    failure: ?anyerror = null,
+
+    fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
+        const self: *@This() = @ptrCast(@alignCast(context));
+        try std.testing.expectEqual(std.meta.activeTag(self.request), std.meta.activeTag(request));
+        if (self.failure) |failure| return failure;
+        return switch (request) {
+            .list_commits => .{ .commit_list = try self.repository.interface().listCommits(std.testing.io, self.root) },
+            .list_working_tree_changes => .{ .working_tree_changes = try self.repository.interface().listWorkingTreeChanges(std.testing.io, self.root) },
+            .list_open_pull_requests => .{ .pull_request_list = try self.pull_requests.interface().listOpenPullRequests(std.testing.io, self.root) },
+            else => error.UnexpectedRequest,
+        };
+    }
+
+    fn handler(self: *@This()) Handler {
+        return .{ .dispatcher = .{ .context = self, .dispatchFn = dispatch } };
+    }
+
+    fn action(self: *@This()) httpz.Action(*Handler) {
+        return switch (self.request) {
+            .list_commits => listCommits,
+            .list_working_tree_changes => listWorkingTreeChanges,
+            .list_open_pull_requests => listOpenPullRequests,
+            else => unreachable,
+        };
+    }
+
+    fn input(self: *@This()) ![]u8 {
+        return std.fmt.allocPrint(std.testing.allocator, "{{\"type\":\"{s}\"}}", .{@tagName(self.request)});
+    }
+
+    fn expectResponse(self: *@This()) !std.json.Parsed(std.json.Value) {
+        var target = self.handler();
+        const request = try self.input();
+        defer std.testing.allocator.free(request);
+        const native = try json_protocol.dispatchJson(std.testing.allocator, target.dispatcher, request);
+        defer std.testing.allocator.free(native);
+        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        errdefer envelope.deinit();
+        try std.testing.expect(envelope.value.object.get("ok").?.bool);
+        const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, envelope.value.object.get("data").?, .{});
+        defer std.testing.allocator.free(expected);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try self.action()(&target, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectHeader("content-type", "application/json; charset=utf-8");
+        try ht.expectHeader("cache-control", "no-store");
+        try ht.expectBody(expected);
+        return envelope;
+    }
+
+    fn expectError(self: *@This(), code: model.ErrorCode, status: std.http.Status) !void {
+        var target = self.handler();
+        const request = try self.input();
+        defer std.testing.allocator.free(request);
+        const native = try json_protocol.dispatchJson(std.testing.allocator, target.dispatcher, request);
+        defer std.testing.allocator.free(native);
+        const expected = try json_protocol.encodeError(std.testing.allocator, code);
+        defer std.testing.allocator.free(expected);
+        const expected_native = try std.fmt.allocPrint(std.testing.allocator, "{{\"ok\":false,{s}", .{expected[1..]});
+        defer std.testing.allocator.free(expected_native);
+        try std.testing.expectEqualStrings(expected_native, native);
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try self.action()(&target, ht.req, ht.res);
+        try ht.expectStatusCode(status);
+        try ht.expectBody(expected);
+    }
+
+    fn expectSerializationFailure(self: *@This()) !void {
+        var target = self.handler();
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+        ht.res.arena = failing.allocator();
+        try std.testing.expectError(error.OutOfMemory, self.action()(&target, ht.req, ht.res));
+    }
+};
+
 test "commit history crosses HTTP and native JSON with matching results and errors" {
     var repository = try @import("../testing/repository.zig").Repository.init(std.testing.allocator);
     defer repository.deinit();
-    const CommitDispatcher = struct {
-        root: []const u8,
-        provider: @import("../provider/repository/git.zig").GitProvider = .{ .allocator = std.testing.allocator },
-        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            try std.testing.expect(request == .list_commits);
-            return .{ .commit_list = try self.provider.interface().listCommits(std.testing.io, self.root) };
-        }
-    };
-    var context: CommitDispatcher = .{ .root = repository.root };
-    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = CommitDispatcher.dispatch };
-    var handler: Handler = .{ .dispatcher = dispatcher };
-    const input = "{\"type\":\"list_commits\"}";
+    var context: RepositoryTransportTest = .{ .root = repository.root, .request = .list_commits };
     for (0..2) |count| {
         if (count == 1) {
             try repository.write("tracked.txt", "content\n");
             try repository.commit("Subject with \"quotes\" and 雪\nsecond line\n\nbody");
         }
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        const envelope = try context.expectResponse();
         defer envelope.deinit();
-        try std.testing.expect(envelope.value.object.get("ok").?.bool);
         const data = envelope.value.object.get("data").?;
         const commits = data.object.get("commits").?.array.items;
         try std.testing.expectEqual(count, commits.len);
@@ -448,43 +518,17 @@ test "commit history crosses HTTP and native JSON with matching results and erro
             try std.testing.expectEqualStrings("rvw tests", commit.get("authorName").?.string);
             try std.testing.expect(commit.get("commitDate").?.string.len > 0);
         }
-        const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, data, .{});
-        defer std.testing.allocator.free(expected);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listCommits(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(.ok);
-        try ht.expectHeader("content-type", "application/json; charset=utf-8");
-        try ht.expectHeader("cache-control", "no-store");
-        try ht.expectBody(expected);
     }
     for ([_]struct { executable: []const u8, code: model.ErrorCode, status: std.http.Status }{
         .{ .executable = "/rvw-missing-git", .code = .repository_unavailable, .status = .service_unavailable },
         .{ .executable = "/usr/bin/false", .code = .repository_failed, .status = .internal_server_error },
         .{ .executable = "/usr/bin/true", .code = .invalid_commit_history, .status = .internal_server_error },
     }) |failure| {
-        context.provider.executable = failure.executable;
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
-        defer envelope.deinit();
-        try std.testing.expect(!envelope.value.object.get("ok").?.bool);
-        try std.testing.expectEqualStrings(@tagName(failure.code), envelope.value.object.get("error").?.object.get("code").?.string);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listCommits(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(failure.status);
-        const expected = try json_protocol.encodeError(std.testing.allocator, failure.code);
-        defer std.testing.allocator.free(expected);
-        try ht.expectBody(expected);
+        context.repository.executable = failure.executable;
+        try context.expectError(failure.code, failure.status);
     }
-    // Result storage uses the testing allocator. A missing deinit leaks here.
-    context.provider.executable = null;
-    var ht = httpz.testing.init(.{});
-    defer ht.deinit();
-    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    ht.res.arena = failing.allocator();
-    try std.testing.expectError(error.OutOfMemory, listCommits(&handler, ht.req, ht.res));
+    context.repository.executable = null;
+    try context.expectSerializationFailure();
 }
 
 test "open pull requests cross HTTP and native JSON with matching results and errors" {
@@ -497,32 +541,14 @@ test "open pull requests cross HTTP and native JSON with matching results and er
     try executable.setPermissions(std.testing.io, .executable_file);
     const gh = try std.fs.path.join(std.testing.allocator, &.{ repository.root, ".git/fake-gh" });
     defer std.testing.allocator.free(gh);
-    const PullRequestDispatcher = struct {
-        root: []const u8,
-        provider: @import("../provider/pull_request/github_cli.zig").GitHubCliProvider,
-        failure: ?anyerror = null,
-
-        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            try std.testing.expect(request == .list_open_pull_requests);
-            if (self.failure) |failure| return failure;
-            return .{ .pull_request_list = try self.provider.interface().listOpenPullRequests(std.testing.io, self.root) };
-        }
-    };
-    var context: PullRequestDispatcher = .{ .root = repository.root, .provider = .{ .allocator = std.testing.allocator, .executable = gh } };
-    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = PullRequestDispatcher.dispatch };
-    var handler: Handler = .{ .dispatcher = dispatcher };
-    const input = "{\"type\":\"list_open_pull_requests\"}";
+    var context: RepositoryTransportTest = .{ .root = repository.root, .request = .list_open_pull_requests, .pull_requests = .{ .allocator = std.testing.allocator, .executable = gh } };
     const output =
         \\[{"number":42,"title":"Draft \"quoted\" 雪","author":{"login":"author"},"url":"https://github.com/owner/repo/pull/42","isDraft":true,"baseRefName":"main","headRefName":"feature"},{"number":7,"title":"Ready","author":{"login":"other"},"url":"https://github.com/owner/repo/pull/7","isDraft":false,"baseRefName":"release","headRefName":"fix"}]
     ;
     for ([_][]const u8{ "[]", output, "[]" }, [_]usize{ 0, 2, 0 }) |body, count| {
         try repository.write(".git/gh-response", body);
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
+        const envelope = try context.expectResponse();
         defer envelope.deinit();
-        try std.testing.expect(envelope.value.object.get("ok").?.bool);
         const data = envelope.value.object.get("data").?;
         const requests = data.object.get("pullRequests").?.array.items;
         try std.testing.expectEqual(count, requests.len);
@@ -540,15 +566,6 @@ test "open pull requests cross HTTP and native JSON with matching results and er
             try std.testing.expectEqual(@as(i64, 7), requests[1].object.get("number").?.integer);
             try std.testing.expect(!requests[1].object.get("isDraft").?.bool);
         }
-        const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, data, .{});
-        defer std.testing.allocator.free(expected);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listOpenPullRequests(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(.ok);
-        try ht.expectHeader("content-type", "application/json; charset=utf-8");
-        try ht.expectHeader("cache-control", "no-store");
-        try ht.expectBody(expected);
     }
     for ([_]struct { failure: anyerror, code: model.ErrorCode, status: std.http.Status }{
         .{ .failure = error.MissingOrigin, .code = .missing_origin, .status = .bad_request },
@@ -561,28 +578,11 @@ test "open pull requests cross HTTP and native JSON with matching results and er
         .{ .failure = error.InvalidPullRequestList, .code = .invalid_pull_request_list, .status = .internal_server_error },
     }) |failure| {
         context.failure = failure.failure;
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        const envelope = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, native, .{});
-        defer envelope.deinit();
-        try std.testing.expect(!envelope.value.object.get("ok").?.bool);
-        try std.testing.expectEqualStrings(@tagName(failure.code), envelope.value.object.get("error").?.object.get("code").?.string);
-        try std.testing.expectEqualStrings(model.errorMessage(failure.code), envelope.value.object.get("error").?.object.get("message").?.string);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listOpenPullRequests(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(failure.status);
-        const expected = try json_protocol.encodeError(std.testing.allocator, failure.code);
-        defer std.testing.allocator.free(expected);
-        try ht.expectBody(expected);
+        try context.expectError(failure.code, failure.status);
     }
     context.failure = null;
     try repository.write(".git/gh-response", output);
-    var ht = httpz.testing.init(.{});
-    defer ht.deinit();
-    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    ht.res.arena = failing.allocator();
-    try std.testing.expectError(error.OutOfMemory, listOpenPullRequests(&handler, ht.req, ht.res));
+    try context.expectSerializationFailure();
 }
 
 test "working-tree summaries cross HTTP and native JSON with matching results and errors" {
@@ -590,22 +590,7 @@ test "working-tree summaries cross HTTP and native JSON with matching results an
     defer repository.deinit();
     try repository.write("old.txt", "base\n");
     try repository.commit("base");
-    const WorkingTreeDispatcher = struct {
-        root: []const u8,
-        provider: @import("../provider/repository/git.zig").GitProvider = .{ .allocator = std.testing.allocator },
-        failure: ?anyerror = null,
-
-        fn dispatch(context: *anyopaque, request: model.Request) !model.Response {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            try std.testing.expect(request == .list_working_tree_changes);
-            if (self.failure) |failure| return failure;
-            return .{ .working_tree_changes = try self.provider.interface().listWorkingTreeChanges(std.testing.io, self.root) };
-        }
-    };
-    var context: WorkingTreeDispatcher = .{ .root = repository.root };
-    const dispatcher: dispatcher_module.Dispatcher = .{ .context = &context, .dispatchFn = WorkingTreeDispatcher.dispatch };
-    var handler: Handler = .{ .dispatcher = dispatcher };
-    const input = "{\"type\":\"list_working_tree_changes\"}";
+    var context: RepositoryTransportTest = .{ .root = repository.root, .request = .list_working_tree_changes };
     for (0..2) |phase| {
         if (phase == 1) {
             try repository.git(&.{ "mv", "old.txt", "new 雪.txt" });
@@ -617,39 +602,17 @@ test "working-tree summaries cross HTTP and native JSON with matching results an
         };
         const expected = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .files = files }, .{});
         defer std.testing.allocator.free(expected);
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        const expected_native = try std.fmt.allocPrint(std.testing.allocator, "{{\"ok\":true,\"data\":{s}}}", .{expected});
-        defer std.testing.allocator.free(expected_native);
-        try std.testing.expectEqualStrings(expected_native, native);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listWorkingTreeChanges(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(.ok);
-        try ht.expectHeader("content-type", "application/json; charset=utf-8");
-        try ht.expectHeader("cache-control", "no-store");
-        try ht.expectBody(expected);
+        const envelope = try context.expectResponse();
+        defer envelope.deinit();
+        const actual = try std.json.Stringify.valueAlloc(std.testing.allocator, envelope.value.object.get("data").?, .{});
+        defer std.testing.allocator.free(actual);
+        try std.testing.expectEqualStrings(expected, actual);
     }
     for ([_]anyerror{ error.RepositoryUnavailable, error.WorkingTreeChangesFailed, error.InvalidRevision, error.UnsupportedPath, error.MalformedGitOutput }) |failure| {
         context.failure = failure;
         const code = model.errorCode(failure);
-        const expected = try json_protocol.encodeError(std.testing.allocator, code);
-        defer std.testing.allocator.free(expected);
-        const expected_native = try std.fmt.allocPrint(std.testing.allocator, "{{\"ok\":false,{s}", .{expected[1..]});
-        defer std.testing.allocator.free(expected_native);
-        const native = try json_protocol.dispatchJson(std.testing.allocator, dispatcher, input);
-        defer std.testing.allocator.free(native);
-        try std.testing.expectEqualStrings(expected_native, native);
-        var ht = httpz.testing.init(.{});
-        defer ht.deinit();
-        try listWorkingTreeChanges(&handler, ht.req, ht.res);
-        try ht.expectStatusCode(if (failure == error.RepositoryUnavailable) .service_unavailable else .internal_server_error);
-        try ht.expectBody(expected);
+        try context.expectError(code, if (failure == error.RepositoryUnavailable) .service_unavailable else .internal_server_error);
     }
     context.failure = null;
-    var ht = httpz.testing.init(.{});
-    defer ht.deinit();
-    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    ht.res.arena = failing.allocator();
-    try std.testing.expectError(error.OutOfMemory, listWorkingTreeChanges(&handler, ht.req, ht.res));
+    try context.expectSerializationFailure();
 }
