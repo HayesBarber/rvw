@@ -12,24 +12,12 @@ pub const RepositoryProvider = struct {
         listWorkingTreeChanges: *const fn (*anyopaque, std.Io, []const u8) anyerror!model.WorkingTreeChangesResult,
     };
 
-    /// Read up to 30 commits reachable from current HEAD, most recent first.
-    /// Include HEAD and merge history. An unborn HEAD returns an empty list.
-    /// Do not retain selection state or change the repository or active review.
-    /// Return RepositoryUnavailable when Git is absent, RepositoryFailed when
-    /// execution fails, or InvalidCommitHistory when parsing fails.
-    /// The caller must call result.deinit() after use or serialization failure.
+    /// List recent commits reachable from HEAD.
     pub fn listCommits(self: RepositoryProvider, io: std.Io, directory: []const u8) !model.CommitListResult {
         return self.vtable.listCommits(self.context, io, directory);
     }
 
-    /// Read current staged, unstaged, and untracked changes against HEAD.
-    /// Follow ordinary working-tree review rules and sort by current path.
-    /// Return InvalidRevision if HEAD does not resolve to a commit,
-    /// RepositoryUnavailable if Git is absent, WorkingTreeChangesFailed if
-    /// execution fails, UnsupportedPath for invalid paths, or
-    /// MalformedGitOutput for invalid metadata. Allocation can fail.
-    /// Do not retain selection state or change repository or review state.
-    /// The caller must call result.deinit() after use or serialization failure.
+    /// List current working-tree changes against HEAD.
     pub fn listWorkingTreeChanges(self: RepositoryProvider, io: std.Io, directory: []const u8) !model.WorkingTreeChangesResult {
         return self.vtable.listWorkingTreeChanges(self.context, io, directory);
     }
