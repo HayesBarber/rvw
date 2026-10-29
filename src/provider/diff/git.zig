@@ -29,16 +29,9 @@ pub const GitProvider = struct {
         else
             try std.fmt.allocPrint(allocator, "working-tree:{s}", .{snapshot.base});
 
-        var summaries: std.ArrayList(model.FileSummary) = .empty;
+        const summaries = try metadata.summarize(allocator, changes);
         var file_contents: std.ArrayList(model.FileContent) = .empty;
         for (changes) |change| {
-            try summaries.append(allocator, .{
-                .path = change.path,
-                .previousPath = change.previous_path,
-                .status = change.status,
-                .additions = change.additions,
-                .deletions = change.deletions,
-            });
             try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change));
         }
 
@@ -53,7 +46,7 @@ pub const GitProvider = struct {
             .source = source,
             .sourceLabel = labels.full,
             .compactSourceLabel = labels.compact,
-            .files = try summaries.toOwnedSlice(allocator),
+            .files = summaries,
         };
 
         return .{
@@ -127,7 +120,11 @@ test "Git provider builds a deterministic working-tree review from a temporary r
 
     try fixture.write("deleted.txt", "removed\n");
     try fixture.write("modified.txt", "before\n");
+    try fixture.write("old.txt", "rename content\n");
+    try fixture.write("binary.dat", "before\x00\n");
     try fixture.commit("initial snapshot");
+    try fixture.git(&.{ "mv", "old.txt", "renamed.txt" });
+    try fixture.write("binary.dat", "after\x00\n");
     try fixture.temporary.dir.deleteFile(std.testing.io, "deleted.txt");
     try fixture.write("modified.txt", "after\n");
     try fixture.write("untracked.txt", "one\ntwo\n");
@@ -147,10 +144,16 @@ test "Git provider builds a deterministic working-tree review from a temporary r
     try std.testing.expectEqualStrings(std.fs.path.basename(fixture.root), overview.repository.name);
     try std.testing.expectEqualStrings("working tree", overview.sourceLabel);
     try std.testing.expectEqualStrings("working tree", overview.compactSourceLabel);
-    try std.testing.expectEqual(@as(usize, 3), overview.files.len);
-    try expectSummary(overview.files[0], "deleted.txt", .deleted, 0, 1);
-    try expectSummary(overview.files[1], "modified.txt", .modified, 1, 1);
-    try expectSummary(overview.files[2], "untracked.txt", .added, 2, 0);
+    try std.testing.expectEqual(@as(usize, 5), overview.files.len);
+    try expectSummary(overview.files[0], "binary.dat", .modified, null, null);
+    try expectSummary(overview.files[1], "deleted.txt", .deleted, 0, 1);
+    try expectSummary(overview.files[2], "modified.txt", .modified, 1, 1);
+    try expectSummary(overview.files[3], "renamed.txt", .renamed, 0, 0);
+    try std.testing.expectEqualStrings("old.txt", overview.files[3].previousPath.?);
+    try expectSummary(overview.files[4], "untracked.txt", .added, 2, 0);
+
+    const binary = try diffs.getFileDiff(std.testing.io, overview.id, "binary.dat");
+    try std.testing.expectEqual(model.UnavailableReason.binary, binary.content.unavailable.reason);
 
     const deleted = try diffs.getFileDiff(std.testing.io, overview.id, "deleted.txt");
     try std.testing.expectEqualStrings("removed\n", deleted.content.diff.oldFile.?.contents);

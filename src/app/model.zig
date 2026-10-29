@@ -259,6 +259,24 @@ pub const FileSummary = struct {
     deletions: ?usize,
 };
 
+pub const WorkingTreeChangesResult = struct {
+    files: []const FileSummary,
+    /// Storage for this result; null for static results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    /// Call once after use, including when serialization fails.
+    pub fn deinit(self: WorkingTreeChangesResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: WorkingTreeChangesResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .files = self.files });
+    }
+};
+
 pub const UnavailableReason = enum {
     binary,
     invalid_utf8,
@@ -452,6 +470,7 @@ pub const Request = union(enum) {
     reload_review,
     get_diff_overview,
     list_commits,
+    list_working_tree_changes,
     list_open_pull_requests,
     get_files,
     get_files_not_ignored,
@@ -517,6 +536,7 @@ pub const Response = union(enum) {
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     commit_list: CommitListResult,
+    working_tree_changes: WorkingTreeChangesResult,
     pull_request_list: PullRequestListResult,
     files: []const []const u8,
     text_search: TextSearchResult,
@@ -564,6 +584,10 @@ const error_definitions = .{
     .repository_unavailable = ErrorDefinition{ .errors = &.{error.RepositoryUnavailable}, .message = "Git is unavailable" },
     .repository_failed = ErrorDefinition{ .errors = &.{error.RepositoryFailed}, .message = "Unable to read repository history" },
     .invalid_commit_history = ErrorDefinition{ .errors = &.{error.InvalidCommitHistory}, .message = "Repository history data is invalid" },
+    .working_tree_changes_failed = ErrorDefinition{ .errors = &.{error.WorkingTreeChangesFailed}, .message = "Unable to list working-tree changes" },
+    .invalid_revision = ErrorDefinition{ .errors = &.{error.InvalidRevision}, .message = "Revision does not identify a commit" },
+    .unsupported_path = ErrorDefinition{ .errors = &.{error.UnsupportedPath}, .message = "Git file path is not supported" },
+    .invalid_working_tree_changes = ErrorDefinition{ .errors = &.{error.MalformedGitOutput}, .message = "Working-tree change data is invalid" },
     .missing_origin = ErrorDefinition{ .errors = &.{error.MissingOrigin}, .message = "Pull request listing requires an origin remote" },
     .unsupported_origin = ErrorDefinition{ .errors = &.{error.UnsupportedOrigin}, .message = "The origin remote must identify a GitHub repository" },
     .pull_request_list_unavailable = ErrorDefinition{ .errors = &.{error.PullRequestListUnavailable}, .message = "GitHub CLI is unavailable" },
@@ -607,4 +631,39 @@ test "application error definitions map source errors and preserve wire codes" {
         }
     }
     try std.testing.expectEqual(ErrorCode.internal_error, errorCode(error.OutOfMemory));
+}
+
+test "working-tree results serialize file summaries and release owned storage on failure" {
+    const Test = struct {
+        fn run(allocator: std.mem.Allocator) !void {
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            const result: WorkingTreeChangesResult = result: {
+                errdefer arena.deinit();
+                const storage = arena.allocator();
+                const files = try storage.alloc(FileSummary, 2);
+                files[0] = .{
+                    .path = try storage.dupe(u8, "new 雪.txt"),
+                    .previousPath = try storage.dupe(u8, "old.txt"),
+                    .status = .renamed,
+                    .additions = 3,
+                    .deletions = 1,
+                };
+                files[1] = .{ .path = "binary.dat", .status = .added, .additions = null, .deletions = null };
+                break :result .{ .files = files, .arena = arena };
+            };
+            defer result.deinit();
+            const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+            defer allocator.free(encoded);
+            try std.testing.expectEqualStrings(
+                "{\"files\":[{\"path\":\"new 雪.txt\",\"previousPath\":\"old.txt\",\"status\":\"renamed\",\"additions\":3,\"deletions\":1},{\"path\":\"binary.dat\",\"previousPath\":null,\"status\":\"added\",\"additions\":null,\"deletions\":null}]}",
+                encoded,
+            );
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+    const empty: WorkingTreeChangesResult = .{ .files = &.{} };
+    defer empty.deinit();
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, empty, .{});
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("{\"files\":[]}", encoded);
 }

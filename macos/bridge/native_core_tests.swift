@@ -120,13 +120,35 @@ private func testNativeSearchFailure(_ directory: URL) throws {
     }
 }
 
-private func testNativeReviewComments() throws {
+private func commitRepository(_ directory: URL, _ message: String) throws {
+    try git(directory, ["add", "."])
+    try git(directory, ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
+                        "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m", message])
+}
+
+private func withNativeRepository(range: String? = nil,
+                                  _ body: (URL, NativeCore, NativeRequestRouter) throws -> Void) throws {
     try withTemporaryDirectory { directory in
         try git(directory, ["init", "--quiet"])
-        try git(directory, ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
-                            "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m", "empty review"])
-        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
-        let router = routerBlockingTermination(core)
+        try "base\n".write(to: directory.appendingPathComponent("tracked.txt"), atomically: true, encoding: .utf8)
+        try commitRepository(directory, "first")
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: range))
+        try body(directory, core, routerBlockingTermination(core))
+    }
+}
+
+private func expectNativeError(_ router: NativeRequestRouter, _ operation: String, _ message: String) throws {
+    do {
+        _ = try response(router, ["type": operation])
+        fatalError("\(operation) should fail")
+    } catch {
+        expect(error.localizedDescription == message, "\(operation) should return its error through the native queue")
+    }
+    _ = try response(router, ["type": "get_configuration"])
+}
+
+private func testNativeReviewComments() throws {
+    try withNativeRepository { directory, core, router in
         let overview = try response(router, ["type": "get_diff_overview"])
         expect((overview["files"] as? [Any])?.isEmpty == true, "review should have no changed files")
         let first = try response(router, ["type": "create_comment", "body": "Summary", "commentType": "QUESTION",
@@ -163,14 +185,10 @@ private func testNativeReviewComments() throws {
     }
 }
 
-private func testNativeCommitHistory() throws {
-    try withTemporaryDirectory { directory in
-        try git(directory, ["init", "--quiet"])
-        let commit = ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
-                      "-c", "commit.gpgSign=false", "commit", "--quiet", "--allow-empty", "-m"]
-        try git(directory, commit + ["first"])
-        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
-        let router = routerBlockingTermination(core)
+private func testNativeRepositoryLists() throws {
+    try withNativeRepository(range: "HEAD..HEAD") { directory, _, router in
+        let tracked = directory.appendingPathComponent("tracked.txt")
+        let before = try response(router, ["type": "get_diff_overview"])
         let first = try response(router, ["type": "list_commits"])
         let initial = first["commits"] as? [[String: Any]]
         expect(initial?.count == 1, "native history should include HEAD")
@@ -178,28 +196,41 @@ private func testNativeCommitHistory() throws {
         expect(initial?.first?["authorName"] as? String == "rvw tests", "native history should return the author")
         expect((initial?.first?["sha"] as? String)?.count == 40, "native history should return the full SHA")
         expect(initial?.first?["commitDate"] is String, "native history should return the commit date")
+        let clean = try response(router, ["type": "list_working_tree_changes"])
+        expect((clean["files"] as? [Any])?.isEmpty == true, "a clean worktree should return no summaries")
+
+        try "staged\n".write(to: tracked, atomically: true, encoding: .utf8)
+        try git(directory, ["add", "tracked.txt"])
+        try "unstaged\nextra\n".write(to: tracked, atomically: true, encoding: .utf8)
+        try "new\n".write(to: directory.appendingPathComponent("雪.txt"), atomically: true, encoding: .utf8)
+        let changed = try response(router, ["type": "list_working_tree_changes"])
+        let files = changed["files"] as? [[String: Any]]
+        expect(files?.count == 2, "native listing should return current tracked and untracked files")
+        expect(files?.first?["path"] as? String == "tracked.txt", "summaries should follow path order")
+        expect(files?.first?["status"] as? String == "modified", "tracked changes should be modified")
+        expect(files?.first?["additions"] as? Int == 2 && files?.first?["deletions"] as? Int == 1,
+               "counts should combine staged and unstaged changes against HEAD")
+        expect(files?.last?["path"] as? String == "雪.txt", "paths should retain Unicode text")
 
         try git(directory, ["checkout", "--quiet", "--detach"])
-        try git(directory, commit + ["second\nnext line"])
+        try commitRepository(directory, "second\nnext line")
         let next = try response(router, ["type": "list_commits"])
         let current = next["commits"] as? [[String: Any]]
         expect(current?.count == 2, "later native requests should read the current detached HEAD")
         expect(current?.first?["subject"] as? String == "second", "subjects should contain only the first message line")
         expect(current?.last?["sha"] as? String == initial?.first?["sha"] as? String,
                "native history should retain reachable parents")
+        let updated = try response(router, ["type": "list_working_tree_changes"])
+        expect((updated["files"] as? [Any])?.isEmpty == true, "later requests should read the new HEAD")
+        let after = try response(router, ["type": "get_diff_overview"])
+        expect(NSDictionary(dictionary: before).isEqual(to: after), "listing should preserve the active commit-range review")
 
         try git(directory, ["symbolic-ref", "HEAD", "refs/heads/unborn"])
         let empty = try response(router, ["type": "list_commits"])
         expect((empty["commits"] as? [Any])?.isEmpty == true, "an unborn branch should return an empty list")
+        try expectNativeError(router, "list_working_tree_changes", "Revision does not identify a commit")
         try "invalid HEAD\n".write(to: directory.appendingPathComponent(".git/HEAD"), atomically: true, encoding: .utf8)
-        do {
-            _ = try response(router, ["type": "list_commits"])
-            fatalError("invalid HEAD should fail")
-        } catch {
-            expect(error.localizedDescription == "Unable to read repository history",
-                   "repository failures should reach the native queue")
-        }
-        _ = try response(router, ["type": "get_configuration"])
+        try expectNativeError(router, "list_commits", "Unable to read repository history")
     }
 }
 
@@ -223,13 +254,7 @@ private func testNativePullRequests() throws {
         }
         let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
         let router = routerBlockingTermination(core)
-        do {
-            _ = try response(router, ["type": "list_open_pull_requests"])
-            fatalError("missing origin should fail")
-        } catch {
-            expect(error.localizedDescription == "Pull request listing requires an origin remote",
-                   "origin failures should reach the native queue")
-        }
+        try expectNativeError(router, "list_open_pull_requests", "Pull request listing requires an origin remote")
         try git(directory, ["remote", "add", "origin", "https://github.com/owner/repo.git"])
         try #"[{"number":42,"title":"Draft 雪","author":{"login":"author"},"url":"https://github.com/owner/repo/pull/42","isDraft":true,"baseRefName":"main","headRefName":"feature"}]"#
             .write(to: output, atomically: true, encoding: .utf8)
@@ -253,22 +278,10 @@ private func testNativePullRequests() throws {
         ] {
             try script.write(to: gh, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path)
-            do {
-                _ = try response(router, ["type": "list_open_pull_requests"])
-                fatalError("native pull request listing should fail")
-            } catch {
-                expect(error.localizedDescription == message, "listing errors should reach the native queue")
-            }
-            _ = try response(router, ["type": "get_configuration"])
+            try expectNativeError(router, "list_open_pull_requests", message)
         }
         try FileManager.default.removeItem(at: gh)
-        do {
-            _ = try response(router, ["type": "list_open_pull_requests"])
-            fatalError("missing gh should fail")
-        } catch {
-            expect(error.localizedDescription == "GitHub CLI is unavailable", "missing gh should reach the native queue")
-        }
-        _ = try response(router, ["type": "get_configuration"])
+        try expectNativeError(router, "list_open_pull_requests", "GitHub CLI is unavailable")
     }
 }
 
@@ -278,7 +291,7 @@ struct NativeCoreTests {
         do {
             try testNativeTextSearch()
             try testNativeReviewComments()
-            try testNativeCommitHistory()
+            try testNativeRepositoryLists()
             try testNativePullRequests()
             print("Native core tests passed")
         } catch {

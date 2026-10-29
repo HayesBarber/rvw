@@ -85,6 +85,7 @@ pub const Core = struct {
             },
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
             .list_commits => .{ .commit_list = try self.repository_provider.listCommits(self.io, self.review_provider.repositoryRoot()) },
+            .list_working_tree_changes => .{ .working_tree_changes = try self.repository_provider.listWorkingTreeChanges(self.io, self.review_provider.repositoryRoot()) },
             .list_open_pull_requests => .{ .pull_request_list = try self.pull_request_provider.listOpenPullRequests(self.io, self.review_provider.repositoryRoot()) },
             .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
             .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
@@ -208,6 +209,7 @@ fn operationName(request: model.Request) []const u8 {
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
         .list_commits => "list_commits",
+        .list_working_tree_changes => "list_working_tree_changes",
         .list_open_pull_requests => "list_open_pull_requests",
         .get_files => "get_files",
         .get_files_not_ignored => "get_files_not_ignored",
@@ -596,103 +598,7 @@ test "core reload replaces the review snapshot without touching comments and pre
     try std.testing.expectEqualStrings("keep review", (try core.dispatch(.get_comments)).comments[1].body);
 }
 
-test "core lists current commits without changing working-tree, range, or PR reviews" {
-    const TestRepository = @import("../testing/repository.zig").Repository;
-    const ReviewState = struct {
-        fn encode(core: *Core) ![]u8 {
-            const overview = (try core.dispatch(.get_diff_overview)).diff_overview;
-            return std.json.Stringify.valueAlloc(std.testing.allocator, .{
-                .overview = overview,
-                .file = (try core.dispatch(.{ .get_file_diff = .{ .diff_id = overview.id, .path = "tracked.txt" } })).file_diff,
-                .comments = (try core.dispatch(.get_comments)).comments,
-            }, .{});
-        }
-    };
-    for ([_]struct { range: ?[]const u8, pr: ?u32 }{
-        .{ .range = null, .pr = null },
-        .{ .range = "HEAD~1..HEAD", .pr = null },
-        .{ .range = "HEAD~1..HEAD", .pr = 100 },
-    }) |source| {
-        var fixture = try TestRepository.init(std.testing.allocator);
-        defer fixture.deinit();
-        try fixture.write("tracked.txt", "base\n");
-        try fixture.commit("first");
-        try fixture.write("tracked.txt", "head\n");
-        try fixture.commit("second");
-        try fixture.write("tracked.txt", "review snapshot\n");
-
-        var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr);
-        defer review.deinit();
-        var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
-        var pull_requests: provider_module.pull_request.github_cli.GitHubCliProvider = .{ .allocator = std.testing.allocator };
-        var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
-        defer comments.deinit();
-        var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
-        var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
-        var context: u8 = 0;
-        var core = Core.init(
-            std.testing.allocator,
-            std.testing.io,
-            review.interface(),
-            repository.interface(),
-            pull_requests.interface(),
-            search_ignore_aware.interface(),
-            search_all_files.interface(),
-            comments.interface(),
-            .{ .context = &context, .vtable = &noop_clipboard_vtable },
-            .{ .allocator = std.testing.allocator, .context = &context, .vtable = &silent_logger_vtable },
-            .{ .configuration = .{ .object = .empty }, .diagnostic = null },
-        );
-        core.review_generation = 4;
-        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review comment", .target = .review } });
-        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep file comment", .target = .{ .file = .{ .path = "tracked.txt" } } } });
-        const before_review = try ReviewState.encode(&core);
-        defer std.testing.allocator.free(before_review);
-
-        const first = (try core.dispatch(.list_commits)).commit_list;
-        defer first.deinit();
-        try std.testing.expectEqual(@as(usize, 2), first.commits.len);
-        try std.testing.expectEqualStrings("second", first.commits[0].subject);
-
-        try fixture.commit("third");
-        try fixture.write("tracked.txt", "staged\n");
-        try fixture.git(&.{ "add", "tracked.txt" });
-        try fixture.write("tracked.txt", "unstaged\n");
-        try fixture.write("untracked.txt", "untracked\n");
-        const before_head = try fixture.revision("HEAD");
-        defer std.testing.allocator.free(before_head);
-        const paths = [_][]const u8{ ".git/index", "tracked.txt", "untracked.txt" };
-        var before_files: [paths.len][]const u8 = undefined;
-        for (paths, &before_files) |path, *contents| {
-            contents.* = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
-        }
-        defer for (before_files) |contents| std.testing.allocator.free(contents);
-
-        const current = (try core.dispatch(.list_commits)).commit_list;
-        defer current.deinit();
-        try std.testing.expectEqual(@as(usize, 3), current.commits.len);
-        try std.testing.expectEqualStrings(before_head, current.commits[0].sha);
-        try std.testing.expectEqualStrings("third", current.commits[0].subject);
-        try std.testing.expectEqualStrings(first.commits[0].sha, current.commits[1].sha);
-
-        repository.executable = "/rvw-missing-git";
-        try std.testing.expectError(error.RepositoryUnavailable, core.dispatch(.list_commits));
-        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
-        const after_review = try ReviewState.encode(&core);
-        defer std.testing.allocator.free(after_review);
-        try std.testing.expectEqualStrings(before_review, after_review);
-        const after_head = try fixture.revision("HEAD");
-        defer std.testing.allocator.free(after_head);
-        try std.testing.expectEqualStrings(before_head, after_head);
-        for (paths, before_files) |path, before| {
-            const after = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
-            defer std.testing.allocator.free(after);
-            try std.testing.expectEqualSlices(u8, before, after);
-        }
-    }
-}
-
-test "core lists current pull requests without changing working-tree, range, or PR reviews" {
+test "core lists current repository data without changing working-tree, range, or PR reviews" {
     const TestRepository = @import("../testing/repository.zig").Repository;
     const Provider = provider_module.pull_request.PullRequestProvider;
     const PullRequests = struct {
@@ -756,6 +662,7 @@ test "core lists current pull requests without changing working-tree, range, or 
         try fixture.write("tracked.txt", "head\n");
         try fixture.commit("second");
         try fixture.write("tracked.txt", "review snapshot\n");
+
         var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr);
         defer review.deinit();
         var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
@@ -783,26 +690,64 @@ test "core lists current pull requests without changing working-tree, range, or 
         _ = try core.dispatch(.{ .create_comment = .{ .body = "keep file comment", .target = .{ .file = .{ .path = "tracked.txt" } } } });
         const before_review = try ReviewState.encode(&core);
         defer std.testing.allocator.free(before_review);
-        try fixture.write("tracked.txt", "changed after snapshot\n");
 
+        const first_commits = try core.dispatch(.list_commits);
+        defer first_commits.deinit();
+        try std.testing.expectEqual(@as(usize, 2), first_commits.commit_list.commits.len);
+        try std.testing.expectEqualStrings("second", first_commits.commit_list.commits[0].subject);
+        const first_changes = try core.dispatch(.list_working_tree_changes);
+        defer first_changes.deinit();
+        const initial_files = [_]model.FileSummary{
+            .{ .path = "tracked.txt", .status = .modified, .additions = 1, .deletions = 1 },
+        };
+        try std.testing.expectEqualDeep(@as([]const model.FileSummary, &initial_files), first_changes.working_tree_changes.files);
         const dispatcher = core.dispatcher();
-        const first = try dispatcher.dispatch(.list_open_pull_requests);
-        defer first.deinit();
-        try std.testing.expectEqual(@as(usize, 1), first.pull_request_list.pullRequests.len);
-        try std.testing.expectEqualDeep(first_pr, first.pull_request_list.pullRequests[0]);
+        const first_requests = try dispatcher.dispatch(.list_open_pull_requests);
+        defer first_requests.deinit();
+        try std.testing.expectEqualDeep(@as([]const model.PullRequest, &.{first_pr}), first_requests.pull_request_list.pullRequests);
         try std.testing.expectEqualStrings(fixture.root, pull_requests.directory.?);
 
-        pull_requests.items = &.{next_pr};
-        const next = try dispatcher.dispatch(.list_open_pull_requests);
-        defer next.deinit();
-        try std.testing.expectEqual(@as(usize, 1), next.pull_request_list.pullRequests.len);
-        try std.testing.expectEqualDeep(next_pr, next.pull_request_list.pullRequests[0]);
-        try std.testing.expectEqualDeep(first_pr, first.pull_request_list.pullRequests[0]);
+        try fixture.commit("third");
+        try fixture.write("tracked.txt", "staged\n");
+        try fixture.git(&.{ "add", "tracked.txt" });
+        try fixture.write("tracked.txt", "unstaged\nextra\n");
+        try fixture.write("untracked.txt", "untracked\n");
+        const before_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(before_head);
+        const paths = [_][]const u8{ ".git/index", "tracked.txt", "untracked.txt" };
+        var before_files: [paths.len][]const u8 = undefined;
+        for (paths, &before_files) |path, *contents| {
+            contents.* = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+        }
+        defer for (before_files) |contents| std.testing.allocator.free(contents);
 
+        const next_commits = try core.dispatch(.list_commits);
+        defer next_commits.deinit();
+        try std.testing.expectEqual(@as(usize, 3), next_commits.commit_list.commits.len);
+        try std.testing.expectEqualStrings(before_head, next_commits.commit_list.commits[0].sha);
+        try std.testing.expectEqualStrings("third", next_commits.commit_list.commits[0].subject);
+        try std.testing.expectEqualStrings(first_commits.commit_list.commits[0].sha, next_commits.commit_list.commits[1].sha);
+        const next_changes = try core.dispatch(.list_working_tree_changes);
+        defer next_changes.deinit();
+        const current_files = [_]model.FileSummary{
+            .{ .path = "tracked.txt", .status = .modified, .additions = 2, .deletions = 1 },
+            .{ .path = "untracked.txt", .status = .added, .additions = 1, .deletions = 0 },
+        };
+        try std.testing.expectEqualDeep(@as([]const model.FileSummary, &current_files), next_changes.working_tree_changes.files);
+        try std.testing.expectEqualDeep(@as([]const model.FileSummary, &initial_files), first_changes.working_tree_changes.files);
+        pull_requests.items = &.{next_pr};
+        const next_requests = try dispatcher.dispatch(.list_open_pull_requests);
+        defer next_requests.deinit();
+        try std.testing.expectEqualDeep(@as([]const model.PullRequest, &.{next_pr}), next_requests.pull_request_list.pullRequests);
+        try std.testing.expectEqualDeep(@as([]const model.PullRequest, &.{first_pr}), first_requests.pull_request_list.pullRequests);
         pull_requests.items = &.{};
-        const empty = try dispatcher.dispatch(.list_open_pull_requests);
-        defer empty.deinit();
-        try std.testing.expectEqual(@as(usize, 0), empty.pull_request_list.pullRequests.len);
+        const empty_requests = try dispatcher.dispatch(.list_open_pull_requests);
+        defer empty_requests.deinit();
+        try std.testing.expectEqual(@as(usize, 0), empty_requests.pull_request_list.pullRequests.len);
+
+        repository.executable = "/rvw-missing-git";
+        try std.testing.expectError(error.RepositoryUnavailable, core.dispatch(.list_commits));
+        try std.testing.expectError(error.RepositoryUnavailable, core.dispatch(.list_working_tree_changes));
         const failures = [_]Provider.Error{
             error.MissingOrigin,
             error.UnsupportedOrigin,
@@ -823,6 +768,25 @@ test "core lists current pull requests without changing working-tree, range, or 
         const after_review = try ReviewState.encode(&core);
         defer std.testing.allocator.free(after_review);
         try std.testing.expectEqualStrings(before_review, after_review);
+        const after_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(after_head);
+        try std.testing.expectEqualStrings(before_head, after_head);
+        for (paths, before_files) |path, before| {
+            const after = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+            defer std.testing.allocator.free(after);
+            try std.testing.expectEqualSlices(u8, before, after);
+        }
+
+        repository.executable = null;
+        try fixture.git(&.{ "reset", "--hard", "HEAD" });
+        try fixture.temporary.dir.deleteFile(std.testing.io, "untracked.txt");
+        const clean = try core.dispatch(.list_working_tree_changes);
+        defer clean.deinit();
+        try std.testing.expectEqual(@as(usize, 0), clean.working_tree_changes.files.len);
+        const clean_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(clean_review);
+        try std.testing.expectEqualStrings(before_review, clean_review);
+        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
     }
 }
 
