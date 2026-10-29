@@ -259,6 +259,24 @@ pub const FileSummary = struct {
     deletions: ?usize,
 };
 
+pub const WorkingTreeChangesResult = struct {
+    files: []const FileSummary,
+    /// Storage for this result; null for static results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    /// Call once after use, including when serialization fails.
+    pub fn deinit(self: WorkingTreeChangesResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: WorkingTreeChangesResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .files = self.files });
+    }
+};
+
 pub const UnavailableReason = enum {
     binary,
     invalid_utf8,
@@ -607,4 +625,39 @@ test "application error definitions map source errors and preserve wire codes" {
         }
     }
     try std.testing.expectEqual(ErrorCode.internal_error, errorCode(error.OutOfMemory));
+}
+
+test "working-tree results serialize file summaries and release owned storage on failure" {
+    const Test = struct {
+        fn run(allocator: std.mem.Allocator) !void {
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            const result: WorkingTreeChangesResult = result: {
+                errdefer arena.deinit();
+                const storage = arena.allocator();
+                const files = try storage.alloc(FileSummary, 2);
+                files[0] = .{
+                    .path = try storage.dupe(u8, "new 雪.txt"),
+                    .previousPath = try storage.dupe(u8, "old.txt"),
+                    .status = .renamed,
+                    .additions = 3,
+                    .deletions = 1,
+                };
+                files[1] = .{ .path = "binary.dat", .status = .added, .additions = null, .deletions = null };
+                break :result .{ .files = files, .arena = arena };
+            };
+            defer result.deinit();
+            const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+            defer allocator.free(encoded);
+            try std.testing.expectEqualStrings(
+                "{\"files\":[{\"path\":\"new 雪.txt\",\"previousPath\":\"old.txt\",\"status\":\"renamed\",\"additions\":3,\"deletions\":1},{\"path\":\"binary.dat\",\"previousPath\":null,\"status\":\"added\",\"additions\":null,\"deletions\":null}]}",
+                encoded,
+            );
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+    const empty: WorkingTreeChangesResult = .{ .files = &.{} };
+    defer empty.deinit();
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, empty, .{});
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("{\"files\":[]}", encoded);
 }

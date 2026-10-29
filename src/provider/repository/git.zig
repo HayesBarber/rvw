@@ -2,15 +2,48 @@ const std = @import("std");
 const model = @import("../../app/model.zig");
 const git_process = @import("../../util/git_process.zig");
 const RepositoryProvider = @import("interface.zig").RepositoryProvider;
+const metadata = @import("../diff/git/metadata.zig");
 
-/// Each request owns its result. No repository history is cached.
+/// Each request owns its result. Repository data is not cached.
 pub const GitProvider = struct {
     allocator: std.mem.Allocator,
     /// Null finds Git through PATH. Overrides must be absolute paths.
     executable: ?[]const u8 = null,
 
     pub fn interface(self: *GitProvider) RepositoryProvider {
-        return .{ .context = self, .vtable = &.{ .listCommits = listCommits } };
+        return .{ .context = self, .vtable = &.{ .listCommits = listCommits, .listWorkingTreeChanges = listWorkingTreeChanges } };
+    }
+
+    fn listWorkingTreeChanges(context: *anyopaque, io: std.Io, directory: []const u8) !model.WorkingTreeChangesResult {
+        const self: *GitProvider = @ptrCast(@alignCast(context));
+        var arena = std.heap.ArenaAllocator.init(self.allocator);
+        errdefer arena.deinit();
+        const allocator = arena.allocator();
+
+        // A corrupt repository can make Git discover a parent worktree.
+        const root = std.Io.Dir.cwd().realPathFileAlloc(io, directory, allocator) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return error.WorkingTreeChangesFailed,
+        };
+        const reported = self.run(allocator, io, root, &.{ "rev-parse", "--show-toplevel" }, git_process.maximum_revision_size) catch |err| switch (err) {
+            error.RepositoryFailed => return error.WorkingTreeChangesFailed,
+            else => return err,
+        };
+        if (!git_process.exitedSuccessfully(reported.term) or !std.mem.eql(u8, root, std.mem.trimEnd(u8, reported.stdout, "\r\n"))) return error.WorkingTreeChangesFailed;
+
+        const revision = self.run(allocator, io, directory, &.{ "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}" }, git_process.maximum_revision_size) catch |err| switch (err) {
+            error.RepositoryFailed => return error.WorkingTreeChangesFailed,
+            else => return err,
+        };
+        if (!git_process.exitedSuccessfully(revision.term)) return error.InvalidRevision;
+        const head = std.mem.trim(u8, revision.stdout, " \t\r\n");
+        if (head.len == 0 or !std.unicode.utf8ValidateSlice(head)) return error.InvalidRevision;
+        const changes = metadata.enumerateWithGit(allocator, io, directory, .{ .base = head }, self.executable orelse "git") catch |err| switch (err) {
+            error.OutOfMemory, error.UnsupportedPath, error.MalformedGitOutput => return err,
+            error.GitNotFound, error.AccessDenied, error.InvalidExe => return error.RepositoryUnavailable,
+            else => return error.WorkingTreeChangesFailed,
+        };
+        return .{ .files = try metadata.summarize(allocator, changes), .arena = arena };
     }
 
     fn listCommits(context: *anyopaque, io: std.Io, directory: []const u8) !model.CommitListResult {
@@ -250,4 +283,143 @@ test "Git history parser rejects incomplete records, invalid UTF-8, and excess r
     }
     const valid = sha ++ "\x00\x00author\x00" ++ date ++ "\x00";
     try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, valid ** 31));
+}
+
+test "working-tree summaries match ordinary reviews for all change types without writes" {
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.write(".gitignore", "ignored.txt\n");
+    try repository.write("binary.dat", "before\x00\n");
+    try repository.write("deleted.txt", "removed\n");
+    try repository.write("mixed.txt", "base\n");
+    try repository.write("old.txt", "rename content\n");
+    try repository.write("staged.txt", "base\n");
+    try repository.write("unstaged.txt", "base\n");
+    try repository.commit("base");
+    try repository.write("staged.txt", "staged\n");
+    try repository.write("mixed.txt", "staged\n");
+    try repository.git(&.{ "add", "staged.txt", "mixed.txt" });
+    try repository.write("mixed.txt", "final\nextra\n");
+    try repository.write("unstaged.txt", "unstaged\n");
+    try repository.write("binary.dat", "after\x00\n");
+    try repository.temporary.dir.deleteFile(std.testing.io, "deleted.txt");
+    try repository.git(&.{ "mv", "old.txt", "renamed.txt" });
+    try repository.write("untracked.txt", "one\ntwo\n");
+    try repository.write("untracked-binary.dat", "\x00data");
+    try repository.write("ignored.txt", "ignored\n");
+
+    const index_before = try repository.temporary.dir.readFileAlloc(std.testing.io, ".git/index", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(index_before);
+    var provider: GitProvider = .{ .allocator = std.testing.allocator };
+    const result = try provider.interface().listWorkingTreeChanges(std.testing.io, repository.root);
+    defer result.deinit();
+    const expected = [_]model.FileSummary{
+        .{ .path = "binary.dat", .status = .modified, .additions = null, .deletions = null },
+        .{ .path = "deleted.txt", .status = .deleted, .additions = 0, .deletions = 1 },
+        .{ .path = "mixed.txt", .status = .modified, .additions = 2, .deletions = 1 },
+        .{ .path = "renamed.txt", .previousPath = "old.txt", .status = .renamed, .additions = 0, .deletions = 0 },
+        .{ .path = "staged.txt", .status = .modified, .additions = 1, .deletions = 1 },
+        .{ .path = "unstaged.txt", .status = .modified, .additions = 1, .deletions = 1 },
+        .{ .path = "untracked-binary.dat", .status = .added, .additions = null, .deletions = null },
+        .{ .path = "untracked.txt", .status = .added, .additions = 2, .deletions = 0 },
+    };
+    try std.testing.expectEqualDeep(@as([]const model.FileSummary, &expected), result.files);
+    const index_after = try repository.temporary.dir.readFileAlloc(std.testing.io, ".git/index", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(index_after);
+    try std.testing.expectEqualSlices(u8, index_before, index_after);
+
+    var review = try @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null);
+    defer review.deinit();
+    try std.testing.expectEqualDeep(review.overview.files, result.files);
+    const mixed = try repository.temporary.dir.readFileAlloc(std.testing.io, "mixed.txt", std.testing.allocator, .limited(1024));
+    defer std.testing.allocator.free(mixed);
+    try std.testing.expectEqualStrings("final\nextra\n", mixed);
+}
+
+test "working-tree summaries read current HEAD and changes on each request" {
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.write("tracked.txt", "base\n");
+    try repository.commit("base");
+    var provider: GitProvider = .{ .allocator = std.testing.allocator };
+    const clean = try provider.interface().listWorkingTreeChanges(std.testing.io, repository.root);
+    defer clean.deinit();
+    try std.testing.expectEqual(@as(usize, 0), clean.files.len);
+    try repository.write("tracked.txt", "changed\n");
+    const first = try provider.interface().listWorkingTreeChanges(std.testing.io, repository.root);
+    defer first.deinit();
+    try std.testing.expectEqual(@as(usize, 1), first.files.len);
+    try repository.commit("new HEAD");
+    const next = try provider.interface().listWorkingTreeChanges(std.testing.io, repository.root);
+    defer next.deinit();
+    try std.testing.expectEqual(@as(usize, 0), next.files.len);
+    try repository.write("later.txt", "new\n");
+    const later = try provider.interface().listWorkingTreeChanges(std.testing.io, repository.root);
+    defer later.deinit();
+    try std.testing.expectEqual(@as(usize, 1), later.files.len);
+    try std.testing.expectEqualStrings("later.txt", later.files[0].path);
+    // Earlier results keep their storage until the caller releases them.
+    try std.testing.expectEqualStrings("tracked.txt", first.files[0].path);
+}
+
+test "working-tree summaries define errors for Git failures and absent HEAD" {
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+    var provider: GitProvider = .{ .allocator = std.testing.allocator };
+    try std.testing.expectError(error.InvalidRevision, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    try std.testing.expectError(error.InvalidRevision, @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null));
+    provider.executable = "/rvw-missing-git";
+    try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    provider.executable = "relative-git";
+    try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    provider.executable = "/usr/bin/false";
+    try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    provider.executable = "/usr/bin/true";
+    try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    provider.executable = null;
+    try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, "/rvw-missing-repository"));
+    try repository.write(".git/HEAD", "invalid HEAD\n");
+    try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+}
+
+test "working-tree summaries release storage after command, path, and parsing failures" {
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+    const executable = try std.fs.path.join(std.testing.allocator, &.{ repository.root, "fake-git" });
+    defer std.testing.allocator.free(executable);
+    var provider: GitProvider = .{ .allocator = std.testing.allocator, .executable = executable };
+    const prefix = "#!/bin/sh\ncase \"$*\" in\n*--show-toplevel*) printf '%s\\n' \"$5\";;\n*rev-parse*) printf '%s\\n' '0123456789abcdef0123456789abcdef01234567';;\n";
+    for ([_]struct { script: []const u8, failure: anyerror }{
+        .{ .script = prefix ++ "*) exit 2;;\nesac\n", .failure = error.WorkingTreeChangesFailed },
+        .{ .script = prefix ++ "*) printf 'malformed metadata';;\nesac\n", .failure = error.MalformedGitOutput },
+        .{ .script = prefix ++ "*) printf ':100644 100644 a b M\\000\\377\\0001\\t1\\t\\377\\000';;\nesac\n", .failure = error.UnsupportedPath },
+        .{ .script = prefix ++ "*) printf ':100644 100644 a b M\\000file\\000bad\\t1\\tfile\\000';;\nesac\n", .failure = error.MalformedGitOutput },
+        .{ .script = prefix ++ "*diff*) exit 0;;\n*) exit 2;;\nesac\n", .failure = error.WorkingTreeChangesFailed },
+        .{ .script = prefix ++ "*diff*) exit 0;;\n*) printf 'missing-file\\000';;\nesac\n", .failure = error.WorkingTreeChangesFailed },
+    }) |case| {
+        try repository.write("fake-git", case.script);
+        var file = try repository.temporary.dir.openFile(std.testing.io, "fake-git", .{});
+        defer file.close(std.testing.io);
+        try file.setPermissions(std.testing.io, .executable_file);
+        try std.testing.expectError(case.failure, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
+    }
+}
+
+test "working-tree summaries release request and serialization storage on allocation failures" {
+    var repository = try TestRepository.init(std.testing.allocator);
+    defer repository.deinit();
+    try repository.write("tracked.txt", "base\n");
+    try repository.commit("base");
+    try repository.write("tracked.txt", "changed\n");
+    try repository.write("new.txt", "untracked\n");
+    const Test = struct {
+        fn run(allocator: std.mem.Allocator, directory: []const u8) !void {
+            var provider: GitProvider = .{ .allocator = allocator };
+            const result = try provider.interface().listWorkingTreeChanges(std.testing.io, directory);
+            defer result.deinit();
+            const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+            defer allocator.free(encoded);
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{repository.root});
 }

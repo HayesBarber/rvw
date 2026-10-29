@@ -38,8 +38,18 @@ pub fn enumerate(
     root: []const u8,
     snapshot: snapshot_module.Snapshot,
 ) ![]const Change {
-    var changes = try trackedChanges(allocator, io, root, snapshot);
-    if (snapshot.head == null) try appendUntracked(allocator, io, root, &changes);
+    return enumerateWithGit(allocator, io, root, snapshot, "git");
+}
+
+pub fn enumerateWithGit(
+    allocator: Allocator,
+    io: Io,
+    root: []const u8,
+    snapshot: snapshot_module.Snapshot,
+    executable: []const u8,
+) ![]const Change {
+    var changes = try trackedChanges(allocator, io, root, snapshot, executable);
+    if (snapshot.head == null) try appendUntracked(allocator, io, root, &changes, executable);
     std.mem.sort(Change, changes.items, {}, lessThanChange);
     return changes.toOwnedSlice(allocator);
 }
@@ -49,11 +59,12 @@ fn trackedChanges(
     io: Io,
     root: []const u8,
     snapshot: snapshot_module.Snapshot,
+    executable: []const u8,
 ) !std.ArrayList(Change) {
     const output = if (snapshot.head) |head|
-        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, process.maximum_metadata_size * 2)
+        try process.run(allocator, io, &.{ executable, "--no-optional-locks", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, head, "--" }, process.maximum_metadata_size * 2)
     else
-        try process.run(allocator, io, &.{ "git", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, process.maximum_metadata_size * 2);
+        try process.run(allocator, io, &.{ executable, "--no-optional-locks", "-C", root, "diff", "--no-ext-diff", "--no-textconv", "--raw", "--numstat", "-z", "--find-renames=50%", snapshot.base, "--" }, process.maximum_metadata_size * 2);
     return parseChanges(allocator, output);
 }
 
@@ -118,8 +129,9 @@ fn appendUntracked(
     io: Io,
     root: []const u8,
     changes: *std.ArrayList(Change),
+    executable: []const u8,
 ) !void {
-    const output = try process.run(allocator, io, &.{ "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z", "--" }, process.maximum_metadata_size);
+    const output = try process.run(allocator, io, &.{ executable, "--no-optional-locks", "-C", root, "ls-files", "--others", "--exclude-standard", "-z", "--" }, process.maximum_metadata_size);
     var cursor: usize = 0;
     var directory = try std.Io.Dir.openDirAbsolute(io, root, .{});
     defer directory.close(io);
