@@ -85,6 +85,7 @@ pub const Core = struct {
             },
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
             .list_commits => .{ .commit_list = try self.repository_provider.listCommits(self.io, self.review_provider.repositoryRoot()) },
+            .list_working_tree_changes => .{ .working_tree_changes = try self.repository_provider.listWorkingTreeChanges(self.io, self.review_provider.repositoryRoot()) },
             .list_open_pull_requests => .{ .pull_request_list = try self.pull_request_provider.listOpenPullRequests(self.io, self.review_provider.repositoryRoot()) },
             .get_files => .{ .files = try self.review_provider.getFiles(self.io) },
             .get_files_not_ignored => .{ .files = try self.review_provider.getFilesNotIgnored(self.io) },
@@ -208,6 +209,7 @@ fn operationName(request: model.Request) []const u8 {
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
         .list_commits => "list_commits",
+        .list_working_tree_changes => "list_working_tree_changes",
         .list_open_pull_requests => "list_open_pull_requests",
         .get_files => "get_files",
         .get_files_not_ignored => "get_files_not_ignored",
@@ -689,6 +691,124 @@ test "core lists current commits without changing working-tree, range, or PR rev
             defer std.testing.allocator.free(after);
             try std.testing.expectEqualSlices(u8, before, after);
         }
+    }
+}
+
+test "core lists current working-tree changes without changing working-tree, range, or PR reviews" {
+    const TestRepository = @import("../testing/repository.zig").Repository;
+    const ReviewState = struct {
+        fn encode(core: *Core) ![]u8 {
+            const overview = (try core.dispatch(.get_diff_overview)).diff_overview;
+            return std.json.Stringify.valueAlloc(std.testing.allocator, .{
+                .overview = overview,
+                .file = (try core.dispatch(.{ .get_file_diff = .{ .diff_id = overview.id, .path = "tracked.txt" } })).file_diff,
+                .comments = (try core.dispatch(.get_comments)).comments,
+            }, .{});
+        }
+    };
+    for ([_]struct { range: ?[]const u8, pr: ?u32 }{
+        .{ .range = null, .pr = null },
+        .{ .range = "HEAD~1..HEAD", .pr = null },
+        .{ .range = "HEAD~1..HEAD", .pr = 100 },
+    }) |source| {
+        var fixture = try TestRepository.init(std.testing.allocator);
+        defer fixture.deinit();
+        try fixture.write("tracked.txt", "base\n");
+        try fixture.commit("first");
+        try fixture.write("tracked.txt", "head\n");
+        try fixture.commit("second");
+        try fixture.write("tracked.txt", "review snapshot\n");
+
+        var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr);
+        defer review.deinit();
+        var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
+        var pull_requests: provider_module.pull_request.github_cli.GitHubCliProvider = .{ .allocator = std.testing.allocator };
+        var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
+        defer comments.deinit();
+        var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
+        var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
+        var context: u8 = 0;
+        var core = Core.init(
+            std.testing.allocator,
+            std.testing.io,
+            review.interface(),
+            repository.interface(),
+            pull_requests.interface(),
+            search_ignore_aware.interface(),
+            search_all_files.interface(),
+            comments.interface(),
+            .{ .context = &context, .vtable = &noop_clipboard_vtable },
+            .{ .allocator = std.testing.allocator, .context = &context, .vtable = &silent_logger_vtable },
+            .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+        );
+        core.review_generation = 4;
+        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review comment", .target = .review } });
+        _ = try core.dispatch(.{ .create_comment = .{ .body = "keep file comment", .target = .{ .file = .{ .path = "tracked.txt" } } } });
+        const before_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(before_review);
+
+        const first_response = try core.dispatch(.list_working_tree_changes);
+        defer first_response.deinit();
+        const first = first_response.working_tree_changes;
+        try std.testing.expectEqual(@as(usize, 1), first.files.len);
+        try std.testing.expectEqualStrings("tracked.txt", first.files[0].path);
+        try std.testing.expectEqual(model.FileStatus.modified, first.files[0].status);
+        try std.testing.expectEqual(@as(?usize, 1), first.files[0].additions);
+        try std.testing.expectEqual(@as(?usize, 1), first.files[0].deletions);
+
+        try fixture.commit("third");
+        try fixture.write("tracked.txt", "staged\n");
+        try fixture.git(&.{ "add", "tracked.txt" });
+        try fixture.write("tracked.txt", "unstaged\nextra\n");
+        try fixture.write("untracked.txt", "untracked\n");
+        const before_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(before_head);
+        const paths = [_][]const u8{ ".git/index", "tracked.txt", "untracked.txt" };
+        var before_files: [paths.len][]const u8 = undefined;
+        for (paths, &before_files) |path, *contents| {
+            contents.* = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+        }
+        defer for (before_files) |contents| std.testing.allocator.free(contents);
+
+        const current_response = try core.dispatch(.list_working_tree_changes);
+        defer current_response.deinit();
+        const current = current_response.working_tree_changes;
+        try std.testing.expectEqual(@as(usize, 2), current.files.len);
+        try std.testing.expectEqualStrings("tracked.txt", current.files[0].path);
+        try std.testing.expectEqual(model.FileStatus.modified, current.files[0].status);
+        try std.testing.expectEqual(@as(?usize, 2), current.files[0].additions);
+        try std.testing.expectEqual(@as(?usize, 1), current.files[0].deletions);
+        try std.testing.expectEqualStrings("untracked.txt", current.files[1].path);
+        try std.testing.expectEqual(model.FileStatus.added, current.files[1].status);
+        try std.testing.expectEqual(@as(?usize, 1), current.files[1].additions);
+        try std.testing.expectEqual(@as(?usize, 0), current.files[1].deletions);
+        try std.testing.expectEqual(@as(?usize, 1), first.files[0].additions);
+
+        repository.executable = "/rvw-missing-git";
+        try std.testing.expectError(error.RepositoryUnavailable, core.dispatch(.list_working_tree_changes));
+        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
+        const after_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(after_review);
+        try std.testing.expectEqualStrings(before_review, after_review);
+        const after_head = try fixture.revision("HEAD");
+        defer std.testing.allocator.free(after_head);
+        try std.testing.expectEqualStrings(before_head, after_head);
+        for (paths, before_files) |path, before| {
+            const after = try fixture.temporary.dir.readFileAlloc(std.testing.io, path, std.testing.allocator, .limited(1024 * 1024));
+            defer std.testing.allocator.free(after);
+            try std.testing.expectEqualSlices(u8, before, after);
+        }
+
+        repository.executable = null;
+        try fixture.git(&.{ "reset", "--hard", "HEAD" });
+        try fixture.temporary.dir.deleteFile(std.testing.io, "untracked.txt");
+        const clean = try core.dispatch(.list_working_tree_changes);
+        defer clean.deinit();
+        try std.testing.expectEqual(@as(usize, 0), clean.working_tree_changes.files.len);
+        const clean_review = try ReviewState.encode(&core);
+        defer std.testing.allocator.free(clean_review);
+        try std.testing.expectEqualStrings(before_review, clean_review);
+        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
     }
 }
 

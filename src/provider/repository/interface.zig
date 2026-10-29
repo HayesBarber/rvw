@@ -83,9 +83,11 @@ test "repository provider forwards working-tree requests and failures" {
         try std.testing.expectEqual(@as(usize, 0), result.files.len);
     }
     const failures = [_]anyerror{ error.RepositoryUnavailable, error.WorkingTreeChangesFailed, error.InvalidRevision, error.UnsupportedPath, error.MalformedGitOutput, error.OutOfMemory };
-    for (failures) |failure| {
+    const codes = [_]model.ErrorCode{ .repository_unavailable, .working_tree_changes_failed, .invalid_revision, .unsupported_path, .invalid_working_tree_changes, .internal_error };
+    for (failures, codes) |failure, code| {
         stub.failure = failure;
         try std.testing.expectError(failure, provider.listWorkingTreeChanges(std.testing.io, "/repository"));
+        try std.testing.expectEqual(code, model.errorCode(failure));
     }
     try std.testing.expectEqual(@as(usize, 8), stub.calls);
 }
