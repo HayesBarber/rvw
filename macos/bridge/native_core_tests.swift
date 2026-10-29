@@ -203,6 +203,51 @@ private func testNativeCommitHistory() throws {
     }
 }
 
+private func testNativeWorkingTreeChanges() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        let tracked = directory.appendingPathComponent("tracked.txt")
+        try "base\n".write(to: tracked, atomically: true, encoding: .utf8)
+        try git(directory, ["add", "."])
+        let commit = ["-c", "user.name=rvw tests", "-c", "user.email=rvw-tests@example.invalid",
+                      "-c", "commit.gpgSign=false", "commit", "--quiet", "-m"]
+        try git(directory, commit + ["base"])
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: "HEAD..HEAD"))
+        let router = routerBlockingTermination(core)
+        let before = try response(router, ["type": "get_diff_overview"])
+        let clean = try response(router, ["type": "list_working_tree_changes"])
+        expect((clean["files"] as? [Any])?.isEmpty == true, "a clean worktree should return no summaries")
+
+        try "staged\n".write(to: tracked, atomically: true, encoding: .utf8)
+        try git(directory, ["add", "tracked.txt"])
+        try "unstaged\nextra\n".write(to: tracked, atomically: true, encoding: .utf8)
+        try "new\n".write(to: directory.appendingPathComponent("雪.txt"), atomically: true, encoding: .utf8)
+        let changed = try response(router, ["type": "list_working_tree_changes"])
+        let files = changed["files"] as? [[String: Any]]
+        expect(files?.count == 2, "native listing should return current tracked and untracked files")
+        expect(files?.first?["path"] as? String == "tracked.txt", "summaries should follow path order")
+        expect(files?.first?["status"] as? String == "modified", "tracked changes should be modified")
+        expect(files?.first?["additions"] as? Int == 2 && files?.first?["deletions"] as? Int == 1,
+               "counts should combine staged and unstaged changes against HEAD")
+        expect(files?.last?["path"] as? String == "雪.txt", "paths should retain Unicode text")
+        try git(directory, ["add", "."])
+        try git(directory, commit + ["updated HEAD"])
+        let updated = try response(router, ["type": "list_working_tree_changes"])
+        expect((updated["files"] as? [Any])?.isEmpty == true, "later requests should read the new HEAD")
+        let after = try response(router, ["type": "get_diff_overview"])
+        expect(NSDictionary(dictionary: before).isEqual(to: after), "listing should preserve the active commit-range review")
+
+        try git(directory, ["symbolic-ref", "HEAD", "refs/heads/unborn"])
+        do {
+            _ = try response(router, ["type": "list_working_tree_changes"])
+            fatalError("an unborn HEAD should fail")
+        } catch {
+            expect(error.localizedDescription == "Revision does not identify a commit", "revision errors should reach the native queue")
+        }
+        _ = try response(router, ["type": "get_configuration"])
+    }
+}
+
 private func testNativePullRequests() throws {
     try withTemporaryDirectory { directory in
         try git(directory, ["init", "--quiet"])
@@ -279,6 +324,7 @@ struct NativeCoreTests {
             try testNativeTextSearch()
             try testNativeReviewComments()
             try testNativeCommitHistory()
+            try testNativeWorkingTreeChanges()
             try testNativePullRequests()
             print("Native core tests passed")
         } catch {

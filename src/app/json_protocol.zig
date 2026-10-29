@@ -52,6 +52,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "list_commits")) return .list_commits;
+    if (std.mem.eql(u8, operation, "list_working_tree_changes")) return .list_working_tree_changes;
     if (std.mem.eql(u8, operation, "list_open_pull_requests")) return .list_open_pull_requests;
     if (std.mem.eql(u8, operation, "get_files")) return .get_files;
     if (std.mem.eql(u8, operation, "get_files_not_ignored")) return .get_files_not_ignored;
@@ -373,53 +374,54 @@ test "review comment requests reject location fields and still require a target"
     }
 }
 
-test "native commit responses release result storage when serialization fails" {
+test "native repository responses release result storage when serialization fails" {
     const Test = struct {
         fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
-            try std.testing.expect(request == .list_commits);
             var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
             errdefer arena.deinit();
-            const commits = try arena.allocator().alloc(model.Commit, 1);
-            commits[0] = .{
-                .sha = "0123456789abcdef0123456789abcdef01234567",
-                .subject = "Commit subject",
-                .authorName = "Author",
-                .commitDate = "2026-10-27T18:00:00Z",
+            return switch (request) {
+                .list_commits => blk: {
+                    const commits = try arena.allocator().alloc(model.Commit, 1);
+                    commits[0] = .{
+                        .sha = "0123456789abcdef0123456789abcdef01234567",
+                        .subject = "Commit subject",
+                        .authorName = "Author",
+                        .commitDate = "2026-10-27T18:00:00Z",
+                    };
+                    break :blk .{ .commit_list = .{ .commits = commits, .arena = arena } };
+                },
+                .list_open_pull_requests => blk: {
+                    const requests = try arena.allocator().alloc(model.PullRequest, 1);
+                    requests[0] = .{
+                        .number = 42,
+                        .title = "Draft PR",
+                        .authorLogin = "author",
+                        .url = "https://github.com/owner/repo/pull/42",
+                        .isDraft = true,
+                        .baseRefName = "main",
+                        .headRefName = "feature",
+                    };
+                    break :blk .{ .pull_request_list = .{ .pullRequests = requests, .arena = arena } };
+                },
+                .list_working_tree_changes => blk: {
+                    const files = try arena.allocator().alloc(model.FileSummary, 1);
+                    files[0] = .{ .path = "file.txt", .status = .modified, .additions = 1, .deletions = 0 };
+                    break :blk .{ .working_tree_changes = .{ .files = files, .arena = arena } };
+                },
+                else => error.UnexpectedRequest,
             };
-            return .{ .commit_list = .{ .commits = commits, .arena = arena } };
         }
-        fn run(allocator: Allocator) !void {
+        fn run(allocator: Allocator, input: []const u8) !void {
             var context: u8 = 0;
-            const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, "{\"type\":\"list_commits\"}");
+            const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, input);
             defer allocator.free(encoded);
         }
     };
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
-}
-
-test "native pull request responses release result storage when serialization fails" {
-    const Test = struct {
-        fn dispatch(_: *anyopaque, request: model.Request) !model.Response {
-            try std.testing.expect(request == .list_open_pull_requests);
-            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-            errdefer arena.deinit();
-            const requests = try arena.allocator().alloc(model.PullRequest, 1);
-            requests[0] = .{
-                .number = 42,
-                .title = "Draft PR",
-                .authorLogin = "author",
-                .url = "https://github.com/owner/repo/pull/42",
-                .isDraft = true,
-                .baseRefName = "main",
-                .headRefName = "feature",
-            };
-            return .{ .pull_request_list = .{ .pullRequests = requests, .arena = arena } };
-        }
-        fn run(allocator: Allocator) !void {
-            var context: u8 = 0;
-            const encoded = try dispatchJson(allocator, .{ .context = &context, .dispatchFn = dispatch }, "{\"type\":\"list_open_pull_requests\"}");
-            defer allocator.free(encoded);
-        }
-    };
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+    for ([_][]const u8{
+        "{\"type\":\"list_commits\"}",
+        "{\"type\":\"list_open_pull_requests\"}",
+        "{\"type\":\"list_working_tree_changes\"}",
+    }) |input| {
+        try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{input});
+    }
 }
