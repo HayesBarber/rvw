@@ -16,6 +16,22 @@ pub const Change = struct {
     unavailable: ?model.UnavailableReason = null,
 };
 
+/// Preserve enumeration order. The caller owns the returned slice.
+/// Paths borrow storage from changes and must remain valid during use.
+pub fn summarize(allocator: Allocator, changes: []const Change) ![]const model.FileSummary {
+    const summaries = try allocator.alloc(model.FileSummary, changes.len);
+    for (changes, summaries) |change, *summary| {
+        summary.* = .{
+            .path = change.path,
+            .previousPath = change.previous_path,
+            .status = change.status,
+            .additions = change.additions,
+            .deletions = change.deletions,
+        };
+    }
+    return summaries;
+}
+
 pub fn enumerate(
     allocator: Allocator,
     io: Io,
