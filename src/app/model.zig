@@ -12,6 +12,90 @@ pub const FileStatus = enum {
 
 pub const Repository = struct { name: []const u8 };
 
+pub const PullRequest = struct {
+    number: u32,
+    title: []const u8,
+    authorLogin: []const u8,
+    url: []const u8,
+    isDraft: bool,
+    baseRefName: []const u8,
+    headRefName: []const u8,
+};
+
+pub const PullRequestListResult = struct {
+    pullRequests: []const PullRequest,
+    /// Storage for this result; null for static results. Never serialized.
+    arena: ?std.heap.ArenaAllocator = null,
+
+    /// Call once after use, including when serialization fails.
+    pub fn deinit(self: PullRequestListResult) void {
+        if (self.arena) |storage| {
+            var arena = storage;
+            arena.deinit();
+        }
+    }
+
+    pub fn jsonStringify(self: PullRequestListResult, writer: *std.json.Stringify) !void {
+        try writer.write(.{ .pullRequests = self.pullRequests });
+    }
+};
+
+test "pull request list preserves metadata and order and releases owned storage" {
+    const Test = struct {
+        fn run(allocator: std.mem.Allocator) !void {
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            // Covers allocation and serialization failures as well as success.
+            const result: PullRequestListResult = result: {
+                errdefer arena.deinit();
+                const storage = arena.allocator();
+                const items = try storage.alloc(PullRequest, 2);
+                items[0] = .{
+                    .number = 42,
+                    .title = try storage.dupe(u8, "Fix \"quoted\" text and 雪"),
+                    .authorLogin = try storage.dupe(u8, "test-author"),
+                    .url = try storage.dupe(u8, "https://github.com/owner/repo/pull/42"),
+                    .isDraft = true,
+                    .baseRefName = try storage.dupe(u8, "main"),
+                    .headRefName = try storage.dupe(u8, "feature/雪"),
+                };
+                items[1] = items[0];
+                items[1].number = 7;
+                items[1].url = try storage.dupe(u8, "https://github.com/owner/repo/pull/7");
+                items[1].isDraft = false;
+                break :result .{ .pullRequests = items, .arena = arena };
+            };
+            defer result.deinit();
+            const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+            defer allocator.free(encoded);
+            const parsed = try std.json.parseFromSlice(std.json.Value, allocator, encoded, .{});
+            defer parsed.deinit();
+            try std.testing.expectEqual(@as(usize, 1), parsed.value.object.count());
+            const items = parsed.value.object.get("pullRequests").?.array.items;
+            try std.testing.expectEqual(@as(usize, 2), items.len);
+            for (items, result.pullRequests) |item, expected| {
+                const fields = item.object;
+                try std.testing.expectEqual(@as(usize, 7), fields.count());
+                try std.testing.expectEqual(@as(i64, expected.number), fields.get("number").?.integer);
+                try std.testing.expectEqualStrings(expected.title, fields.get("title").?.string);
+                try std.testing.expectEqualStrings(expected.authorLogin, fields.get("authorLogin").?.string);
+                try std.testing.expectEqualStrings(expected.url, fields.get("url").?.string);
+                try std.testing.expectEqual(expected.isDraft, fields.get("isDraft").?.bool);
+                try std.testing.expectEqualStrings(expected.baseRefName, fields.get("baseRefName").?.string);
+                try std.testing.expectEqualStrings(expected.headRefName, fields.get("headRefName").?.string);
+            }
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{});
+}
+
+test "empty pull request list supports static storage" {
+    const result: PullRequestListResult = .{ .pullRequests = &.{} };
+    defer result.deinit();
+    const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, result, .{});
+    defer std.testing.allocator.free(encoded);
+    try std.testing.expectEqualStrings("{\"pullRequests\":[]}", encoded);
+}
+
 pub const Commit = struct {
     /// Full commit object ID.
     sha: []const u8,
@@ -368,6 +452,7 @@ pub const Request = union(enum) {
     reload_review,
     get_diff_overview,
     list_commits,
+    list_open_pull_requests,
     get_files,
     get_files_not_ignored,
     search_text: TextSearchRequest,
@@ -432,6 +517,7 @@ pub const Response = union(enum) {
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     commit_list: CommitListResult,
+    pull_request_list: PullRequestListResult,
     files: []const []const u8,
     text_search: TextSearchResult,
     file: FileDiff,
@@ -456,91 +542,69 @@ pub const Response = union(enum) {
     }
 };
 
-pub const AppError = error{
-    UnknownDiff,
-    UnknownFile,
-    InvalidComment,
-    InvalidCommentId,
-    UnknownComment,
-    NoComments,
-    InvalidFilePath,
-    ReloadUnavailable,
-    InvalidSearchQuery,
-    SearchUnavailable,
-    SearchFailed,
-    RepositoryUnavailable,
-    RepositoryFailed,
-    InvalidCommitHistory,
+const ErrorDefinition = struct {
+    errors: []const anyerror = &.{},
+    message: []const u8,
 };
 
-pub const ErrorCode = enum {
-    malformed_request,
-    unknown_operation,
-    unknown_diff,
-    unknown_file,
-    invalid_comment,
-    invalid_comment_id,
-    unknown_comment,
-    no_comments,
-    invalid_file_path,
-    reload_unavailable,
-    invalid_search_query,
-    search_unavailable,
-    search_failed,
-    repository_unavailable,
-    repository_failed,
-    invalid_commit_history,
-    file_path_clipboard_unavailable,
-    clipboard_unavailable,
-    internal_error,
+const error_definitions = .{
+    .malformed_request = ErrorDefinition{ .message = "Malformed request" },
+    .unknown_operation = ErrorDefinition{ .message = "Unknown operation" },
+    .unknown_diff = ErrorDefinition{ .errors = &.{error.UnknownDiff}, .message = "Unknown diff" },
+    .unknown_file = ErrorDefinition{ .errors = &.{error.UnknownFile}, .message = "Unknown file" },
+    .invalid_comment = ErrorDefinition{ .errors = &.{error.InvalidComment}, .message = "Comment body or target is invalid" },
+    .invalid_comment_id = ErrorDefinition{ .errors = &.{error.InvalidCommentId}, .message = "Comment ID is invalid" },
+    .unknown_comment = ErrorDefinition{ .errors = &.{error.UnknownComment}, .message = "Comment was not found" },
+    .no_comments = ErrorDefinition{ .errors = &.{error.NoComments}, .message = "No review comments to copy" },
+    .invalid_file_path = ErrorDefinition{ .errors = &.{error.InvalidFilePath}, .message = "File path is invalid" },
+    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to reload the review snapshot" },
+    .invalid_search_query = ErrorDefinition{ .errors = &.{error.InvalidSearchQuery}, .message = "Search query must be valid UTF-8 without NUL or line breaks" },
+    .search_unavailable = ErrorDefinition{ .errors = &.{error.SearchUnavailable}, .message = "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH" },
+    .search_failed = ErrorDefinition{ .errors = &.{error.SearchFailed}, .message = "Search failed; check directory access and try again" },
+    .repository_unavailable = ErrorDefinition{ .errors = &.{error.RepositoryUnavailable}, .message = "Git is unavailable" },
+    .repository_failed = ErrorDefinition{ .errors = &.{error.RepositoryFailed}, .message = "Unable to read repository history" },
+    .invalid_commit_history = ErrorDefinition{ .errors = &.{error.InvalidCommitHistory}, .message = "Repository history data is invalid" },
+    .missing_origin = ErrorDefinition{ .errors = &.{error.MissingOrigin}, .message = "Pull request listing requires an origin remote" },
+    .unsupported_origin = ErrorDefinition{ .errors = &.{error.UnsupportedOrigin}, .message = "The origin remote must identify a GitHub repository" },
+    .pull_request_list_unavailable = ErrorDefinition{ .errors = &.{error.PullRequestListUnavailable}, .message = "GitHub CLI is unavailable" },
+    .pull_request_authentication_failed = ErrorDefinition{ .errors = &.{error.PullRequestAuthenticationFailed}, .message = "GitHub authentication failed; sign in with gh auth login" },
+    .pull_request_list_failed = ErrorDefinition{ .errors = &.{error.PullRequestListFailed}, .message = "Unable to list open pull requests" },
+    .invalid_pull_request_list = ErrorDefinition{ .errors = &.{error.InvalidPullRequestList}, .message = "Pull request list data is invalid" },
+    .file_path_clipboard_unavailable = ErrorDefinition{ .errors = &.{error.FilePathClipboardUnavailable}, .message = "Unable to copy the file path to the clipboard" },
+    .clipboard_unavailable = ErrorDefinition{ .errors = &.{ error.ClipboardCommandFailed, error.ClipboardToolNotFound, error.ClipboardWriteFailed, error.UnsupportedPlatform }, .message = "Unable to copy review comments to the clipboard" },
+    .internal_error = ErrorDefinition{ .message = "Internal error" },
 };
+
+pub const ErrorCode = std.meta.FieldEnum(@TypeOf(error_definitions));
 
 pub fn errorCode(err: anyerror) ErrorCode {
-    return switch (err) {
-        error.UnknownDiff => .unknown_diff,
-        error.UnknownFile => .unknown_file,
-        error.InvalidComment => .invalid_comment,
-        error.InvalidCommentId => .invalid_comment_id,
-        error.UnknownComment => .unknown_comment,
-        error.NoComments => .no_comments,
-        error.InvalidFilePath => .invalid_file_path,
-        error.InvalidSearchQuery => .invalid_search_query,
-        error.SearchUnavailable => .search_unavailable,
-        error.SearchFailed => .search_failed,
-        error.RepositoryUnavailable => .repository_unavailable,
-        error.RepositoryFailed => .repository_failed,
-        error.InvalidCommitHistory => .invalid_commit_history,
-        error.ReloadUnavailable => .reload_unavailable,
-        error.FilePathClipboardUnavailable => .file_path_clipboard_unavailable,
-        error.ClipboardCommandFailed,
-        error.ClipboardToolNotFound,
-        error.ClipboardWriteFailed,
-        error.UnsupportedPlatform,
-        => .clipboard_unavailable,
-        else => .internal_error,
-    };
+    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
+        inline for (@field(error_definitions, field.name).errors) |source| {
+            if (err == source) return @field(ErrorCode, field.name);
+        }
+    }
+    return .internal_error;
 }
 
 pub fn errorMessage(code: ErrorCode) []const u8 {
     return switch (code) {
-        .malformed_request => "Malformed request",
-        .unknown_operation => "Unknown operation",
-        .unknown_diff => "Unknown diff",
-        .unknown_file => "Unknown file",
-        .invalid_comment => "Comment body or target is invalid",
-        .invalid_comment_id => "Comment ID is invalid",
-        .unknown_comment => "Comment was not found",
-        .no_comments => "No review comments to copy",
-        .invalid_file_path => "File path is invalid",
-        .invalid_search_query => "Search query must be valid UTF-8 without NUL or line breaks",
-        .search_unavailable => "Search is unavailable; install ripgrep and set RVW_RIPGREP to its absolute executable path or add rg to Rvw’s PATH",
-        .search_failed => "Search failed; check directory access and try again",
-        .repository_unavailable => "Git is unavailable",
-        .repository_failed => "Unable to read repository history",
-        .invalid_commit_history => "Repository history data is invalid",
-        .reload_unavailable => "Unable to reload the review snapshot",
-        .file_path_clipboard_unavailable => "Unable to copy the file path to the clipboard",
-        .clipboard_unavailable => "Unable to copy review comments to the clipboard",
-        .internal_error => "Internal error",
+        inline else => |value| @field(error_definitions, @tagName(value)).message,
     };
+}
+
+test "application error definitions map source errors and preserve wire codes" {
+    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
+        const code = @field(ErrorCode, field.name);
+        const definition = @field(error_definitions, field.name);
+        try std.testing.expect(errorMessage(code).len > 0);
+        const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, code, .{});
+        defer std.testing.allocator.free(encoded);
+        const decoded = try std.json.parseFromSlice([]const u8, std.testing.allocator, encoded, .{});
+        defer decoded.deinit();
+        try std.testing.expectEqualStrings(field.name, decoded.value);
+        for (definition.errors) |source| {
+            try std.testing.expectEqual(code, errorCode(source));
+        }
+    }
+    try std.testing.expectEqual(ErrorCode.internal_error, errorCode(error.OutOfMemory));
 }

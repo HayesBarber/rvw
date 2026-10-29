@@ -60,6 +60,7 @@ pub fn main(init: std.process.Init) !void {
     });
     defer configuration.deinit();
     var repository: rvw.provider.repository.git.GitProvider = .{ .allocator = init.gpa };
+    var pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider = .{ .allocator = init.gpa };
     var search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"ignore-aware", .executable = init.environ_map.get("RVW_RIPGREP") };
     var search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"all-files", .executable = init.environ_map.get("RVW_RIPGREP") };
     var core = rvw.core.Core.init(
@@ -67,6 +68,7 @@ pub fn main(init: std.process.Init) !void {
         init.io,
         review.interface(),
         repository.interface(),
+        pull_requests.interface(),
         search_ignore_aware.interface(),
         search_all_files.interface(),
         comments.interface(),
