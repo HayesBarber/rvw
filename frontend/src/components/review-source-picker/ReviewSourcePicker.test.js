@@ -55,7 +55,10 @@ test('each mode displays only its corresponding placeholder', () => {
     ['pull-requests', 'Pull request'],
     ['working-tree', 'Working tree'],
   ]) {
-    const html = renderToStaticMarkup(createElement(ReviewSourcePickerContent, { mode }))
+    const registerActionAdapter = () => () => {}
+    const content = ReviewSourcePickerContent({ mode, registerActionAdapter })
+    assert.equal(content.props.registerActionAdapter, registerActionAdapter)
+    const html = renderToStaticMarkup(content)
     assert.equal(html, `<p>${expected} selection is not available yet.</p>`)
   }
 })
