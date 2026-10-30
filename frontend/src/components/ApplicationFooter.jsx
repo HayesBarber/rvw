@@ -18,7 +18,7 @@ export function FooterActionsMenu({ id, onReload, onSearchText, onChooseReviewSo
         aria-haspopup="dialog"
         onClick={onChooseReviewSource}
       >
-        Choose review source…
+        Choose review source
       </button>
       <button
         className="footer-actions-item"

@@ -60,8 +60,8 @@ test('the footer menu opens the picker through the application dispatcher', () =
     reloadDisabled: true,
   })
   const html = renderToStaticMarkup(menu)
-  assert.match(html, /<button class="footer-actions-item" type="button" aria-haspopup="dialog">Choose review source…<\/button>/)
-  menu.props.children.find((child) => child.props.children === 'Choose review source…').props.onClick()
+  assert.match(html, /<button class="footer-actions-item" type="button" aria-haspopup="dialog">Choose review source<\/button>/)
+  menu.props.children.find((child) => child.props.children === 'Choose review source').props.onClick()
   assert.deepEqual(workspace, { ...initialWorkspaceState, reviewSourcePickerOpen: true })
 })
 
