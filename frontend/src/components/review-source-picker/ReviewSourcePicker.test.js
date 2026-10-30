@@ -9,13 +9,16 @@ import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-
 
 let server
 let ReviewSourcePicker
+let ReviewSourcePickerContent
 let ReviewSourceModeControl
 before(async () => {
   server = await createServer({
     configFile: false,
     server: { middlewareMode: true, hmr: false, watch: null },
   })
-  ReviewSourcePicker = (await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourcePicker.jsx')).default
+  const pickerModule = await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourcePicker.jsx')
+  ReviewSourcePicker = pickerModule.default
+  ReviewSourcePickerContent = pickerModule.ReviewSourcePickerContent
   ReviewSourceModeControl = (await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourceModeControl.jsx')).default
 })
 after(async () => { await server?.close() })
@@ -42,6 +45,19 @@ test('the picker starts with only Commits selected', () => {
   assert.match(html, /aria-pressed="true">Commits<\/button>/)
   assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
   assert.match(html, /aria-pressed="false">Working tree<\/button>/)
+  assert.match(html, /Commit range selection is not available yet\./)
+  assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
+})
+
+test('each mode displays only its corresponding placeholder', () => {
+  for (const [mode, expected] of [
+    ['commits', 'Commit range'],
+    ['pull-requests', 'Pull request'],
+    ['working-tree', 'Working tree'],
+  ]) {
+    const html = renderToStaticMarkup(createElement(ReviewSourcePickerContent, { mode }))
+    assert.equal(html, `<p>${expected} selection is not available yet.</p>`)
+  }
 })
 
 test('mode controls select one mode at a time', () => {
