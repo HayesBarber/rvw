@@ -54,6 +54,10 @@ Rvw uses a Vim-style keymap for navigation and actions.
 
 A decimal count before a supported command repeats or scales that command. For example, `20 j` moves the active cursor down 20 items. The footer shows the current mode, count, and any pending multi-key sequence.
 
+In the review source picker, `file.open.next` and `file.open.previous` move between
+Commits, Pull requests, and Working tree. They use the configured bindings
+(`] b` and `[ b` by default). Counts move multiple modes and stop at either end.
+
 Press `?` to show/search the current bindings.
 
 For range comments, use `diff.visual_line` to select lines, then `comments.add` to add a comment.

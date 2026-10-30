@@ -102,11 +102,15 @@ export function shouldCaptureKeyboardEvent(event) {
 
   let target = eventTarget(event)
   while (target) {
+    // Opted-in buttons keep native activation and capture other configured keys.
+    const tagName = target.tagName?.toLowerCase()
+    if (tagName === 'button' && target.hasAttribute?.('data-vim-native-activation') &&
+      (event.key === 'Enter' || event.key === ' ') &&
+      !event.altKey && !event.ctrlKey && !event.metaKey) return false
     if (typeof target.hasAttribute === 'function') {
       if (target.hasAttribute('data-vim-capture')) return true
       if (target.hasAttribute('data-vim-ignore')) return false
     }
-    const tagName = target.tagName?.toLowerCase()
     const role = typeof target.getAttribute === 'function'
       ? target.getAttribute('role')
       : null

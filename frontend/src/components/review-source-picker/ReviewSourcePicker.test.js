@@ -33,7 +33,7 @@ test('the picker shell uses a labelled native dialog and a Close control', () =>
   assert(html.includes(`aria-labelledby="${titleId}"`))
   assert.match(html, /<dialog class="review-source-picker-dialog"/)
   assert.match(html, /tabindex="-1" data-vim-capture="true"/)
-  assert.match(html, /<button type="button" data-vim-ignore="true" aria-label="Close review source picker">Close<\/button>/)
+  assert.match(html, /<button type="button" data-vim-native-activation="true" aria-label="Close review source picker">Close<\/button>/)
 })
 
 test('the picker starts with only Commits selected', () => {
@@ -41,7 +41,7 @@ test('the picker starts with only Commits selected', () => {
     onClose: () => {},
     registerActionAdapter: () => {},
   }))
-  assert.match(html, /role="group" aria-label="Review source mode" data-vim-ignore="true"/)
+  assert.match(html, /role="group" aria-label="Review source mode"/)
   assert.match(html, /aria-pressed="true">Commits<\/button>/)
   assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
   assert.match(html, /aria-pressed="false">Working tree<\/button>/)

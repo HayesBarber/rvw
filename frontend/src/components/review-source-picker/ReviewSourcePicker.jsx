@@ -1,6 +1,7 @@
-import { useId, useRef, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import { blockingOverlayActions, OverlayKind } from '../../actions/overlay-actions.js'
 import { createReviewSourcePickerModeActionRegistry } from '../../actions/review-source-picker-mode-actions.js'
+import { createReviewSourcePickerActionAdapter } from '../../actions/review-source-picker-actions.js'
 import Overlay from '../Overlay.jsx'
 import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
@@ -23,16 +24,19 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   const [actions, setActions] = useState(blockingOverlayActions)
   const [modeActions] = useState(() => createReviewSourcePickerModeActionRegistry(setActions))
 
-  function changeMode(nextMode) {
+  const changeMode = useCallback((nextMode) => {
     if (nextMode === mode) return
     modeActions.clear()
     setMode(nextMode)
-  }
+  }, [mode, modeActions])
+  const pickerActions = useMemo(() => createReviewSourcePickerActionAdapter({
+    mode, modeActions: actions, onChange: changeMode,
+  }), [mode, actions, changeMode])
 
   return (
     <Overlay
       kind={OverlayKind.REVIEW_SOURCE_PICKER}
-      actions={actions}
+      actions={pickerActions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={dialogRef}
@@ -45,7 +49,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
         <h2 id={titleId}>Choose review source</h2>
         <button
           type="button"
-          data-vim-ignore
+          data-vim-native-activation
           onClick={onClose}
           aria-label="Close review source picker"
         >
