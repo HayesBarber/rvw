@@ -25,9 +25,10 @@ test('default and configured file navigation bindings change picker modes', () =
     const controller = new VimController({ bindings: result.bindings })
     controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
     for (const [keys, expected] of [
-      [nextKeys, 'pull-requests'], [nextKeys, 'working-tree'], [nextKeys, 'working-tree'],
-      [previousKeys, 'pull-requests'], [previousKeys, 'commits'], [previousKeys, 'commits'],
-      [['2', ...nextKeys], 'working-tree'], [['9', ...previousKeys], 'commits'],
+      [nextKeys, 'pull-requests'], [nextKeys, 'working-tree'], [nextKeys, 'commits'],
+      [previousKeys, 'working-tree'], [previousKeys, 'pull-requests'], [previousKeys, 'commits'],
+      [['2', ...nextKeys], 'working-tree'], [['9', ...previousKeys], 'working-tree'],
+      [['4', ...nextKeys], 'commits'], [['4', ...previousKeys], 'working-tree'],
     ]) {
       for (const key of keys) assert.equal(controller.dispatch({ type: 'key', key }).handled, true)
       assert.equal(mode, expected)

@@ -13,7 +13,8 @@ export function createReviewSourcePickerActionAdapter({ mode, modeActions = bloc
     const index = reviewSourceModes.findIndex(({ value }) => value === mode)
     if (index < 0) return false
     const steps = Number.isSafeInteger(count) && count > 0 ? count : 1
-    const nextIndex = Math.max(0, Math.min(reviewSourceModes.length - 1, index + direction * steps))
+    const length = reviewSourceModes.length
+    const nextIndex = (index + direction * (steps % length) + length) % length
     if (nextIndex !== index) onChange(reviewSourceModes[nextIndex].value)
     return true
   }
