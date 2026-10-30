@@ -443,6 +443,7 @@ export default function App() {
         }}
         onReload={reloadRequest.reload}
         onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
+        onChooseReviewSource={() => dispatchApplicationAction(ApplicationAction.OPEN_REVIEW_SOURCE_PICKER)}
         reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
         reloadMessage={reloadMessage}
         reloadMessageIsError={reloadMessageIsError}

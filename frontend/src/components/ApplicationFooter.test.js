@@ -4,15 +4,22 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import { clearAllComments, removeDeletedComment, replaceEditedComment } from '../review/comments-request.js'
+import { ApplicationAction } from '../actions/application-actions.js'
+import { createApplicationDispatcher } from '../actions/application-dispatch.js'
+import { openReviewSourcePicker } from '../actions/review-source-picker-actions.js'
+import { initialWorkspaceState, workspaceReducer } from '../app/workspace.js'
 
 let server
 let ApplicationFooter
+let FooterActionsMenu
 before(async () => {
   server = await createServer({
     configFile: false,
     server: { middlewareMode: true, hmr: false, watch: null },
   })
-  ApplicationFooter = (await server.ssrLoadModule('/src/components/ApplicationFooter.jsx')).default
+  const footerModule = await server.ssrLoadModule('/src/components/ApplicationFooter.jsx')
+  ApplicationFooter = footerModule.default
+  FooterActionsMenu = footerModule.FooterActionsMenu
 })
 after(async () => { await server?.close() })
 
@@ -33,6 +40,30 @@ function assertCount(comments, count) {
   assert.match(html, /<button class="comments-button" type="button" aria-haspopup="dialog" aria-expanded="false">/)
   assert.doesNotMatch(html, /Copy as Markdown|copy-markdown-button/)
 }
+
+test('the footer menu opens the picker through the application dispatcher', () => {
+  let workspace = initialWorkspaceState
+  const dispatch = createApplicationDispatcher({
+    getActiveSurface: () => workspace.activeSurface,
+    getSurfaceActions: () => null,
+    globalActions: {
+      [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: () => openReviewSourcePicker((action) => {
+        workspace = workspaceReducer(workspace, action)
+      }, true),
+    },
+  })
+  const menu = FooterActionsMenu({
+    id: 'footer-menu',
+    onChooseReviewSource: () => dispatch(ApplicationAction.OPEN_REVIEW_SOURCE_PICKER),
+    onReload: () => assert.fail('Reload must not run'),
+    onSearchText: () => assert.fail('Search must not run'),
+    reloadDisabled: true,
+  })
+  const html = renderToStaticMarkup(menu)
+  assert.match(html, /<button class="footer-actions-item" type="button" aria-haspopup="dialog">Choose review source…<\/button>/)
+  menu.props.children.find((child) => child.props.children === 'Choose review source…').props.onClick()
+  assert.deepEqual(workspace, { ...initialWorkspaceState, reviewSourcePickerOpen: true })
+})
 
 test('footer counts saved review, file, and line comments after mutations', () => {
   let comments = []

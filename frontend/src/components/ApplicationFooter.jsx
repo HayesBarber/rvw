@@ -9,7 +9,34 @@ function diagnosticText(diagnostic) {
   return `Configuration: ${diagnostic.message}. Fix ${diagnostic.path}, then restart Rvw. The current configuration remains active.`
 }
 
-function FooterActions({ onReload, onSearchText, reloadDisabled }) {
+export function FooterActionsMenu({ id, onReload, onSearchText, onChooseReviewSource, reloadDisabled }) {
+  return (
+    <span id={id} className="footer-actions-popover" role="group" aria-label="More actions">
+      <button
+        className="footer-actions-item"
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onChooseReviewSource}
+      >
+        Choose review source…
+      </button>
+      <button
+        className="footer-actions-item"
+        type="button"
+        disabled={reloadDisabled}
+        title={reloadDisabled ? BLOCKED_DURING_DRAFT_MESSAGE : 'Reload review'}
+        onClick={onReload}
+      >
+        Reload
+      </button>
+      <button className="footer-actions-item" type="button" onClick={onSearchText}>
+        Search text
+      </button>
+    </span>
+  )
+}
+
+function FooterActions({ onReload, onSearchText, onChooseReviewSource, reloadDisabled }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
@@ -23,6 +50,12 @@ function FooterActions({ onReload, onSearchText, reloadDisabled }) {
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
+
+  function selectAction(action) {
+    setOpen(false)
+    triggerRef.current?.focus({ preventScroll: true })
+    action()
+  }
 
   return (
     <span
@@ -50,32 +83,13 @@ function FooterActions({ onReload, onSearchText, reloadDisabled }) {
         </svg>
       </button>
       {open && (
-        <span id={popoverId} className="footer-actions-popover" role="group" aria-label="More actions">
-          <button
-            className="footer-actions-item"
-            type="button"
-            disabled={reloadDisabled}
-            title={reloadDisabled ? BLOCKED_DURING_DRAFT_MESSAGE : 'Reload review'}
-            onClick={() => {
-              setOpen(false)
-              triggerRef.current?.focus({ preventScroll: true })
-              onReload()
-            }}
-          >
-            Reload
-          </button>
-          <button
-            className="footer-actions-item"
-            type="button"
-            onClick={() => {
-              setOpen(false)
-              triggerRef.current?.focus({ preventScroll: true })
-              onSearchText()
-            }}
-          >
-            Search text
-          </button>
-        </span>
+        <FooterActionsMenu
+          id={popoverId}
+          onChooseReviewSource={() => selectAction(onChooseReviewSource)}
+          onReload={() => selectAction(onReload)}
+          onSearchText={() => selectAction(onSearchText)}
+          reloadDisabled={reloadDisabled}
+        />
       )}
     </span>
   )
@@ -94,6 +108,7 @@ export default function ApplicationFooter({
   onToggleComments,
   onReload,
   onSearchText,
+  onChooseReviewSource,
   overview,
   pathCopyRequest,
   reloadDisabled = false,
@@ -183,6 +198,7 @@ export default function ApplicationFooter({
             <FooterActions
               onReload={onReload}
               onSearchText={onSearchText}
+              onChooseReviewSource={onChooseReviewSource}
               reloadDisabled={reloadDisabled}
             />
             <span className="footer-comments-action">
