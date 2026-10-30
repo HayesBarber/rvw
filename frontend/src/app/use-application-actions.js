@@ -9,6 +9,7 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from '../actions/codebase-search-actions.js'
+import { openReviewSourcePicker } from '../actions/review-source-picker-actions.js'
 import { createCurrentFileLineNavigation } from '../actions/line-navigation.js'
 import { createOverlayActionRegistry } from '../actions/overlay-actions.js'
 import { closeApplication } from '../review/api.js'
@@ -98,6 +99,7 @@ export function useApplicationActions({
     [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
     [ApplicationAction.RELOAD_REVIEW]: reloadReview,
+    [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: () => openReviewSourcePicker(dispatchWorkspace, reviewAvailable),
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
       dispatchWorkspace({ type: 'file_tree_resized', steps: count })
       return true

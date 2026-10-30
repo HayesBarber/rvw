@@ -309,6 +309,24 @@ test('relative line numbers start absolute, toggle, and accept boolean configura
   }
 })
 
+test('review source picker visibility is idempotent and preserves the complete workspace context', () => {
+  const state = {
+    ...initialWorkspaceState,
+    selectedPath: 'src/main.zig',
+    lineNavigation: { path: 'src/main.zig', lineNumber: 12 },
+    treeMode: TreeMode.FILES,
+    activeSurface: ActiveSurface.FILE_TREE,
+    fileHistory: ['README.md', 'src/main.zig'],
+    fileHistoryIndex: 1,
+  }
+  const opened = workspaceReducer(state, { type: 'review_source_picker_opened' })
+  assert.deepEqual(opened, { ...state, reviewSourcePickerOpen: true })
+  assert.equal(workspaceReducer(opened, { type: 'review_source_picker_opened' }), opened)
+  const closed = workspaceReducer(opened, { type: 'review_source_picker_closed' })
+  assert.deepEqual(closed, state)
+  assert.equal(workspaceReducer(closed, { type: 'review_source_picker_closed' }), closed)
+})
+
 test('keyboard reference visibility is idempotent and preserves workspace context', () => {
   const opened = workspaceReducer(initialWorkspaceState, {
     type: 'keymap_reference_opened',
