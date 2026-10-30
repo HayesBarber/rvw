@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
-import { OverlayKind } from '../../actions/overlay-actions.js'
-import { createReviewSourcePickerActionRouter } from '../../actions/review-source-picker-routing.js'
+import { blockingOverlayActions, OverlayKind } from '../../actions/overlay-actions.js'
+import { createReviewSourcePickerModeActionRegistry } from '../../actions/review-source-picker-mode-actions.js'
 import Overlay from '../Overlay.jsx'
 import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
@@ -20,7 +20,8 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
-  const [modeActions] = useState(createReviewSourcePickerActionRouter)
+  const [actions, setActions] = useState(blockingOverlayActions)
+  const [modeActions] = useState(() => createReviewSourcePickerModeActionRegistry(setActions))
 
   function changeMode(nextMode) {
     if (nextMode === mode) return
@@ -31,7 +32,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   return (
     <Overlay
       kind={OverlayKind.REVIEW_SOURCE_PICKER}
-      actions={modeActions.actions}
+      actions={actions}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
       initialFocusRef={dialogRef}
