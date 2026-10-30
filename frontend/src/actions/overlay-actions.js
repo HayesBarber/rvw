@@ -2,6 +2,7 @@ export const OverlayKind = Object.freeze({
   FILE_FINDER: 'file_finder',
   CODEBASE_SEARCH: 'codebase_search',
   KEYMAP_REFERENCE: 'keymap_reference',
+  REVIEW_SOURCE_PICKER: 'review_source_picker',
   COMMENTS: 'comments',
 })
 

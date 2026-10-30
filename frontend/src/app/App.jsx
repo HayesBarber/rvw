@@ -14,6 +14,7 @@ import {
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
+import ReviewSourcePicker from '../components/review-source-picker/ReviewSourcePicker.jsx'
 import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
 import { useCopyFilePath } from '../review/file-path-copy-request.js'
@@ -319,7 +320,8 @@ export default function App() {
             lineNavigation={workspace.lineNavigation}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
             visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
-              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen && !workspace.commentsOpen}
+              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen &&
+              !workspace.commentsOpen && !workspace.reviewSourcePickerOpen}
             loading={fileLoading}
             error={fileError}
             comments={comments}
@@ -408,6 +410,12 @@ export default function App() {
           leader={keyboardConfiguration.leader}
           aliases={keyboardConfiguration.commandAliases}
           onClose={closeKeymapReference}
+          registerActionAdapter={registerOverlayActions}
+        />
+      )}
+      {workspace.reviewSourcePickerOpen && (
+        <ReviewSourcePicker
+          onClose={() => dispatchWorkspace({ type: 'review_source_picker_closed' })}
           registerActionAdapter={registerOverlayActions}
         />
       )}
