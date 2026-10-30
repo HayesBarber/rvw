@@ -1,10 +1,12 @@
-import { useId, useRef } from 'react'
+import { useId, useRef, useState } from 'react'
 import { OverlayKind } from '../../actions/overlay-actions.js'
 import Overlay from '../Overlay.jsx'
+import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 
 export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   const dialogRef = useRef(null)
   const titleId = useId()
+  const [mode, setMode] = useState('commits')
 
   return (
     <Overlay
@@ -28,6 +30,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
           Close
         </button>
       </header>
+      <ReviewSourceModeControl mode={mode} onChange={setMode} />
       <div className="review-source-picker-body" />
     </Overlay>
   )

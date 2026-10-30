@@ -9,12 +9,14 @@ import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-
 
 let server
 let ReviewSourcePicker
+let ReviewSourceModeControl
 before(async () => {
   server = await createServer({
     configFile: false,
     server: { middlewareMode: true, hmr: false, watch: null },
   })
   ReviewSourcePicker = (await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourcePicker.jsx')).default
+  ReviewSourceModeControl = (await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourceModeControl.jsx')).default
 })
 after(async () => { await server?.close() })
 
@@ -29,6 +31,31 @@ test('the picker shell uses a labelled native dialog and a Close control', () =>
   assert.match(html, /<dialog class="review-source-picker-dialog"/)
   assert.match(html, /tabindex="-1" data-vim-capture="true"/)
   assert.match(html, /<button type="button" data-vim-ignore="true" aria-label="Close review source picker">Close<\/button>/)
+})
+
+test('the picker starts with only Commits selected', () => {
+  const html = renderToStaticMarkup(createElement(ReviewSourcePicker, {
+    onClose: () => {},
+    registerActionAdapter: () => {},
+  }))
+  assert.match(html, /role="group" aria-label="Review source mode" data-vim-ignore="true"/)
+  assert.match(html, /aria-pressed="true">Commits<\/button>/)
+  assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
+  assert.match(html, /aria-pressed="false">Working tree<\/button>/)
+})
+
+test('mode controls select one mode at a time', () => {
+  let mode = 'commits'
+  const onChange = (value) => { mode = value }
+  for (const value of ['pull-requests', 'working-tree', 'commits']) {
+    const controls = ReviewSourceModeControl({ mode, onChange })
+    const button = controls.props.children.find((child) => child.key === value)
+    assert.equal(button.props.type, 'button')
+    button.props.onClick()
+    assert.equal(mode, value)
+    const updated = ReviewSourceModeControl({ mode, onChange }).props.children
+    assert.deepEqual(updated.filter((child) => child.props['aria-pressed']).map((child) => child.key), [value])
+  }
 })
 
 test('the picker registration blocks all workspace actions until it closes', () => {
