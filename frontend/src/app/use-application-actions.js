@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 import {
   APPLICATION_DISPATCH_COMMAND,
@@ -36,6 +36,7 @@ export function useApplicationActions({
   const diffPaneRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
   const [overlayActions] = useState(createOverlayActionRegistry)
+  const overlayOpen = useSyncExternalStore(overlayActions.subscribe, overlayActions.isOpen, overlayActions.isOpen)
 
   const activateSurface = useCallback((surface) => {
     dispatchWorkspace({ type: 'surface_activated', surface })
@@ -176,6 +177,7 @@ export function useApplicationActions({
   }, [dispatchApplicationAction, vimController])
 
   return {
+    overlayOpen,
     dispatchApplicationAction,
     activateSurface,
     addFileComment,

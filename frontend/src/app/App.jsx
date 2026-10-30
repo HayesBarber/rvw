@@ -132,6 +132,7 @@ export default function App() {
     dispatchWorkspace({ type: 'keymap_reference_opened' })
   }
   const {
+    overlayOpen,
     activateSurface,
     dispatchApplicationAction,
     navigateToLine,
@@ -319,9 +320,7 @@ export default function App() {
             filePath={activePath}
             lineNavigation={workspace.lineNavigation}
             isCursorVisible={workspace.activeSurface === ActiveSurface.DIFF_PANE}
-            visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE &&
-              !workspace.finderOpen && !workspace.searchMode && !workspace.keymapReferenceOpen &&
-              !workspace.commentsOpen && !workspace.reviewSourcePickerOpen}
+            visualSelectionEnabled={workspace.activeSurface === ActiveSurface.DIFF_PANE && !overlayOpen}
             loading={fileLoading}
             error={fileError}
             comments={comments}

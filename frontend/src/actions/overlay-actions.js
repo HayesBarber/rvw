@@ -12,7 +12,16 @@ export const blockingOverlayActions = Object.freeze({})
 /** Adapter updates preserve the order in which overlays were opened. */
 export function createOverlayActionRegistry() {
   const registrations = new Set()
+  const listeners = new Set()
+  const notify = () => { for (const listener of listeners) listener() }
   return Object.freeze({
+    isOpen() {
+      return registrations.size > 0
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
     get() {
       let actions = null
       for (const registration of registrations) actions = registration.actions
@@ -24,6 +33,7 @@ export function createOverlayActionRegistry() {
       }
       const registration = { actions: blockingOverlayActions }
       registrations.add(registration)
+      notify()
       return Object.freeze({
         update(actions) {
           if (!actions || typeof actions !== 'object' || Array.isArray(actions)) {
@@ -32,7 +42,7 @@ export function createOverlayActionRegistry() {
           registration.actions = actions
         },
         unregister() {
-          registrations.delete(registration)
+          if (registrations.delete(registration)) notify()
         },
       })
     },

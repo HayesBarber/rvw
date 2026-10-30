@@ -4,7 +4,6 @@ import Overlay from '../Overlay.jsx'
 
 export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   const dialogRef = useRef(null)
-  const closeRef = useRef(null)
   const titleId = useId()
 
   return (
@@ -12,7 +11,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
       kind={OverlayKind.REVIEW_SOURCE_PICKER}
       registerActionAdapter={registerActionAdapter}
       dialogRef={dialogRef}
-      initialFocusRef={closeRef}
+      initialFocusRef={dialogRef}
       nativeDialog
       className="review-source-picker-dialog"
       labelledBy={titleId}
@@ -21,7 +20,6 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
       <header className="review-source-picker-header">
         <h2 id={titleId}>Choose review source</h2>
         <button
-          ref={closeRef}
           type="button"
           data-vim-ignore
           onClick={onClose}

@@ -593,6 +593,7 @@ textarea {
   overflow: auto;
   border: 1px solid #414145;
   border-radius: 10px;
+  outline: none;
   background: #141415;
   box-shadow: 0 24px 80px rgb(0 0 0 / 60%);
   color: #fafafa;
