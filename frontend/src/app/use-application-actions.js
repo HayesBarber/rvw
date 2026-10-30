@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 import {
   APPLICATION_DISPATCH_COMMAND,
@@ -9,6 +9,7 @@ import {
   createSurfaceActionRegistry,
 } from '../actions/application-dispatch.js'
 import { openCodebaseSearch, openCodebaseSearchAll } from '../actions/codebase-search-actions.js'
+import { openReviewSourcePicker } from '../actions/review-source-picker-actions.js'
 import { createCurrentFileLineNavigation } from '../actions/line-navigation.js'
 import { createOverlayActionRegistry } from '../actions/overlay-actions.js'
 import { closeApplication } from '../review/api.js'
@@ -35,6 +36,7 @@ export function useApplicationActions({
   const diffPaneRef = useRef(null)
   const [surfaceActions] = useState(createSurfaceActionRegistry)
   const [overlayActions] = useState(createOverlayActionRegistry)
+  const overlayOpen = useSyncExternalStore(overlayActions.subscribe, overlayActions.isOpen, overlayActions.isOpen)
 
   const activateSurface = useCallback((surface) => {
     dispatchWorkspace({ type: 'surface_activated', surface })
@@ -98,6 +100,7 @@ export function useApplicationActions({
     [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
     [ApplicationAction.RELOAD_REVIEW]: reloadReview,
+    [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: () => openReviewSourcePicker(dispatchWorkspace, reviewAvailable),
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
       dispatchWorkspace({ type: 'file_tree_resized', steps: count })
       return true
@@ -174,6 +177,7 @@ export function useApplicationActions({
   }, [dispatchApplicationAction, vimController])
 
   return {
+    overlayOpen,
     dispatchApplicationAction,
     activateSurface,
     addFileComment,

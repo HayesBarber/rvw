@@ -58,6 +58,7 @@ export const APPLICATION_DISPATCH_COMMAND = 'application.dispatch'
 export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CLOSE_APPLICATION]: actionBindings(keySequence('q')),
   [ApplicationAction.RELOAD_REVIEW]: actionBindings(keySequence(LEADER_KEY, 'r')),
+  [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: actionBindings(keySequence(LEADER_KEY, 'i')),
   [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
   [ApplicationAction.OPEN_COMMAND_LINE]: actionBindings(keySequence(':')),
   [ApplicationAction.CURSOR_UP]: actionBindings(

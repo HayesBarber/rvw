@@ -108,6 +108,22 @@ test('data-vim-capture explicitly opts a descendant back in', () => {
   assert.equal(shouldCaptureKeyboardEvent(keyboardEvent(target)), true)
 })
 
+test('overlay buttons keep native activation but capture other configured keys', () => {
+  const dialog = element('DIALOG', { attributes: { 'data-vim-capture': '' } })
+  const button = element('BUTTON', { attributes: { 'data-vim-native-activation': '' }, parentElement: dialog })
+  const target = element('SPAN', { parentElement: button })
+  for (const key of ['Enter', ' ']) {
+    assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(target), key }), false)
+  }
+  for (const key of [']', '[', 'b', 'j', '2']) {
+    assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(target), key }), true)
+  }
+  const treeButton = element('BUTTON', { attributes: { 'data-vim-capture': '' } })
+  for (const key of [' ', 'Enter']) {
+    assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(treeButton), key }), true)
+  }
+})
+
 test('platform copy and paste always remain native clipboard shortcuts', () => {
   const target = element('BODY')
   const event = (key) => ({

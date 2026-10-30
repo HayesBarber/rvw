@@ -580,8 +580,91 @@ textarea {
   border: 0;
 }
 
+.review-source-picker-dialog::backdrop,
 .keymap-reference-dialog::backdrop {
   background: rgb(0 0 0 / 74%);
+}
+
+.review-source-picker-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #414145;
+  border-radius: 10px;
+  outline: none;
+  background: #141415;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 60%);
+  color: #fafafa;
+}
+
+.review-source-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #303033;
+}
+
+.review-source-picker-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.review-source-picker-header button {
+  padding: 6px 10px;
+  border: 1px solid #414145;
+  border-radius: 6px;
+  background: #202022;
+  color: #d4d4d8;
+}
+
+.review-source-picker-header button:hover,
+.review-source-picker-header button:focus-visible {
+  border-color: #71717a;
+  color: #fafafa;
+}
+
+.review-source-mode-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 16px 20px 0;
+  padding: 4px;
+  border: 1px solid #303033;
+  border-radius: 8px;
+  background: #18181b;
+}
+
+.review-source-mode-control button {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #a1a1aa;
+  white-space: nowrap;
+}
+
+.review-source-mode-control button[aria-pressed='true'] {
+  background: #303033;
+  color: #fafafa;
+}
+
+.review-source-mode-control button:hover {
+  color: #fafafa;
+}
+
+.review-source-mode-control button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.review-source-picker-body {
+  min-height: 180px;
+  padding: 20px;
 }
 
 .keymap-reference-dialog {

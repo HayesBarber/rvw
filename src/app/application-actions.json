@@ -12,6 +12,12 @@
     "description": "Reload repository files and changes."
   },
   {
+    "name": "OPEN_REVIEW_SOURCE_PICKER",
+    "id": "review_source_picker.open",
+    "group": "application",
+    "description": "Choose a review source."
+  },
+  {
     "name": "OPEN_KEYMAP_REFERENCE",
     "id": "keymap_reference.open",
     "group": "application",

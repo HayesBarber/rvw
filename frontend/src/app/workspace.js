@@ -34,6 +34,7 @@ export const initialWorkspaceState = Object.freeze({
   finderOpen: false,
   finderMode: null,
   keymapReferenceOpen: false,
+  reviewSourcePickerOpen: false,
   commentsOpen: false,
   activeSurface: ActiveSurface.DIFF_PANE,
   relativeLineNumbers: false,
@@ -160,6 +161,14 @@ function reduceWorkspace(state, action) {
         treeMode: action.changed ? state.treeMode : TreeMode.FILES,
         activeSurface: ActiveSurface.DIFF_PANE,
       }
+    case 'review_source_picker_opened':
+      return state.reviewSourcePickerOpen
+        ? state
+        : { ...state, reviewSourcePickerOpen: true }
+    case 'review_source_picker_closed':
+      return state.reviewSourcePickerOpen
+        ? { ...state, reviewSourcePickerOpen: false }
+        : state
     case 'keymap_reference_opened':
       return state.keymapReferenceOpen
         ? state
