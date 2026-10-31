@@ -1,4 +1,5 @@
 const std = @import("std");
+const defaults = @import("../../config/executables.zig").defaults;
 const model = @import("../../app/model.zig");
 const git_process = @import("../../util/git_process.zig");
 const RepositoryProvider = @import("interface.zig").RepositoryProvider;
@@ -7,8 +8,8 @@ const metadata = @import("../diff/git/metadata.zig");
 /// Each request owns its result. Repository data is not cached.
 pub const GitProvider = struct {
     allocator: std.mem.Allocator,
-    /// Null finds Git through PATH. Overrides must be absolute paths.
-    executable: ?[]const u8 = null,
+    /// Selected command name or validated absolute path.
+    executable: []const u8 = defaults.git,
 
     pub fn interface(self: *GitProvider) RepositoryProvider {
         return .{ .context = self, .vtable = &.{ .listCommits = listCommits, .listWorkingTreeChanges = listWorkingTreeChanges } };
@@ -38,7 +39,7 @@ pub const GitProvider = struct {
         if (!git_process.exitedSuccessfully(revision.term)) return error.InvalidRevision;
         const head = std.mem.trim(u8, revision.stdout, " \t\r\n");
         if (head.len == 0 or !std.unicode.utf8ValidateSlice(head)) return error.InvalidRevision;
-        const changes = metadata.enumerateWithGit(allocator, io, directory, .{ .base = head }, self.executable orelse "git") catch |err| switch (err) {
+        const changes = metadata.enumerate(allocator, io, directory, .{ .base = head }, self.executable) catch |err| switch (err) {
             error.OutOfMemory, error.UnsupportedPath, error.MalformedGitOutput => return err,
             error.GitNotFound, error.AccessDenied, error.InvalidExe => return error.RepositoryUnavailable,
             else => return error.WorkingTreeChangesFailed,
@@ -82,8 +83,7 @@ pub const GitProvider = struct {
     }
 
     fn run(self: *GitProvider, allocator: std.mem.Allocator, io: std.Io, directory: []const u8, arguments: []const []const u8, limit: usize) !git_process.RunResult {
-        const executable = self.executable orelse "git";
-        if (self.executable != null and !std.fs.path.isAbsolute(executable)) return error.RepositoryUnavailable;
+        const executable = self.executable;
         var argv: std.ArrayList([]const u8) = .empty;
         try argv.appendSlice(allocator, &.{ executable, "--no-pager", "--no-optional-locks", "--no-replace-objects", "-C", directory });
         try argv.appendSlice(allocator, arguments);
@@ -224,13 +224,13 @@ test "Git history reports missing Git, failed commands, invalid repositories, an
     defer repository.deinit();
     var provider: GitProvider = .{ .allocator = std.testing.allocator, .executable = "/rvw-missing-git" };
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listCommits(std.testing.io, repository.root));
-    provider.executable = "relative-git";
+    provider.executable = "rvw-missing-git";
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listCommits(std.testing.io, repository.root));
     provider.executable = "/usr/bin/false";
     try std.testing.expectError(error.RepositoryFailed, provider.interface().listCommits(std.testing.io, repository.root));
     provider.executable = "/usr/bin/true";
     try std.testing.expectError(error.InvalidCommitHistory, provider.interface().listCommits(std.testing.io, repository.root));
-    provider.executable = null;
+    provider.executable = defaults.git;
     try std.testing.expectError(error.RepositoryFailed, provider.interface().listCommits(std.testing.io, "/rvw-missing-repository"));
     var temporary = std.testing.tmpDir(.{});
     defer temporary.cleanup();
@@ -328,7 +328,7 @@ test "working-tree summaries match ordinary reviews for all change types without
     defer std.testing.allocator.free(index_after);
     try std.testing.expectEqualSlices(u8, index_before, index_after);
 
-    var review = try @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null);
+    var review = try @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null, defaults.git);
     defer review.deinit();
     try std.testing.expectEqualDeep(review.overview.files, result.files);
     const mixed = try repository.temporary.dir.readFileAlloc(std.testing.io, "mixed.txt", std.testing.allocator, .limited(1024));
@@ -367,16 +367,16 @@ test "working-tree summaries define errors for Git failures and absent HEAD" {
     defer repository.deinit();
     var provider: GitProvider = .{ .allocator = std.testing.allocator };
     try std.testing.expectError(error.InvalidRevision, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
-    try std.testing.expectError(error.InvalidRevision, @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null));
+    try std.testing.expectError(error.InvalidRevision, @import("../diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repository.root, null, null, defaults.git));
     provider.executable = "/rvw-missing-git";
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
-    provider.executable = "relative-git";
+    provider.executable = "rvw-missing-git";
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
     provider.executable = "/usr/bin/false";
     try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
     provider.executable = "/usr/bin/true";
     try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));
-    provider.executable = null;
+    provider.executable = defaults.git;
     try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, "/rvw-missing-repository"));
     try repository.write(".git/HEAD", "invalid HEAD\n");
     try std.testing.expectError(error.WorkingTreeChangesFailed, provider.interface().listWorkingTreeChanges(std.testing.io, repository.root));

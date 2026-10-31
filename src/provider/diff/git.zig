@@ -1,10 +1,12 @@
 const std = @import("std");
+const default_executables = @import("../../config/executables.zig").defaults;
 const model = @import("../../app/model.zig");
 const diff_provider = @import("interface.zig");
 const repository = @import("../../util/repository.zig");
 const snapshot_module = @import("git/snapshot.zig");
 const metadata = @import("git/metadata.zig");
 const file = @import("git/file.zig");
+const git_process = @import("../../util/git_process.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -15,14 +17,14 @@ pub const GitProvider = struct {
     overview: model.DiffOverview,
     file_contents: []const model.FileContent,
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !GitProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !GitProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
         const allocator = arena.allocator();
 
-        const root = try repository.validateRoot(io, allocator, path);
-        const snapshot = try snapshot_module.resolve(allocator, io, root, range);
-        const changes = try metadata.enumerate(allocator, io, root, snapshot);
+        const root = try repository.validateRoot(io, allocator, path, executable);
+        const snapshot = try snapshot_module.resolve(allocator, io, root, range, executable);
+        const changes = try metadata.enumerate(allocator, io, root, snapshot, executable);
 
         const diff_id = if (snapshot.head) |head|
             try std.fmt.allocPrint(allocator, "{s}..{s}", .{ snapshot.base, head })
@@ -32,7 +34,7 @@ pub const GitProvider = struct {
         const summaries = try metadata.summarize(allocator, changes);
         var file_contents: std.ArrayList(model.FileContent) = .empty;
         for (changes) |change| {
-            try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change));
+            try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change, executable));
         }
 
         const source: model.DiffSource = if (pr) |number| .{ .pull_request = .{ .number = number } } else if (snapshot.head) |head|
@@ -97,7 +99,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
         error.NotDirectory => "repository path is not a directory",
         error.NotGitRepository => "path is not a Git worktree",
         error.NotRepositoryRoot => "path must be the Git worktree root",
-        error.GitNotFound => "git is not available on PATH",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => git_process.unavailable_message,
         error.InvalidRange => "range must contain exactly two revisions separated by '..'",
         error.InvalidRevision => "range contains an unknown or non-commit revision",
         error.UnsupportedPath => "repository contains a changed path that is not valid UTF-8",
@@ -135,6 +137,7 @@ test "Git provider builds a deterministic working-tree review from a temporary r
         fixture.root,
         null,
         null,
+        default_executables.git,
     );
     defer provider.deinit();
     const diffs = provider.interface();
@@ -201,6 +204,7 @@ test "Git provider resolves explicit commit ranges independently of the working 
         fixture.root,
         range,
         null,
+        default_executables.git,
     );
     defer provider.deinit();
     const diffs = provider.interface();

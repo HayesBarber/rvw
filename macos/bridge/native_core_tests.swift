@@ -45,6 +45,67 @@ private func routerBlockingTermination(_ core: NativeCore) -> NativeRequestRoute
     }
 }
 
+private func withUserConfiguration(_ configuration: [String: Any], _ body: () throws -> Void) throws {
+    try withTemporaryDirectory { home in
+        let directory = home.appendingPathComponent(".config/rvw")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: configuration)
+            .write(to: directory.appendingPathComponent("config.json"))
+        let previous = getenv("HOME").map { String(cString: $0) }
+        setenv("HOME", home.path, 1)
+        defer {
+            if let previous { setenv("HOME", previous, 1) } else { unsetenv("HOME") }
+        }
+        try body()
+    }
+}
+
+private func testNativeExecutableConfiguration() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        try "base\n".write(to: directory.appendingPathComponent("tracked.txt"), atomically: true, encoding: .utf8)
+        try commitRepository(directory, "base")
+        let executable = directory.appendingPathComponent(".git/custom git")
+        try "#!/bin/sh\nexec /usr/bin/git \"$@\"\n".write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let previousPath = getenv("PATH").map { String(cString: $0) }
+        setenv("PATH", "/rvw-no-tools", 1)
+        defer {
+            if let previousPath { setenv("PATH", previousPath, 1) } else { unsetenv("PATH") }
+        }
+        try withUserConfiguration(["executables": [
+            "git": executable.path, "gh": "/rvw-missing-gh", "rg": "/rvw-missing-rg",
+        ]]) {
+            let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+            let router = routerBlockingTermination(core)
+            let commits = try response(router, ["type": "list_commits"])
+            expect((commits["commits"] as? [Any])?.count == 1, "configured Git must work without PATH")
+            _ = try response(router, ["type": "list_working_tree_changes"])
+            try "updated\n".write(to: directory.appendingPathComponent("tracked.txt"), atomically: true, encoding: .utf8)
+            _ = try response(router, ["type": "reload_review"])
+            try git(directory, ["remote", "add", "origin", "https://github.com/owner/repo.git"])
+            try expectNativeError(router, "list_open_pull_requests",
+                                  "GitHub CLI is unavailable; check executables.gh in ~/.config/rvw/config.json or gh on the process PATH")
+            for mode in ["ignore-aware", "all-files"] {
+                do {
+                    _ = try response(router, ["type": "search_text", "mode": mode, "query": "needle"])
+                    fatalError("missing configured ripgrep must fail")
+                } catch {
+                    expect(error.localizedDescription.contains("executables.rg"), "search error must identify the setting")
+                }
+            }
+        }
+        try withUserConfiguration(["executables": ["git": "/rvw-missing-git"]]) {
+            do {
+                _ = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+                fatalError("missing configured Git must fail at startup")
+            } catch {
+                expect(error.localizedDescription.contains("executables.git"), "startup error must identify the Git setting")
+            }
+        }
+    }
+}
+
 private func testNativeTextSearch() throws {
     try withTemporaryDirectory { directory in
         try git(directory, ["init", "--quiet"])
@@ -94,29 +155,26 @@ private func testNativeSearchFailure(_ directory: URL) throws {
         to: executable, atomically: true, encoding: .utf8
     )
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
-    let previous = getenv("RVW_RIPGREP").map { String(cString: $0) }
-    setenv("RVW_RIPGREP", executable.path, 1)
-    defer {
-        if let previous { setenv("RVW_RIPGREP", previous, 1) } else { unsetenv("RVW_RIPGREP") }
-    }
+    try withUserConfiguration(["executables": ["rg": executable.path]]) {
 
-    let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
-    let router = routerBlockingTermination(core)
-    for _ in 0..<2 {
-        do {
-            _ = try response(router, ["type": "search_text", "mode": "all-files", "query": "needle"])
-            fatalError("excessive stderr should fail the search")
-        } catch {
-            expect(error.localizedDescription == "Search failed; check directory access and try again",
-                   "search failure should reach Swift without a timeout")
+        let core = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
+        let router = routerBlockingTermination(core)
+        for _ in 0..<2 {
+            do {
+                _ = try response(router, ["type": "search_text", "mode": "all-files", "query": "needle"])
+                fatalError("excessive stderr should fail the search")
+            } catch {
+                expect(error.localizedDescription == "Search failed; check executables.rg in ~/.config/rvw/config.json and directory access",
+                       "search failure should reach Swift without a timeout")
+            }
+            let pidText = try String(contentsOf: directory.appendingPathComponent("child.pid"), encoding: .utf8)
+            guard let pid = Int32(pidText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                throw NativeCoreTestError.invalidResponse
+            }
+            var status: Int32 = 0
+            expect(waitpid(pid, &status, WNOHANG) == -1 && errno == ECHILD, "search cleanup must reap its child")
+            _ = try response(router, ["type": "get_configuration"])
         }
-        let pidText = try String(contentsOf: directory.appendingPathComponent("child.pid"), encoding: .utf8)
-        guard let pid = Int32(pidText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw NativeCoreTestError.invalidResponse
-        }
-        var status: Int32 = 0
-        expect(waitpid(pid, &status, WNOHANG) == -1 && errno == ECHILD, "search cleanup must reap its child")
-        _ = try response(router, ["type": "get_configuration"])
     }
 }
 
@@ -273,7 +331,7 @@ private func testNativePullRequests() throws {
         expect((empty["pullRequests"] as? [Any])?.isEmpty == true, "later native requests should read the current list")
         for (script, message) in [
             ("#!/bin/sh\nexit 4\n", "GitHub authentication failed; sign in with gh auth login"),
-            ("#!/bin/sh\nexit 1\n", "Unable to list open pull requests"),
+            ("#!/bin/sh\nexit 1\n", "Unable to list open pull requests; check executables.gh in ~/.config/rvw/config.json and GitHub access"),
             ("#!/bin/sh\nprintf 'invalid json'\n", "Pull request list data is invalid"),
         ] {
             try script.write(to: gh, atomically: true, encoding: .utf8)
@@ -281,7 +339,7 @@ private func testNativePullRequests() throws {
             try expectNativeError(router, "list_open_pull_requests", message)
         }
         try FileManager.default.removeItem(at: gh)
-        try expectNativeError(router, "list_open_pull_requests", "GitHub CLI is unavailable")
+        try expectNativeError(router, "list_open_pull_requests", "GitHub CLI is unavailable; check executables.gh in ~/.config/rvw/config.json or gh on the process PATH")
     }
 }
 
@@ -289,10 +347,13 @@ private func testNativePullRequests() throws {
 struct NativeCoreTests {
     static func main() {
         do {
-            try testNativeTextSearch()
-            try testNativeReviewComments()
-            try testNativeRepositoryLists()
-            try testNativePullRequests()
+            try withUserConfiguration([:]) {
+                try testNativeTextSearch()
+                try testNativeReviewComments()
+                try testNativeRepositoryLists()
+                try testNativePullRequests()
+                try testNativeExecutableConfiguration()
+            }
             print("Native core tests passed")
         } catch {
             FileHandle.standardError.write(Data("Native core test failed: \(error)\n".utf8))

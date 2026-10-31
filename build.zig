@@ -61,6 +61,21 @@ pub fn build(b: *std.Build) void {
     cli_tests.root_module.addOptions("build_options", build_options);
     test_step.dependOn(&b.addRunArtifact(cli_tests).step);
 
+    const cli_integration = b.addExecutable(.{
+        .name = "rvw-test-cli",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    cli_integration.root_module.addOptions("build_options", build_options);
+    const executable_tests = b.addSystemCommand(&.{"node"});
+    executable_tests.addFileArg(b.path("build/executable-paths.test.mjs"));
+    executable_tests.addArtifactArg(server);
+    executable_tests.addArtifactArg(cli_integration);
+    test_step.dependOn(&executable_tests.step);
+
     const frontend_tests = b.addSystemCommand(&.{ "npm", "test", "--prefix", "frontend" });
     test_step.dependOn(&frontend_tests.step);
     const release_tests = b.addSystemCommand(&.{ "node", "--test", "build/prepare-release.test.mjs" });

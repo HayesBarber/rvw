@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../../config/executables.zig").defaults;
 const filetree_provider = @import("interface.zig");
 const walk = @import("walk.zig");
 const process = @import("../../util/git_process.zig");
@@ -12,7 +13,7 @@ pub const GitignoreFileTreeProvider = struct {
     io: Io,
     files: []const []const u8,
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8) !GitignoreFileTreeProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, executable: []const u8) !GitignoreFileTreeProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
 
@@ -23,7 +24,7 @@ pub const GitignoreFileTreeProvider = struct {
         };
         errdefer root.close(io);
 
-        const files = try resolveFiles(arena.allocator(), io, root, path);
+        const files = try resolveFiles(arena.allocator(), io, root, path, executable);
         return .{
             .arena = arena,
             .root = root,
@@ -52,10 +53,13 @@ pub const GitignoreFileTreeProvider = struct {
     };
 };
 
-fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8) ![]const []const u8 {
-    const candidates = gitLsFiles(allocator, io, root, path) catch |err| switch (err) {
-        error.GitNotFound, error.GitOutputTooLarge, error.GitCommandFailed => return walk.enumerateFiles(allocator, io, root),
-        else => |unexpected| return unexpected,
+fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: []const u8) ![]const []const u8 {
+    const candidates = gitLsFiles(allocator, io, root, path, executable) catch |err| {
+        if (std.fs.path.isAbsolute(executable)) return err;
+        return switch (err) {
+            error.GitNotFound, error.GitOutputTooLarge, error.GitCommandFailed => return walk.enumerateFiles(allocator, io, root),
+            else => |unexpected| return unexpected,
+        };
     };
 
     std.mem.sort([]const u8, candidates, {}, lessThanPath);
@@ -64,12 +68,12 @@ fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8
 
 /// Enumerates the Git working set (tracked files plus untracked, not-ignored
 /// files) and prunes entries that no longer exist on disk or are not plain
-/// files. Falls back to a full walk when Git is unavailable.
-fn gitLsFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8) ![][]const u8 {
+/// files. The default selection permits a full walk when Git is unavailable.
+fn gitLsFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: []const u8) ![][]const u8 {
     const output = try process.run(
         allocator,
         io,
-        &.{ "git", "-C", path, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--" },
+        &.{ executable, "-C", path, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--" },
         process.maximum_metadata_size,
     );
     defer allocator.free(output);
@@ -119,6 +123,7 @@ test "gitignore tree excludes ignored untracked files but keeps tracked ones" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -142,6 +147,7 @@ test "gitignore tree lists tracked files that are gitignored" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -164,6 +170,7 @@ test "gitignore tree prunes deleted-but-tracked index entries" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -202,6 +209,7 @@ test "gitignore tree falls back to a full walk outside a Git repository" {
         std.testing.allocator,
         std.testing.io,
         root,
+        default_executables.git,
     );
     defer provider.deinit();
 

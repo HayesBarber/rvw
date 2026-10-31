@@ -52,6 +52,15 @@ pub const Repository = struct {
         });
     }
 
+    /// Writes a test executable and returns its owned absolute path.
+    pub fn writeExecutable(self: *Repository, path: []const u8, script: []const u8) ![]u8 {
+        try self.write(path, script);
+        var file = try self.temporary.dir.openFile(std.testing.io, path, .{});
+        defer file.close(std.testing.io);
+        try file.setPermissions(std.testing.io, .executable_file);
+        return std.fs.path.join(self.allocator, &.{ self.root, path });
+    }
+
     pub fn revision(self: *Repository, name: []const u8) ![]u8 {
         const output = try self.runGit(&.{ "rev-parse", "--verify", name });
         defer self.allocator.free(output);

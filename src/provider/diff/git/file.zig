@@ -14,17 +14,18 @@ pub fn buildContent(
     root: []const u8,
     snapshot: snapshot_module.Snapshot,
     change: metadata.Change,
+    executable: []const u8,
 ) !model.FileContent {
     if (change.unavailable) |reason| return content.unavailable(reason);
 
     const old: ?content.Loaded = if (change.status == .added)
         null
     else
-        try loadCommitted(allocator, io, root, snapshot.base, change.previous_path orelse change.path);
+        try loadCommitted(allocator, io, root, snapshot.base, change.previous_path orelse change.path, executable);
     const new: ?content.Loaded = if (change.status == .deleted)
         null
     else if (snapshot.head) |head|
-        try loadCommitted(allocator, io, root, head, change.path)
+        try loadCommitted(allocator, io, root, head, change.path, executable)
     else
         try loadWorkingTree(allocator, io, root, change.path);
 
@@ -49,12 +50,13 @@ fn loadCommitted(
     root: []const u8,
     commit: []const u8,
     path: []const u8,
+    executable: []const u8,
 ) !content.Loaded {
     const object = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ commit, path });
     const contents = process.run(
         allocator,
         io,
-        &.{ "git", "-C", root, "show", "--no-textconv", object },
+        &.{ executable, "-C", root, "show", "--no-textconv", object },
         content.maximum_text_size + 1,
     ) catch |err| switch (err) {
         error.GitOutputTooLarge => return .{ .unavailable = .too_large },
