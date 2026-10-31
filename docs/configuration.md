@@ -164,7 +164,6 @@ Rvw finds `rg` on its process `PATH`. To select an executable, set
 }
 ```
 
-Use an absolute path.
-
-The selected file must be executable. Search reports an error if Rvw cannot find or run it.
+Use an absolute path. The selected file must be executable.
+Search reports an error if Rvw cannot find or run it.
 Other review operations do not require ripgrep.
