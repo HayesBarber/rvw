@@ -6,7 +6,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
     return switch (err) {
         error.MissingHead => "cannot resolve HEAD; last-commit review requires a repository with commits",
         error.MissingParent => "cannot resolve the first parent of HEAD; last-commit review requires a parent commit",
-        error.GitNotFound, error.AccessDenied, error.InvalidExe => "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => git.unavailable_message,
         else => "cannot resolve the last commit",
     };
 }

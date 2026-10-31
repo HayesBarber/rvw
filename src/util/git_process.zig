@@ -3,6 +3,7 @@ const std = @import("std");
 pub const maximum_metadata_size = 16 * 1024 * 1024;
 pub const maximum_revision_size = 4096;
 pub const maximum_stderr_size = 4096;
+pub const unavailable_message = "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH";
 
 pub const RunResult = struct {
     stdout: []const u8,

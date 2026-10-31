@@ -164,9 +164,7 @@ Rvw finds `rg` on its process `PATH`. To select an executable, set
 }
 ```
 
-Use a non-empty absolute path. Rvw treats the value as one executable path.
-Paths with spaces are supported. Rvw does not expand shell variables or `~`,
-and does not split the value into command arguments.
+Use an absolute path.
 
 The selected file must be executable. Search reports an error if Rvw cannot find or run it.
 Other review operations do not require ripgrep.

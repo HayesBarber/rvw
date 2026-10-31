@@ -6,6 +6,7 @@ const repository = @import("../../util/repository.zig");
 const snapshot_module = @import("git/snapshot.zig");
 const metadata = @import("git/metadata.zig");
 const file = @import("git/file.zig");
+const git_process = @import("../../util/git_process.zig");
 
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -98,7 +99,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
         error.NotDirectory => "repository path is not a directory",
         error.NotGitRepository => "path is not a Git worktree",
         error.NotRepositoryRoot => "path must be the Git worktree root",
-        error.GitNotFound, error.AccessDenied, error.InvalidExe => "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => git_process.unavailable_message,
         error.InvalidRange => "range must contain exactly two revisions separated by '..'",
         error.InvalidRevision => "range contains an unknown or non-commit revision",
         error.UnsupportedPath => "repository contains a changed path that is not valid UTF-8",

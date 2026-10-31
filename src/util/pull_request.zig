@@ -16,7 +16,7 @@ pub fn errorMessage(err: anyerror) []const u8 {
         error.MissingOrigin => "PR review requires an origin remote",
         error.PullRequestUnavailable => "unable to fetch PR head and merge refs from origin; check the PR number, access, and mergeability",
         error.InvalidPullRequestRefs => "PR refs do not contain a valid head and merge base",
-        error.GitNotFound, error.AccessDenied, error.InvalidExe => "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => git.unavailable_message,
         else => "unable to resolve pull request",
     };
 }
