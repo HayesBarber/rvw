@@ -22,6 +22,21 @@ function onlyFields(object, allowed) {
   return Object.keys(object).every((field) => allowed.includes(field))
 }
 
+function validateExecutables(executables) {
+  if (executables === undefined) return
+  if (!isObject(executables)) {
+    throw new TypeError('User configuration executables must be a JSON object')
+  }
+  if (!onlyFields(executables, ['git', 'gh', 'rg'])) {
+    throw new TypeError('User configuration executables contains an unsupported field; use git, gh, or rg')
+  }
+  for (const [tool, path] of Object.entries(executables)) {
+    if (typeof path !== 'string' || !path.startsWith('/') || path.includes('\0')) {
+      throw new TypeError(`User configuration executables.${tool} must be a non-empty absolute path string without null bytes`)
+    }
+  }
+}
+
 function configuredDiffSettings(diff) {
   if (!isObject(diff)) {
     throw new TypeError('User configuration diff must be a JSON object')
@@ -122,9 +137,10 @@ function configuredKeyboardConfiguration(configuration) {
   if (!isObject(configuration)) {
     throw new TypeError('User configuration must be a JSON object')
   }
-  if (!onlyFields(configuration, ['keybindings', 'diff', 'comments', 'commandLine'])) {
+  if (!onlyFields(configuration, ['keybindings', 'diff', 'comments', 'commandLine', 'executables'])) {
     throw new TypeError('User configuration contains an unsupported top-level field')
   }
+  validateExecutables(configuration.executables)
 
   const keybindings = configuration.keybindings
   if (keybindings === undefined) {

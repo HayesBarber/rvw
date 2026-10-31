@@ -100,6 +100,9 @@ const ParseResult = union(enum) {
 };
 
 const SchemaError = error{
+    executables_not_object,
+    unknown_executables_field,
+    invalid_executable_path,
     invalid_command_line,
     invalid_alias_name,
     alias_shadows_action,
@@ -159,7 +162,19 @@ fn validateConfiguration(value: std.json.Value, catalog: std.json.Value) SchemaE
         .object => |object| object,
         else => return error.root_not_object,
     };
-    if (!onlyFields(root, &.{ "keybindings", "diff", "comments", "commandLine" })) return error.unknown_root_field;
+    if (!onlyFields(root, &.{ "keybindings", "diff", "comments", "commandLine", "executables" })) return error.unknown_root_field;
+
+    if (root.get("executables")) |executables| {
+        if (executables != .object) return error.executables_not_object;
+        if (!onlyFields(executables.object, &.{ "git", "gh", "rg" })) return error.unknown_executables_field;
+        var paths = executables.object.iterator();
+        while (paths.next()) |entry| {
+            const path = entry.value_ptr.*;
+            if (path != .string or path.string.len == 0 or
+                !std.fs.path.isAbsolute(path.string) or std.mem.indexOfScalar(u8, path.string, 0) != null)
+                return error.invalid_executable_path;
+        }
+    }
 
     if (root.get("commandLine")) |command_line| {
         if (command_line != .object or !onlyFields(command_line.object, &.{"aliases"})) return error.invalid_command_line;
@@ -336,6 +351,9 @@ fn onlyFields(object: std.json.ObjectMap, allowed: []const []const u8) bool {
 
 fn schemaErrorMessage(schema_error: SchemaError) []const u8 {
     return switch (schema_error) {
+        error.executables_not_object => "user configuration executables must be a JSON object",
+        error.unknown_executables_field => "user configuration executables contains an unsupported field; use git, gh, or rg",
+        error.invalid_executable_path => "each executables value must be a non-empty absolute path string without null bytes",
         error.invalid_command_line => "user configuration commandLine must be an object with an optional aliases object",
         error.invalid_alias_name => "commandLine alias names must be non-empty and contain no whitespace",
         error.alias_shadows_action => "commandLine aliases cannot shadow canonical application actions",
@@ -391,6 +409,66 @@ fn diagnosticSnapshot(
         .configuration = .{ .object = .empty },
         .diagnostic = .{ .code = code, .message = message, .path = path },
     };
+}
+
+test "executable settings are optional and preserve literal absolute paths" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    for ([_][]const u8{ "{}", "{\"executables\":{}}" }) |input| {
+        try std.testing.expect((try parseConfiguration(allocator, input)) == .configuration);
+    }
+    for ([_][]const u8{ "git", "gh", "rg" }) |tool| {
+        const input = try std.fmt.allocPrint(allocator, "{{\"executables\":{{\"{s}\":\"/Tools With Spaces/$HOME/tool ~ --flag\"}}}}", .{tool});
+        const parsed = try parseConfiguration(allocator, input);
+        try std.testing.expect(parsed == .configuration);
+        const paths = parsed.configuration.object.get("executables").?.object;
+        try std.testing.expectEqual(@as(usize, 1), paths.count());
+        try std.testing.expectEqualStrings("/Tools With Spaces/$HOME/tool ~ --flag", paths.get(tool).?.string);
+    }
+    const all = try parseConfiguration(allocator,
+        \\{"executables":{"git":"/usr/bin/git","gh":"/opt/homebrew/bin/gh","rg":"/opt/homebrew/bin/rg"}}
+    );
+    try std.testing.expect(all == .configuration);
+    try std.testing.expectEqual(@as(usize, 3), all.configuration.object.get("executables").?.object.count());
+}
+
+test "invalid executable settings use configuration schema diagnostics" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    const home = try temporary.dir.realPathFileAlloc(std.testing.io, ".", std.testing.allocator);
+    defer std.testing.allocator.free(home);
+    try temporary.dir.createDirPath(std.testing.io, ".config/rvw");
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var inputs: std.ArrayList([]const u8) = .empty;
+    for ([_][]const u8{ "null", "[]", "\"git\"", "42", "true" }) |value| {
+        try inputs.append(allocator, try std.fmt.allocPrint(allocator, "{{\"executables\":{s}}}", .{value}));
+    }
+    try inputs.append(allocator,
+        \\{"executables":{"unknown":"/usr/bin/tool"}}
+    );
+    for ([_][]const u8{ "git", "gh", "rg" }) |tool| {
+        for ([_][]const u8{
+            "null",     "[]",         "{}",             "42",                 "true",                           "\"\"", "\" \"",
+            "\"tool\"", "\"./tool\"", "\"~/bin/tool\"", "\"$HOME/bin/tool\"", "\"/usr/bin/tool\\u0000--flag\"",
+        }) |value| {
+            try inputs.append(allocator, try std.fmt.allocPrint(allocator, "{{\"executables\":{{\"{s}\":{s}}}}}", .{ tool, value }));
+        }
+    }
+    for (inputs.items) |input| {
+        try temporary.dir.writeFile(std.testing.io, .{ .sub_path = relative_configuration_path, .data = input });
+        var loaded = try load(std.testing.allocator, std.testing.io, .{ .home = home });
+        defer loaded.deinit();
+        const diagnostic = loaded.snapshot.diagnostic orelse return error.TestUnexpectedResult;
+        try std.testing.expectEqual(config.DiagnosticCode.invalid_schema, diagnostic.code);
+        try std.testing.expect(std.mem.indexOf(u8, diagnostic.message, "executables") != null);
+        try std.testing.expect(std.mem.endsWith(u8, diagnostic.path, relative_configuration_path));
+        try std.testing.expectEqual(@as(usize, 0), loaded.snapshot.configuration.object.count());
+    }
 }
 
 test "configuration path resolves below the user home directory" {

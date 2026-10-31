@@ -48,6 +48,42 @@ test('configured actions replace defaults while missing actions retain them', ()
   )
 })
 
+test('executable settings accept independent literal absolute paths', () => {
+  const configurations = [
+    {},
+    { executables: {} },
+    { executables: { git: '/usr/bin/git', gh: '/opt/homebrew/bin/gh', rg: '/opt/homebrew/bin/rg' } },
+    ...['git', 'gh', 'rg'].map((tool) => ({
+      executables: { [tool]: '/Tools With Spaces/$HOME/tool ~ --flag' },
+    })),
+  ]
+  for (const configuration of configurations) {
+    const original = structuredClone(configuration)
+    const result = resolveConfiguration({ configuration, diagnostic: null })
+    assert.equal(result.diagnostic, null)
+    assert.deepEqual(result.bindings, defaultApplicationBindings)
+    assert.deepEqual(configuration, original)
+  }
+})
+
+test('invalid executable settings produce configuration diagnostics', () => {
+  const configurations = [
+    ...[null, [], 'git', 42, true].map((executables) => ({ executables })),
+    { executables: { unknown: '/usr/bin/tool' } },
+    ...['git', 'gh', 'rg'].flatMap((tool) => [
+      null, [], {}, 42, true, '', ' ', 'tool', './tool', '~/bin/tool',
+      '$HOME/bin/tool', '/usr/bin/tool\0--flag',
+    ].map((path) => ({ executables: { [tool]: path } }))),
+  ]
+  for (const configuration of configurations) {
+    const result = resolveConfiguration({ configuration, diagnostic: null })
+    assert.equal(result.bindings, null)
+    assert.equal(result.diagnostic.code, 'invalid_configuration')
+    assert.equal(result.diagnostic.path, USER_CONFIGURATION_PATH)
+    assert.match(result.diagnostic.message, /executables/)
+  }
+})
+
 test('an empty configured sequence list disables its action', () => {
   const result = resolveConfiguration({
     configuration: {
