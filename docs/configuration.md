@@ -62,7 +62,8 @@ For range comments, use `diff.visual_line` to select lines, then `comments.add` 
 
 Rvw reads `~/.config/rvw/config.json` once when the application starts.
 
-The JSON root accepts optional `keybindings`, `diff`, `comments`, and `commandLine` objects.
+The JSON root accepts optional `keybindings`, `diff`, `comments`, `commandLine`,
+and `executables` objects.
 
 Use `keybindings.normal` to change bindings. Each key must be an action identifier
 from the table above. Each value must be an array of key sequences.
@@ -144,6 +145,31 @@ both `g` and `g g`.
 - Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
 - Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
 
+## Executable paths
+
+Use `executables` in `~/.config/rvw/config.json` to select Git, GitHub CLI,
+and ripgrep. These settings apply to the CLI, native application, and development server.
+
+```json
+{
+  "executables": {
+    "git": "/usr/bin/git",
+    "gh": "/opt/homebrew/bin/gh",
+    "rg": "/opt/homebrew/bin/rg"
+  }
+}
+```
+
+Use an absolute path. The selected file must be executable.
+Each setting is independent. If a setting is absent, Rvw finds the corresponding
+command (`git`, `gh`, or `rg`) on its process `PATH`.
+Omit the `executables` object to use this default for all three tools.
+
+Rvw checks a tool when an operation needs it. If a selected tool cannot run,
+that operation reports an error. Rvw does not select a different tool.
+Git is required to open a review. GitHub CLI is required to list open pull requests.
+Ripgrep is required for text search.
+
 ## Codebase text search
 
 The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
@@ -153,17 +179,4 @@ installation. Rvw does not bundle ripgrep. On macOS, install it with:
 brew install ripgrep
 ```
 
-Rvw finds `rg` on its process `PATH`. To select an executable, set
-`executables.rg` in `~/.config/rvw/config.json`:
-
-```json
-{
-  "executables": {
-    "rg": "/opt/homebrew/bin/rg"
-  }
-}
-```
-
-Use an absolute path. The selected file must be executable.
-Search reports an error if Rvw cannot find or run it.
-Other review operations do not require ripgrep.
+Use `executables.rg` to select ripgrep as described in [Executable paths](#executable-paths).
