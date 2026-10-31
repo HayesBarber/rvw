@@ -14,15 +14,15 @@ const Range = struct {
     head: []const u8,
 };
 
-pub fn resolve(allocator: Allocator, io: Io, root: []const u8, range: ?[]const u8) !Snapshot {
+pub fn resolve(allocator: Allocator, io: Io, root: []const u8, range: ?[]const u8, executable: []const u8) !Snapshot {
     if (range) |value| {
         const revisions = try parseRange(value);
         return .{
-            .base = try resolveCommit(allocator, io, root, revisions.base),
-            .head = try resolveCommit(allocator, io, root, revisions.head),
+            .base = try resolveCommit(allocator, io, root, revisions.base, executable),
+            .head = try resolveCommit(allocator, io, root, revisions.head, executable),
         };
     }
-    return .{ .base = try resolveCommit(allocator, io, root, "HEAD") };
+    return .{ .base = try resolveCommit(allocator, io, root, "HEAD", executable) };
 }
 
 fn parseRange(value: []const u8) !Range {
@@ -33,12 +33,12 @@ fn parseRange(value: []const u8) !Range {
     return .{ .base = value[0..separator], .head = value[separator + 2 ..] };
 }
 
-fn resolveCommit(allocator: Allocator, io: Io, root: []const u8, revision: []const u8) ![]const u8 {
+fn resolveCommit(allocator: Allocator, io: Io, root: []const u8, revision: []const u8, executable: []const u8) ![]const u8 {
     const commit = try std.fmt.allocPrint(allocator, "{s}^{{commit}}", .{revision});
     const output = process.run(
         allocator,
         io,
-        &.{ "git", "-C", root, "rev-parse", "--verify", "--end-of-options", commit },
+        &.{ executable, "-C", root, "rev-parse", "--verify", "--end-of-options", commit },
         process.maximum_revision_size,
     ) catch |err| switch (err) {
         error.GitCommandFailed, error.GitOutputTooLarge => return error.InvalidRevision,

@@ -13,6 +13,10 @@ pub const GitignoreFileTreeProvider = struct {
     files: []const []const u8,
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8) !GitignoreFileTreeProvider {
+        return initWithGit(backing_allocator, io, path, null);
+    }
+
+    pub fn initWithGit(backing_allocator: Allocator, io: Io, path: []const u8, executable: ?[]const u8) !GitignoreFileTreeProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
 
@@ -23,7 +27,7 @@ pub const GitignoreFileTreeProvider = struct {
         };
         errdefer root.close(io);
 
-        const files = try resolveFiles(arena.allocator(), io, root, path);
+        const files = try resolveFiles(arena.allocator(), io, root, path, executable);
         return .{
             .arena = arena,
             .root = root,
@@ -52,10 +56,13 @@ pub const GitignoreFileTreeProvider = struct {
     };
 };
 
-fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8) ![]const []const u8 {
-    const candidates = gitLsFiles(allocator, io, root, path) catch |err| switch (err) {
-        error.GitNotFound, error.GitOutputTooLarge, error.GitCommandFailed => return walk.enumerateFiles(allocator, io, root),
-        else => |unexpected| return unexpected,
+fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: ?[]const u8) ![]const []const u8 {
+    const candidates = gitLsFiles(allocator, io, root, path, executable orelse "git") catch |err| {
+        if (executable != null) return err;
+        return switch (err) {
+            error.GitNotFound, error.GitOutputTooLarge, error.GitCommandFailed => return walk.enumerateFiles(allocator, io, root),
+            else => |unexpected| return unexpected,
+        };
     };
 
     std.mem.sort([]const u8, candidates, {}, lessThanPath);
@@ -64,12 +71,12 @@ fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8
 
 /// Enumerates the Git working set (tracked files plus untracked, not-ignored
 /// files) and prunes entries that no longer exist on disk or are not plain
-/// files. Falls back to a full walk when Git is unavailable.
-fn gitLsFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8) ![][]const u8 {
+/// files. The default selection permits a full walk when Git is unavailable.
+fn gitLsFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: []const u8) ![][]const u8 {
     const output = try process.run(
         allocator,
         io,
-        &.{ "git", "-C", path, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--" },
+        &.{ executable, "-C", path, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--" },
         process.maximum_metadata_size,
     );
     defer allocator.free(output);

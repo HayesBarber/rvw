@@ -23,11 +23,15 @@ pub fn errorMessage(err: anyerror) []const u8 {
 /// Fetches both GitHub refs on every resolution, including force-pushed updates.
 /// The returned range is owned by the caller; the worktree is never checked out.
 pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32) ![]u8 {
+    return resolveRangeWithGit(io, allocator, root, number, "git");
+}
+
+pub fn resolveRangeWithGit(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32, executable: []const u8) ![]u8 {
     if (number == 0) return error.InvalidPr;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const scratch = arena.allocator();
-    _ = command(io, scratch, root, &.{ "remote", "get-url", "origin" }) catch |err| switch (err) {
+    _ = command(io, scratch, root, executable, &.{ "remote", "get-url", "origin" }) catch |err| switch (err) {
         error.GitCommandFailed => return error.MissingOrigin,
         else => return err,
     };
@@ -36,30 +40,30 @@ pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, 
     const head_revision = try std.fmt.allocPrint(scratch, "{s}^{{commit}}", .{head_ref});
     const head_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/head:{s}", .{ number, head_ref });
     const merge_spec = try std.fmt.allocPrint(scratch, "+refs/pull/{d}/merge:{s}", .{ number, merge_ref });
-    _ = command(io, scratch, root, &.{ "fetch", "--atomic", "origin", head_spec, merge_spec }) catch |err| switch (err) {
+    _ = command(io, scratch, root, executable, &.{ "fetch", "--atomic", "origin", head_spec, merge_spec }) catch |err| switch (err) {
         error.GitCommandFailed => return error.PullRequestUnavailable,
         else => return err,
     };
-    const head = (try revision(io, scratch, root, head_revision)) orelse return error.InvalidPullRequestRefs;
+    const head = (try revision(io, scratch, root, head_revision, executable)) orelse return error.InvalidPullRequestRefs;
     const parent = try std.fmt.allocPrint(scratch, "{s}^1", .{merge_ref});
-    const base = command(io, scratch, root, &.{ "merge-base", parent, head }) catch |err| switch (err) {
+    const base = command(io, scratch, root, executable, &.{ "merge-base", parent, head }) catch |err| switch (err) {
         error.GitCommandFailed => return error.InvalidPullRequestRefs,
         else => return err,
     };
     return std.fmt.allocPrint(allocator, "{s}..{s}", .{ base, head });
 }
 
-fn revision(io: std.Io, allocator: std.mem.Allocator, root: []const u8, ref: []const u8) !?[]const u8 {
-    return command(io, allocator, root, &.{ "rev-parse", "--verify", ref }) catch |err| switch (err) {
+fn revision(io: std.Io, allocator: std.mem.Allocator, root: []const u8, ref: []const u8, executable: []const u8) !?[]const u8 {
+    return command(io, allocator, root, executable, &.{ "rev-parse", "--verify", ref }) catch |err| switch (err) {
         error.GitCommandFailed => null,
         else => return err,
     };
 }
 
-fn command(io: std.Io, allocator: std.mem.Allocator, root: []const u8, args: []const []const u8) ![]const u8 {
+fn command(io: std.Io, allocator: std.mem.Allocator, root: []const u8, executable: []const u8, args: []const []const u8) ![]const u8 {
     var argv: std.ArrayList([]const u8) = .empty;
     defer argv.deinit(allocator);
-    try argv.appendSlice(allocator, &.{ "git", "-C", root });
+    try argv.appendSlice(allocator, &.{ executable, "-C", root });
     try argv.appendSlice(allocator, args);
     const result = try git.runResult(allocator, io, argv.items, git.maximum_revision_size);
     if (!git.exitedSuccessfully(result.term)) return error.GitCommandFailed;
@@ -102,6 +106,25 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
     const fetched = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100);
     defer std.testing.allocator.free(fetched);
     try std.testing.expectEqualStrings(expected, fetched);
+    const executable = try local.writeExecutable(".git/custom git",
+        \\#!/bin/sh
+        \\printf '%s\n' "$*" >> "$0.calls"
+        \\exec git "$@"
+        \\
+    );
+    defer std.testing.allocator.free(executable);
+    const selected = try resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, executable);
+    defer std.testing.allocator.free(selected);
+    try std.testing.expectEqualStrings(expected, selected);
+    const calls = try local.temporary.dir.readFileAlloc(std.testing.io, ".git/custom git.calls", std.testing.allocator, .unlimited);
+    defer std.testing.allocator.free(calls);
+    for ([_][]const u8{ "remote get-url origin", "fetch --atomic origin", "rev-parse --verify", "merge-base" }) |command_name| {
+        try std.testing.expect(std.mem.indexOf(u8, calls, command_name) != null);
+    }
+    try std.testing.expectError(error.GitNotFound, resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, "/rvw-missing-git"));
+    const failing = try local.writeExecutable(".git/failing git", "#!/bin/sh\nexit 7\n");
+    defer std.testing.allocator.free(failing);
+    try std.testing.expectError(error.MissingOrigin, resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, failing));
     try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 101));
     // Rewrite the PR branch so refreshing requires a non-fast-forward ref update.
     const upstream = try remote.revision("HEAD^1");

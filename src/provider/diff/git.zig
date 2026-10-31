@@ -16,13 +16,17 @@ pub const GitProvider = struct {
     file_contents: []const model.FileContent,
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !GitProvider {
+        return initWithGit(backing_allocator, io, path, range, pr, "git");
+    }
+
+    pub fn initWithGit(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !GitProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
         const allocator = arena.allocator();
 
-        const root = try repository.validateRoot(io, allocator, path);
-        const snapshot = try snapshot_module.resolve(allocator, io, root, range);
-        const changes = try metadata.enumerate(allocator, io, root, snapshot);
+        const root = try repository.validateRootWithGit(io, allocator, path, executable);
+        const snapshot = try snapshot_module.resolve(allocator, io, root, range, executable);
+        const changes = try metadata.enumerateWithGit(allocator, io, root, snapshot, executable);
 
         const diff_id = if (snapshot.head) |head|
             try std.fmt.allocPrint(allocator, "{s}..{s}", .{ snapshot.base, head })
@@ -32,7 +36,7 @@ pub const GitProvider = struct {
         const summaries = try metadata.summarize(allocator, changes);
         var file_contents: std.ArrayList(model.FileContent) = .empty;
         for (changes) |change| {
-            try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change));
+            try file_contents.append(allocator, try file.buildContent(allocator, io, root, snapshot, change, executable));
         }
 
         const source: model.DiffSource = if (pr) |number| .{ .pull_request = .{ .number = number } } else if (snapshot.head) |head|

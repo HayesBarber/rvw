@@ -13,25 +13,60 @@ pub fn errorMessage(err: anyerror) []const u8 {
 /// Returns an owned range with fixed commit IDs. Resolve the parent from the
 /// fixed HEAD so that a concurrent HEAD change cannot change the review target.
 pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8) ![]u8 {
+    return resolveRangeWithGit(io, allocator, root, "git");
+}
+
+pub fn resolveRangeWithGit(io: std.Io, allocator: std.mem.Allocator, root: []const u8, executable: []const u8) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const scratch = arena.allocator();
-    const head = revision(io, scratch, root, "HEAD^{commit}") catch |err| switch (err) {
+    const head = revision(io, scratch, root, "HEAD^{commit}", executable) catch |err| switch (err) {
         error.GitCommandFailed => return error.MissingHead,
         else => return err,
     };
     const parent_ref = try std.fmt.allocPrint(scratch, "{s}^1", .{head});
-    const parent = revision(io, scratch, root, parent_ref) catch |err| switch (err) {
+    const parent = revision(io, scratch, root, parent_ref, executable) catch |err| switch (err) {
         error.GitCommandFailed => return error.MissingParent,
         else => return err,
     };
     return std.fmt.allocPrint(allocator, "{s}..{s}", .{ parent, head });
 }
 
-fn revision(io: std.Io, allocator: std.mem.Allocator, root: []const u8, ref: []const u8) ![]const u8 {
-    const result = try git.runResult(allocator, io, &.{ "git", "-C", root, "rev-parse", "--verify", "--end-of-options", ref }, git.maximum_revision_size);
+fn revision(io: std.Io, allocator: std.mem.Allocator, root: []const u8, ref: []const u8, executable: []const u8) ![]const u8 {
+    const result = try git.runResult(allocator, io, &.{ executable, "-C", root, "rev-parse", "--verify", "--end-of-options", ref }, git.maximum_revision_size);
     if (!git.exitedSuccessfully(result.term)) return error.GitCommandFailed;
     return std.mem.trim(u8, result.stdout, " \t\r\n");
+}
+
+test "last commit uses the selected Git path for both revisions" {
+    const Repository = @import("../testing/repository.zig").Repository;
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var repo = try Repository.init(allocator);
+    defer repo.deinit();
+    try repo.write("file.txt", "base\n");
+    try repo.commit("base");
+    try repo.write("file.txt", "head\n");
+    try repo.commit("head");
+    const executable = try repo.writeExecutable(".git/custom git",
+        \\#!/bin/sh
+        \\printf '%s\n' "$*" >> "$0.calls"
+        \\exec git "$@"
+        \\
+    );
+    defer allocator.free(executable);
+    const expected = try resolveRange(io, allocator, repo.root);
+    defer allocator.free(expected);
+    const actual = try resolveRangeWithGit(io, allocator, repo.root, executable);
+    defer allocator.free(actual);
+    try std.testing.expectEqualStrings(expected, actual);
+    const calls = try repo.temporary.dir.readFileAlloc(io, ".git/custom git.calls", allocator, .unlimited);
+    defer allocator.free(calls);
+    try std.testing.expectEqual(@as(usize, 2), std.mem.count(u8, calls, "rev-parse --verify --end-of-options"));
+    try std.testing.expectError(error.GitNotFound, resolveRangeWithGit(io, allocator, repo.root, "/rvw-missing-git"));
+    const failing = try repo.writeExecutable(".git/failing git", "#!/bin/sh\nexit 7\n");
+    defer allocator.free(failing);
+    try std.testing.expectError(error.MissingHead, resolveRangeWithGit(io, allocator, repo.root, failing));
 }
 
 test "last commit requires HEAD and a first parent" {
