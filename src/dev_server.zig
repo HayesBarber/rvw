@@ -41,12 +41,17 @@ pub fn main(init: std.process.Init) !void {
     defer default_logger.deinit();
     default_logger.minimum_level = rvw.log.Level.resolve(init.io, options.log_level orelse init.environ_map.get("LOG_LEVEL"));
     const logger = default_logger.interface();
-    const range = if (options.pr) |number| rvw.util.pull_request.resolveRange(init.io, init.arena.allocator(), options.directory.?, number) catch |err| {
+    var configuration = try rvw.config.load(init.gpa, init.io, .{
+        .home = init.environ_map.get("HOME"),
+    });
+    defer configuration.deinit();
+    const executables = rvw.config.Executables.fromSnapshot(configuration.snapshot);
+    const range = if (options.pr) |number| rvw.util.pull_request.resolveRange(init.io, init.arena.allocator(), options.directory.?, number, executables.git) catch |err| {
         std.log.err("{s}", .{rvw.util.pull_request.errorMessage(err)});
         usage();
         return err;
     } else options.range;
-    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, range, options.pr) catch |err| {
+    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, range, options.pr, executables.git) catch |err| {
         rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
         std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
         return err;
@@ -55,14 +60,10 @@ pub fn main(init: std.process.Init) !void {
     var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
     defer comments.deinit();
     var clipboard: rvw.output.SystemClipboard = .{};
-    var configuration = try rvw.config.load(init.gpa, init.io, .{
-        .home = init.environ_map.get("HOME"),
-    });
-    defer configuration.deinit();
-    var repository: rvw.provider.repository.git.GitProvider = .{ .allocator = init.gpa };
-    var pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider = .{ .allocator = init.gpa };
-    var search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"ignore-aware", .executable = init.environ_map.get("RVW_RIPGREP") };
-    var search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"all-files", .executable = init.environ_map.get("RVW_RIPGREP") };
+    var repository: rvw.provider.repository.git.GitProvider = .{ .allocator = init.gpa, .executable = executables.git };
+    var pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider = .{ .allocator = init.gpa, .executable = executables.gh, .git_executable = executables.git };
+    var search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"ignore-aware", .executable = executables.rg };
+    var search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"all-files", .executable = executables.rg };
     var core = rvw.core.Core.init(
         init.gpa,
         init.io,

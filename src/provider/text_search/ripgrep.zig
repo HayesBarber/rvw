@@ -1,4 +1,5 @@
 const std = @import("std");
+const defaults = @import("../../config/executables.zig").defaults;
 const model = @import("../../app/model.zig");
 const TextSearchProvider = @import("interface.zig").TextSearchProvider;
 
@@ -9,8 +10,8 @@ pub const maximum_matches = 1000;
 pub const RipgrepProvider = struct {
     allocator: std.mem.Allocator,
     mode: model.TextSearchMode,
-    /// Null discovers rg through the parent process PATH. An override must be absolute.
-    executable: ?[]const u8 = null,
+    /// Selected command name or validated absolute path.
+    executable: []const u8 = defaults.rg,
     output_limit: usize = maximum_output_size,
     match_limit: usize = maximum_matches,
 
@@ -20,8 +21,7 @@ pub const RipgrepProvider = struct {
 
     fn search(context: *anyopaque, io: std.Io, directory: []const u8, query: []const u8) !model.TextSearchResult {
         const self: *RipgrepProvider = @ptrCast(@alignCast(context));
-        const executable = self.executable orelse "rg";
-        if (self.executable != null and !std.fs.path.isAbsolute(executable)) return error.SearchUnavailable;
+        const executable = self.executable;
         var argv: std.ArrayList([]const u8) = .empty;
         defer argv.deinit(self.allocator);
         try argv.appendSlice(self.allocator, &.{
@@ -226,7 +226,7 @@ test "ripgrep failures map to actionable contract errors" {
     defer repository.deinit();
     var provider: RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware", .executable = "/rvw-missing-rg" };
     try std.testing.expectError(error.SearchUnavailable, provider.interface().search(std.testing.io, repository.root, "needle"));
-    provider.executable = "relative-rg";
+    provider.executable = "rvw-missing-rg";
     try std.testing.expectError(error.SearchUnavailable, provider.interface().search(std.testing.io, repository.root, "needle"));
     try repository.write("not-executable", "not executable");
     const executable = try std.fs.path.join(std.testing.allocator, &.{ repository.root, "not-executable" });
@@ -246,7 +246,7 @@ test "ripgrep failures map to actionable contract errors" {
     defer std.testing.allocator.free(failed_path);
     provider.executable = failed_path;
     try std.testing.expectError(error.SearchFailed, provider.interface().search(std.testing.io, repository.root, "needle"));
-    provider.executable = null;
+    provider.executable = defaults.rg;
     try std.testing.expectError(error.SearchFailed, provider.interface().search(std.testing.io, "/rvw-missing-directory", "needle"));
     for ([_][]const u8{ "a\nb", "a\rb", "a\x00b", "\xff" }) |invalid| {
         try std.testing.expectError(error.InvalidSearchQuery, provider.interface().search(std.testing.io, repository.root, invalid));

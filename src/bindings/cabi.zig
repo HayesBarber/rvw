@@ -43,7 +43,7 @@ pub export fn rvw_core_create(
         }
     }
     const handle = allocator.create(RvwCore) catch return null;
-    // Threaded defaults to an empty environment. Preserve PATH for rg discovery.
+    // Threaded defaults to an empty environment. Preserve PATH for subprocess command lookup.
     handle.threaded = .init(allocator, .{
         .environ = .{ .block = .{ .slice = std.mem.span(std.c.environ) } },
     });
@@ -54,22 +54,6 @@ pub export fn rvw_core_create(
     });
     handle.default_logger.minimum_level = rvw.log.Level.resolve(handle.threaded.io(), if (log_level_ptr) |value| std.mem.span(value) else null);
     handle.logger = handle.default_logger.interface();
-    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range, if (pr_ptr) |pr| pr.* else null) catch |err| {
-        rvw.startup.logApplicationStartFailed(
-            handle.logger,
-            handle.threaded.io(),
-            "diff_provider",
-            err,
-        );
-        handle.default_logger.deinit();
-        handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)}) catch null;
-        if (message) |value| {
-            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
-        }
-        allocator.destroy(handle);
-        return null;
-    };
     handle.configuration = rvw.config.load(allocator, handle.threaded.io(), .{
         .home = environmentVariable("HOME"),
     }) catch |err| {
@@ -79,18 +63,35 @@ pub export fn rvw_core_create(
             "configuration",
             err,
         );
-        handle.review.deinit();
         handle.default_logger.deinit();
         handle.threaded.deinit();
         allocator.destroy(handle);
         return null;
     };
+    const executables = rvw.config.Executables.fromSnapshot(handle.configuration.snapshot);
+    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range, if (pr_ptr) |pr| pr.* else null, executables.git) catch |err| {
+        rvw.startup.logApplicationStartFailed(
+            handle.logger,
+            handle.threaded.io(),
+            "diff_provider",
+            err,
+        );
+        handle.configuration.deinit();
+        handle.default_logger.deinit();
+        handle.threaded.deinit();
+        const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)}) catch null;
+        if (message) |value| {
+            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
+        }
+        allocator.destroy(handle);
+        return null;
+    };
     handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
-    handle.repository = .{ .allocator = allocator };
-    handle.pull_requests = .{ .allocator = allocator };
+    handle.repository = .{ .allocator = allocator, .executable = executables.git };
+    handle.pull_requests = .{ .allocator = allocator, .executable = executables.gh, .git_executable = executables.git };
     handle.clipboard = .{};
-    handle.search_ignore_aware = .{ .allocator = allocator, .mode = .@"ignore-aware", .executable = environmentVariable("RVW_RIPGREP") };
-    handle.search_all_files = .{ .allocator = allocator, .mode = .@"all-files", .executable = environmentVariable("RVW_RIPGREP") };
+    handle.search_ignore_aware = .{ .allocator = allocator, .mode = .@"ignore-aware", .executable = executables.rg };
+    handle.search_all_files = .{ .allocator = allocator, .mode = .@"all-files", .executable = executables.rg };
     handle.core = rvw.core.Core.init(
         allocator,
         handle.threaded.io(),

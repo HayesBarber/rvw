@@ -1,4 +1,5 @@
 const std = @import("std");
+const defaults = @import("../../config/executables.zig").defaults;
 const model = @import("../../app/model.zig");
 const git_process = @import("../../util/git_process.zig");
 const PullRequestProvider = @import("interface.zig").PullRequestProvider;
@@ -6,10 +7,10 @@ const Error = PullRequestProvider.Error;
 
 pub const GitHubCliProvider = struct {
     allocator: std.mem.Allocator,
-    /// Null finds gh through PATH. Overrides must be absolute paths.
-    executable: ?[]const u8 = null,
-    /// Null finds Git through PATH. Overrides must be absolute paths.
-    git_executable: ?[]const u8 = null,
+    /// Selected command name or validated absolute path.
+    executable: []const u8 = defaults.gh,
+    /// Selected command name or validated absolute path.
+    git_executable: []const u8 = defaults.git,
 
     pub fn interface(self: *GitHubCliProvider) PullRequestProvider {
         return .{ .context = self, .vtable = &.{ .listOpenPullRequests = listOpenPullRequests } };
@@ -22,8 +23,7 @@ pub const GitHubCliProvider = struct {
         const allocator = arena.allocator();
         const origin = try self.readOrigin(allocator, io, directory);
         const repository = try std.fmt.allocPrint(allocator, "github.com/{s}", .{try repositoryName(origin)});
-        const executable = self.executable orelse "gh";
-        if (self.executable != null and !std.fs.path.isAbsolute(executable)) return error.PullRequestListUnavailable;
+        const executable = self.executable;
         const output = std.process.run(allocator, io, .{
             .argv = &.{ executable, "pr", "list", "--repo", repository, "--state", "open", "--json", "number,title,author,url,isDraft,baseRefName,headRefName" },
             .cwd = .{ .path = directory },
@@ -45,8 +45,7 @@ pub const GitHubCliProvider = struct {
     }
 
     fn readOrigin(self: *GitHubCliProvider, allocator: std.mem.Allocator, io: std.Io, directory: []const u8) Error![]const u8 {
-        const executable = self.git_executable orelse "git";
-        if (self.git_executable != null and !std.fs.path.isAbsolute(executable)) return error.RepositoryUnavailable;
+        const executable = self.git_executable;
         const output = git_process.runResult(allocator, io, &.{ executable, "--no-pager", "--no-optional-locks", "-C", directory, "remote", "get-url", "origin" }, git_process.maximum_revision_size) catch |err| switch (err) {
             error.GitNotFound, error.AccessDenied, error.InvalidExe => return error.RepositoryUnavailable,
             error.OutOfMemory => return error.OutOfMemory,
@@ -255,7 +254,7 @@ test "GitHub CLI defines origin, Git, and executable failures" {
     try std.testing.expectError(error.UnsupportedOrigin, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
     try repository.git(&.{ "remote", "set-url", "origin", "https://github.com/owner/repo.git" });
     try std.testing.expectError(error.PullRequestListUnavailable, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
-    provider.executable = "relative-gh";
+    provider.executable = "rvw-missing-gh";
     try std.testing.expectError(error.PullRequestListUnavailable, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
     try repository.write(".git/not-executable", "not executable\n");
     const not_executable = try std.fs.path.join(std.testing.allocator, &.{ repository.root, ".git/not-executable" });
@@ -264,11 +263,11 @@ test "GitHub CLI defines origin, Git, and executable failures" {
     try std.testing.expectError(error.PullRequestListUnavailable, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
     provider.git_executable = "/rvw-missing-git";
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
-    provider.git_executable = "relative-git";
+    provider.git_executable = "rvw-missing-git";
     try std.testing.expectError(error.RepositoryUnavailable, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
     provider.git_executable = "/usr/bin/false";
     try std.testing.expectError(error.RepositoryFailed, provider.interface().listOpenPullRequests(std.testing.io, repository.root));
-    provider.git_executable = null;
+    provider.git_executable = defaults.git;
     try std.testing.expectError(error.RepositoryFailed, provider.interface().listOpenPullRequests(std.testing.io, "/rvw-missing-repository"));
 }
 

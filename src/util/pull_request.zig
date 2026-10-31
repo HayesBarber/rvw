@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../config/executables.zig").defaults;
 const git = @import("git_process.zig");
 
 pub fn parseNumber(value: []const u8) error{InvalidPr}!u32 {
@@ -15,18 +16,14 @@ pub fn errorMessage(err: anyerror) []const u8 {
         error.MissingOrigin => "PR review requires an origin remote",
         error.PullRequestUnavailable => "unable to fetch PR head and merge refs from origin; check the PR number, access, and mergeability",
         error.InvalidPullRequestRefs => "PR refs do not contain a valid head and merge base",
-        error.GitNotFound => "git executable was not found",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH",
         else => "unable to resolve pull request",
     };
 }
 
 /// Fetches both GitHub refs on every resolution, including force-pushed updates.
 /// The returned range is owned by the caller; the worktree is never checked out.
-pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32) ![]u8 {
-    return resolveRangeWithGit(io, allocator, root, number, "git");
-}
-
-pub fn resolveRangeWithGit(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32, executable: []const u8) ![]u8 {
+pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, number: u32, executable: []const u8) ![]u8 {
     if (number == 0) return error.InvalidPr;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -99,11 +96,11 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
 
     var local = try Repository.init(std.testing.allocator);
     defer local.deinit();
-    try std.testing.expectError(error.MissingOrigin, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try std.testing.expectError(error.MissingOrigin, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git));
     try local.git(&.{ "remote", "add", "origin", remote.root });
     const expected = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, head });
     defer std.testing.allocator.free(expected);
-    const fetched = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100);
+    const fetched = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git);
     defer std.testing.allocator.free(fetched);
     try std.testing.expectEqualStrings(expected, fetched);
     const executable = try local.writeExecutable(".git/custom git",
@@ -113,7 +110,7 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
         \\
     );
     defer std.testing.allocator.free(executable);
-    const selected = try resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, executable);
+    const selected = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100, executable);
     defer std.testing.allocator.free(selected);
     try std.testing.expectEqualStrings(expected, selected);
     const calls = try local.temporary.dir.readFileAlloc(std.testing.io, ".git/custom git.calls", std.testing.allocator, .unlimited);
@@ -121,11 +118,11 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
     for ([_][]const u8{ "remote get-url origin", "fetch --atomic origin", "rev-parse --verify", "merge-base" }) |command_name| {
         try std.testing.expect(std.mem.indexOf(u8, calls, command_name) != null);
     }
-    try std.testing.expectError(error.GitNotFound, resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, "/rvw-missing-git"));
+    try std.testing.expectError(error.GitNotFound, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, "/rvw-missing-git"));
     const failing = try local.writeExecutable(".git/failing git", "#!/bin/sh\nexit 7\n");
     defer std.testing.allocator.free(failing);
-    try std.testing.expectError(error.MissingOrigin, resolveRangeWithGit(std.testing.io, std.testing.allocator, local.root, 100, failing));
-    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 101));
+    try std.testing.expectError(error.MissingOrigin, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, failing));
+    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 101, default_executables.git));
     // Rewrite the PR branch so refreshing requires a non-fast-forward ref update.
     const upstream = try remote.revision("HEAD^1");
     defer std.testing.allocator.free(upstream);
@@ -140,7 +137,7 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
     try remote.git(&.{ "update-ref", "refs/pull/100/merge", "HEAD" });
     const updated_expected = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ base, updated_head });
     defer std.testing.allocator.free(updated_expected);
-    const refreshed = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100);
+    const refreshed = try resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git);
     defer std.testing.allocator.free(refreshed);
     try std.testing.expectEqualStrings(updated_expected, refreshed);
     const remote_merge = try remote.revision("refs/pull/100/merge");
@@ -150,10 +147,10 @@ test "PR resolution refreshes refs after force pushes and never falls back to st
     try std.testing.expectEqualStrings(remote_merge, local_merge);
 
     try local.git(&.{ "remote", "set-url", "origin", "/nonexistent/rvw-test-remote" });
-    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git));
     try local.git(&.{ "remote", "set-url", "origin", remote.root });
     try remote.git(&.{ "update-ref", "refs/pull/100/merge", base });
-    try std.testing.expectError(error.InvalidPullRequestRefs, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try std.testing.expectError(error.InvalidPullRequestRefs, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git));
     try remote.git(&.{ "update-ref", "-d", "refs/pull/100/merge" });
-    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100));
+    try std.testing.expectError(error.PullRequestUnavailable, resolveRange(std.testing.io, std.testing.allocator, local.root, 100, default_executables.git));
 }

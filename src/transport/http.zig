@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../config/executables.zig").defaults;
 const httpz = @import("httpz");
 const dispatcher_module = @import("../app/dispatcher.zig");
 const json_protocol = @import("../app/json_protocol.zig");
@@ -527,7 +528,7 @@ test "commit history crosses HTTP and native JSON with matching results and erro
         context.repository.executable = failure.executable;
         try context.expectError(failure.code, failure.status);
     }
-    context.repository.executable = null;
+    context.repository.executable = default_executables.git;
     try context.expectSerializationFailure();
 }
 

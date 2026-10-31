@@ -3,11 +3,7 @@ const git = @import("git_process.zig");
 
 /// Validates that `path` identifies a Git worktree root and returns its
 /// canonical path. The caller owns the returned memory.
-pub fn validateRoot(io: std.Io, allocator: std.mem.Allocator, path: []const u8) ![:0]u8 {
-    return validateRootWithGit(io, allocator, path, "git");
-}
-
-pub fn validateRootWithGit(io: std.Io, allocator: std.mem.Allocator, path: []const u8, executable: []const u8) ![:0]u8 {
+pub fn validateRoot(io: std.Io, allocator: std.mem.Allocator, path: []const u8, executable: []const u8) ![:0]u8 {
     const metadata = std.Io.Dir.cwd().statFile(io, path, .{}) catch |err| switch (err) {
         error.FileNotFound => return error.RepositoryPathMissing,
         else => |unexpected| return unexpected,

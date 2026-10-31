@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../config/executables.zig").defaults;
 const config = @import("../config/config.zig");
 const dispatcher_module = @import("dispatcher.zig");
 const model = @import("model.zig");
@@ -663,7 +664,7 @@ test "core lists current repository data without changing working-tree, range, o
         try fixture.commit("second");
         try fixture.write("tracked.txt", "review snapshot\n");
 
-        var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr);
+        var review = try provider_module.review.git.GitReviewProvider.init(std.testing.allocator, std.testing.io, fixture.root, source.range, source.pr, default_executables.git);
         defer review.deinit();
         var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
         var pull_requests: PullRequests = .{ .items = &.{first_pr} };
@@ -777,7 +778,7 @@ test "core lists current repository data without changing working-tree, range, o
             try std.testing.expectEqualSlices(u8, before, after);
         }
 
-        repository.executable = null;
+        repository.executable = default_executables.git;
         try fixture.git(&.{ "reset", "--hard", "HEAD" });
         try fixture.temporary.dir.deleteFile(std.testing.io, "untracked.txt");
         const clean = try core.dispatch(.list_working_tree_changes);

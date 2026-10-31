@@ -8,7 +8,9 @@ pub const Environment = loader.Environment;
 pub const Loaded = loader.Loaded;
 pub const load = loader.load;
 pub const resolvePath = loader.resolvePath;
+pub const Executables = @import("executables.zig").Executables;
 
 test {
     _ = loader;
+    _ = @import("executables.zig");
 }

@@ -1,22 +1,19 @@
 const std = @import("std");
+const default_executables = @import("../config/executables.zig").defaults;
 const git = @import("git_process.zig");
 
 pub fn errorMessage(err: anyerror) []const u8 {
     return switch (err) {
         error.MissingHead => "cannot resolve HEAD; last-commit review requires a repository with commits",
         error.MissingParent => "cannot resolve the first parent of HEAD; last-commit review requires a parent commit",
-        error.GitNotFound => "git executable was not found",
+        error.GitNotFound, error.AccessDenied, error.InvalidExe => "Cannot run Git; check executables.git in ~/.config/rvw/config.json or git on the process PATH",
         else => "cannot resolve the last commit",
     };
 }
 
 /// Returns an owned range with fixed commit IDs. Resolve the parent from the
 /// fixed HEAD so that a concurrent HEAD change cannot change the review target.
-pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8) ![]u8 {
-    return resolveRangeWithGit(io, allocator, root, "git");
-}
-
-pub fn resolveRangeWithGit(io: std.Io, allocator: std.mem.Allocator, root: []const u8, executable: []const u8) ![]u8 {
+pub fn resolveRange(io: std.Io, allocator: std.mem.Allocator, root: []const u8, executable: []const u8) ![]u8 {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const scratch = arena.allocator();
@@ -55,28 +52,28 @@ test "last commit uses the selected Git path for both revisions" {
         \\
     );
     defer allocator.free(executable);
-    const expected = try resolveRange(io, allocator, repo.root);
+    const expected = try resolveRange(io, allocator, repo.root, default_executables.git);
     defer allocator.free(expected);
-    const actual = try resolveRangeWithGit(io, allocator, repo.root, executable);
+    const actual = try resolveRange(io, allocator, repo.root, executable);
     defer allocator.free(actual);
     try std.testing.expectEqualStrings(expected, actual);
     const calls = try repo.temporary.dir.readFileAlloc(io, ".git/custom git.calls", allocator, .unlimited);
     defer allocator.free(calls);
     try std.testing.expectEqual(@as(usize, 2), std.mem.count(u8, calls, "rev-parse --verify --end-of-options"));
-    try std.testing.expectError(error.GitNotFound, resolveRangeWithGit(io, allocator, repo.root, "/rvw-missing-git"));
+    try std.testing.expectError(error.GitNotFound, resolveRange(io, allocator, repo.root, "/rvw-missing-git"));
     const failing = try repo.writeExecutable(".git/failing git", "#!/bin/sh\nexit 7\n");
     defer allocator.free(failing);
-    try std.testing.expectError(error.MissingHead, resolveRangeWithGit(io, allocator, repo.root, failing));
+    try std.testing.expectError(error.MissingHead, resolveRange(io, allocator, repo.root, failing));
 }
 
 test "last commit requires HEAD and a first parent" {
     const Repository = @import("../testing/repository.zig").Repository;
     var repo = try Repository.init(std.testing.allocator);
     defer repo.deinit();
-    try std.testing.expectError(error.MissingHead, resolveRange(std.testing.io, std.testing.allocator, repo.root));
+    try std.testing.expectError(error.MissingHead, resolveRange(std.testing.io, std.testing.allocator, repo.root, default_executables.git));
     try repo.write("root.txt", "root\n");
     try repo.commit("root");
-    try std.testing.expectError(error.MissingParent, resolveRange(std.testing.io, std.testing.allocator, repo.root));
+    try std.testing.expectError(error.MissingParent, resolveRange(std.testing.io, std.testing.allocator, repo.root, default_executables.git));
     try std.testing.expect(std.mem.indexOf(u8, errorMessage(error.MissingHead), "HEAD") != null);
     try std.testing.expect(std.mem.indexOf(u8, errorMessage(error.MissingParent), "first parent") != null);
 }
@@ -103,12 +100,12 @@ test "last commit uses the first merge parent and excludes staged and unstaged c
     try repo.write("staged.txt", "staged\n");
     try repo.git(&.{ "add", "staged.txt" });
     try repo.write("root.txt", "unstaged\n");
-    const range = try resolveRange(std.testing.io, std.testing.allocator, repo.root);
+    const range = try resolveRange(std.testing.io, std.testing.allocator, repo.root, default_executables.git);
     defer std.testing.allocator.free(range);
     const expected = try std.fmt.allocPrint(std.testing.allocator, "{s}..{s}", .{ parent, head });
     defer std.testing.allocator.free(expected);
     try std.testing.expectEqualStrings(expected, range);
-    var provider = try @import("../provider/diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repo.root, range, null);
+    var provider = try @import("../provider/diff/git.zig").GitProvider.init(std.testing.allocator, std.testing.io, repo.root, range, null, default_executables.git);
     defer provider.deinit();
     try std.testing.expectEqual(@as(usize, 1), provider.overview.files.len);
     try std.testing.expectEqualStrings("feature.txt", provider.overview.files[0].path);

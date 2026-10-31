@@ -153,13 +153,20 @@ installation. Rvw does not bundle ripgrep. On macOS, install it with:
 brew install ripgrep
 ```
 
-Rvw finds `rg` on its process `PATH`. To select an executable explicitly, set
-`RVW_RIPGREP` to its absolute path before you start Rvw. This also works when the
-GUI does not inherit your shell's `PATH`:
+Rvw finds `rg` on its process `PATH`. To select an executable, set
+`executables.rg` in `~/.config/rvw/config.json`:
 
-```bash
-RVW_RIPGREP=/opt/homebrew/bin/rg rvw .
+```json
+{
+  "executables": {
+    "rg": "/opt/homebrew/bin/rg"
+  }
+}
 ```
+
+Use a non-empty absolute path. Rvw treats the value as one executable path.
+Paths with spaces are supported. Rvw does not expand shell variables or `~`,
+and does not split the value into command arguments.
 
 The selected file must be executable. Search reports an error if Rvw cannot find or run it.
 Other review operations do not require ripgrep.

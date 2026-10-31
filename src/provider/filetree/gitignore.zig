@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../../config/executables.zig").defaults;
 const filetree_provider = @import("interface.zig");
 const walk = @import("walk.zig");
 const process = @import("../../util/git_process.zig");
@@ -12,11 +13,7 @@ pub const GitignoreFileTreeProvider = struct {
     io: Io,
     files: []const []const u8,
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8) !GitignoreFileTreeProvider {
-        return initWithGit(backing_allocator, io, path, null);
-    }
-
-    pub fn initWithGit(backing_allocator: Allocator, io: Io, path: []const u8, executable: ?[]const u8) !GitignoreFileTreeProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, executable: []const u8) !GitignoreFileTreeProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
 
@@ -56,9 +53,9 @@ pub const GitignoreFileTreeProvider = struct {
     };
 };
 
-fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: ?[]const u8) ![]const []const u8 {
-    const candidates = gitLsFiles(allocator, io, root, path, executable orelse "git") catch |err| {
-        if (executable != null) return err;
+fn resolveFiles(allocator: Allocator, io: Io, root: std.Io.Dir, path: []const u8, executable: []const u8) ![]const []const u8 {
+    const candidates = gitLsFiles(allocator, io, root, path, executable) catch |err| {
+        if (std.fs.path.isAbsolute(executable)) return err;
         return switch (err) {
             error.GitNotFound, error.GitOutputTooLarge, error.GitCommandFailed => return walk.enumerateFiles(allocator, io, root),
             else => |unexpected| return unexpected,
@@ -126,6 +123,7 @@ test "gitignore tree excludes ignored untracked files but keeps tracked ones" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -149,6 +147,7 @@ test "gitignore tree lists tracked files that are gitignored" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -171,6 +170,7 @@ test "gitignore tree prunes deleted-but-tracked index entries" {
         std.testing.allocator,
         std.testing.io,
         repository.root,
+        default_executables.git,
     );
     defer provider.deinit();
     const files = try provider.interface().getFiles(std.testing.io);
@@ -209,6 +209,7 @@ test "gitignore tree falls back to a full walk outside a Git repository" {
         std.testing.allocator,
         std.testing.io,
         root,
+        default_executables.git,
     );
     defer provider.deinit();
 

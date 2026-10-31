@@ -37,15 +37,6 @@ pub fn enumerate(
     io: Io,
     root: []const u8,
     snapshot: snapshot_module.Snapshot,
-) ![]const Change {
-    return enumerateWithGit(allocator, io, root, snapshot, "git");
-}
-
-pub fn enumerateWithGit(
-    allocator: Allocator,
-    io: Io,
-    root: []const u8,
-    snapshot: snapshot_module.Snapshot,
     executable: []const u8,
 ) ![]const Change {
     var changes = try trackedChanges(allocator, io, root, snapshot, executable);

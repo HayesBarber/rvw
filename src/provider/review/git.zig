@@ -1,4 +1,5 @@
 const std = @import("std");
+const default_executables = @import("../../config/executables.zig").defaults;
 const model = @import("../../app/model.zig");
 const diff = @import("../diff/git.zig");
 const file = @import("../file/filesystem.zig");
@@ -17,7 +18,7 @@ pub const GitReviewProvider = struct {
     repository_path: []const u8,
     range: ?[]const u8,
     pr: ?u32,
-    executable: ?[]const u8,
+    executable: []const u8,
     active: *Snapshot,
 
     const Snapshot = struct {
@@ -26,15 +27,15 @@ pub const GitReviewProvider = struct {
         visible_files: gitignore.GitignoreFileTreeProvider,
         files: file.FilesystemFileProvider,
 
-        fn init(allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: ?[]const u8) !*Snapshot {
+        fn init(allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !*Snapshot {
             const snapshot = try allocator.create(Snapshot);
             errdefer allocator.destroy(snapshot);
 
-            snapshot.git = try diff.GitProvider.initWithGit(allocator, io, path, range, pr, executable orelse "git");
+            snapshot.git = try diff.GitProvider.init(allocator, io, path, range, pr, executable);
             errdefer snapshot.git.deinit();
             snapshot.all_files = try walk.WalkFileTreeProvider.init(allocator, io, path);
             errdefer snapshot.all_files.deinit();
-            snapshot.visible_files = try gitignore.GitignoreFileTreeProvider.initWithGit(allocator, io, path, executable);
+            snapshot.visible_files = try gitignore.GitignoreFileTreeProvider.init(allocator, io, path, executable);
             errdefer snapshot.visible_files.deinit();
             snapshot.files = try file.FilesystemFileProvider.init(
                 allocator,
@@ -54,18 +55,14 @@ pub const GitReviewProvider = struct {
         }
     };
 
-    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32) !GitReviewProvider {
-        return initWithGit(backing_allocator, io, path, range, pr, null);
-    }
-
-    pub fn initWithGit(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: ?[]const u8) !GitReviewProvider {
+    pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !GitReviewProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
         const active = try Snapshot.init(backing_allocator, io, path, range, pr, executable);
         errdefer active.deinit(backing_allocator);
         const repository_path = try arena.allocator().dupe(u8, active.git.repository_root);
         const owned_range = if (range) |value| try arena.allocator().dupe(u8, value) else null;
-        const owned_executable = if (executable) |value| try arena.allocator().dupe(u8, value) else null;
+        const owned_executable = try arena.allocator().dupe(u8, executable);
         return .{
             .arena = arena,
             .backing_allocator = backing_allocator,
@@ -164,7 +161,7 @@ test "selected Git handles every review stage and remains selected on reload" {
         \\
     );
     defer allocator.free(executable);
-    var provider = try GitReviewProvider.initWithGit(allocator, io, repository.root, null, null, executable);
+    var provider = try GitReviewProvider.init(allocator, io, repository.root, null, null, executable);
     defer provider.deinit();
     const reviews = provider.interface();
     const overview = try reviews.getDiffOverview(io);
@@ -196,7 +193,7 @@ test "selected Git handles every review stage and remains selected on reload" {
         \\
     );
     defer allocator.free(replacement);
-    var ranged = try GitReviewProvider.initWithGit(allocator, io, repository.root, "HEAD~1..HEAD", null, executable);
+    var ranged = try GitReviewProvider.init(allocator, io, repository.root, "HEAD~1..HEAD", null, executable);
     defer ranged.deinit();
     const ranged_overview = try ranged.interface().getDiffOverview(io);
     const committed = try ranged.interface().getFileDiff(io, ranged_overview.id, "file.txt");
@@ -229,13 +226,13 @@ test "selected Git failures at each review stage do not use another executable" 
         defer allocator.free(script);
         const executable = try repository.writeExecutable(".git/failing git", script);
         defer allocator.free(executable);
-        try std.testing.expectError(case.expected, GitReviewProvider.initWithGit(allocator, io, repository.root, null, null, executable));
+        try std.testing.expectError(case.expected, GitReviewProvider.init(allocator, io, repository.root, null, null, executable));
     }
-    try std.testing.expectError(error.GitNotFound, GitReviewProvider.initWithGit(allocator, io, repository.root, null, null, "/rvw-missing-git"));
+    try std.testing.expectError(error.GitNotFound, GitReviewProvider.init(allocator, io, repository.root, null, null, "/rvw-missing-git"));
     try repository.write(".git/not executable", "not executable\n");
     const not_executable = try std.fs.path.join(allocator, &.{ repository.root, ".git/not executable" });
     defer allocator.free(not_executable);
-    try std.testing.expectError(error.AccessDenied, GitReviewProvider.initWithGit(allocator, io, repository.root, null, null, not_executable));
+    try std.testing.expectError(error.AccessDenied, GitReviewProvider.init(allocator, io, repository.root, null, null, not_executable));
 }
 
 test "reload swaps in new working-tree contents" {
@@ -253,6 +250,7 @@ test "reload swaps in new working-tree contents" {
         repository.root,
         null,
         null,
+        default_executables.git,
     );
     defer provider.deinit();
     const reviews = provider.interface();
@@ -282,6 +280,7 @@ test "failed reload leaves the prior snapshot usable" {
         repository.root,
         null,
         null,
+        default_executables.git,
     );
     defer provider.deinit();
     const reviews = provider.interface();
@@ -315,6 +314,7 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         repository.root,
         "HEAD~1..HEAD",
         null,
+        default_executables.git,
     );
     defer symbolic.deinit();
     const explicit_range = try std.fmt.allocPrint(
@@ -329,6 +329,7 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         repository.root,
         explicit_range,
         null,
+        default_executables.git,
     );
     defer explicit.deinit();
     const explicit_id = (try explicit.interface().getDiffOverview(std.testing.io)).id;
@@ -357,7 +358,7 @@ test "PR source survives snapshot reload and serializes for transports" {
     try repository.commit("base");
     try repository.write("file.txt", "head\n");
     try repository.commit("head");
-    var provider = try GitReviewProvider.init(std.testing.allocator, std.testing.io, repository.root, "HEAD~1..HEAD", 100);
+    var provider = try GitReviewProvider.init(std.testing.allocator, std.testing.io, repository.root, "HEAD~1..HEAD", 100, default_executables.git);
     defer provider.deinit();
     for (0..2) |_| {
         const overview = try provider.interface().getDiffOverview(std.testing.io);

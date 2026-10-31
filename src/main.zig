@@ -1,6 +1,8 @@
 const std = @import("std");
+const default_executables = @import("config/executables.zig").defaults;
 const last_commit = @import("util/last_commit.zig");
 const pull_request = @import("util/pull_request.zig");
+const config = @import("config/config.zig");
 const build_options = @import("build_options");
 
 const usage =
@@ -73,15 +75,25 @@ pub fn main(init: std.process.Init) u8 {
         .launch => |options| options,
     };
 
+    var configuration = config.load(allocator, init.io, .{ .home = init.environ_map.get("HOME") }) catch |err| {
+        std.log.err("unable to load user configuration: {t}", .{err});
+        return 1;
+    };
+    defer configuration.deinit();
+    if (configuration.snapshot.diagnostic) |diagnostic| {
+        std.log.warn("{s}: {s}", .{ diagnostic.path, diagnostic.message });
+    }
+    const executables = config.Executables.fromSnapshot(configuration.snapshot);
+
     const directory = canonicalizeDirectory(init.io, allocator, .cwd(), options.directory) catch |err| {
         std.log.err("invalid directory '{s}': {t}", .{ options.directory, err });
         return 2;
     };
-    const range = if (options.pr) |number| pull_request.resolveRange(init.io, allocator, directory, number) catch |err| {
+    const range = if (options.pr) |number| pull_request.resolveRange(init.io, allocator, directory, number, executables.git) catch |err| {
         std.log.err("{s}", .{pull_request.errorMessage(err)});
         std.Io.File.stderr().writeStreamingAll(init.io, usage) catch {};
         return 2;
-    } else if (options.last_commit) last_commit.resolveRange(init.io, allocator, directory) catch |err| {
+    } else if (options.last_commit) last_commit.resolveRange(init.io, allocator, directory, executables.git) catch |err| {
         std.log.err("{s}", .{last_commit.errorMessage(err)});
         return 2;
     } else options.range;
@@ -456,7 +468,7 @@ test "CLI last-commit forms accept directories and forward the same resolved ran
             try std.testing.expect(options.last_commit);
             try std.testing.expect(options.range == null);
             try std.testing.expectEqualStrings(repo.root, options.directory);
-            const range = try last_commit.resolveRange(std.testing.io, std.testing.allocator, options.directory);
+            const range = try last_commit.resolveRange(std.testing.io, std.testing.allocator, options.directory, default_executables.git);
             defer std.testing.allocator.free(range);
             var buffer: [13][]const u8 = undefined;
             try expectArguments(&.{
