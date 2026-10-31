@@ -148,7 +148,11 @@ both `g` and `g g`.
 ## Executable paths
 
 Use `executables` in `~/.config/rvw/config.json` to select Git, GitHub CLI,
-and ripgrep. These settings apply to the CLI, native application, and development server.
+and ripgrep:
+
+- `git`: Open reviews and read repository data.
+- `gh`: List open pull requests with GitHub CLI.
+- `rg`: Search repository text with [ripgrep](https://github.com/BurntSushi/ripgrep).
 
 ```json
 {
@@ -164,19 +168,3 @@ Use an absolute path. The selected file must be executable.
 Each setting is independent. If a setting is absent, Rvw finds the corresponding
 command (`git`, `gh`, or `rg`) on its process `PATH`.
 Omit the `executables` object to use this default for all three tools.
-
-Rvw checks a tool when an operation needs it. If a selected tool cannot run,
-that operation reports an error. Rvw does not select a different tool.
-Git is required to open a review. GitHub CLI is required to list open pull requests.
-Ripgrep is required for text search.
-
-## Codebase text search
-
-The text-search API requires a local [ripgrep](https://github.com/BurntSushi/ripgrep)
-installation. Rvw does not bundle ripgrep. On macOS, install it with:
-
-```bash
-brew install ripgrep
-```
-
-Use `executables.rg` to select ripgrep as described in [Executable paths](#executable-paths).

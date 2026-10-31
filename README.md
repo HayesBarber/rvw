@@ -42,7 +42,7 @@ usage: rvw [DIR] [-r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [
        rvw -v | --version
 ```
 
-Text search requires [a local ripgrep installation](./docs/configuration.md#codebase-text-search).
+Text search requires [a local ripgrep installation](./docs/configuration.md#executable-paths).
 
 ## Usage
 
