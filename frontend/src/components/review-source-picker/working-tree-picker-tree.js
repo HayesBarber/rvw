@@ -21,14 +21,14 @@ export function workingTreePickerTreeOptions(files) {
       if (!file || item.kind !== 'file') return null
       const additions = file.additions == null ? '+—' : `+${file.additions}`
       const deletions = file.deletions == null ? '−—' : `−${file.deletions}`
-      const previous = file.previousPath == null ? '' : `From ${file.previousPath}  `
+      const previousPathLabel = file.previousPath == null ? '' : `From ${file.previousPath}  `
       return {
-        text: `${previous}${additions} ${deletions}`,
-        title: `${file.path}: ${file.status}. ${previous}Added: ${file.additions ?? 'Unavailable'}. Deleted: ${file.deletions ?? 'Unavailable'}.`,
+        text: `${previousPathLabel}${additions} ${deletions}`,
+        title: `${file.path}: ${file.status}. ${previousPathLabel}Added: ${file.additions ?? 'Unavailable'}. Deleted: ${file.deletions ?? 'Unavailable'}.`,
         parts: [
-          { text: previous },
-          { text: additions, color: '#86efac' },
-          { text: `\u00a0${deletions}`, color: '#fca5a5' },
+          { text: previousPathLabel },
+          { text: additions, color: 'var(--trees-git-added-color)' },
+          { text: `\u00a0${deletions}`, color: 'var(--trees-git-deleted-color)' },
         ],
       }
     },

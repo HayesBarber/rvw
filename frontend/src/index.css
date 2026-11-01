@@ -667,6 +667,17 @@ textarea {
   padding: 20px;
 }
 
+.working-tree-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 140px;
+}
+
+.working-tree-picker p {
+  margin: 0;
+}
+
 .working-tree-picker-files {
   display: block;
   height: min(320px, 45vh);
@@ -686,6 +697,7 @@ textarea {
   border-radius: 6px;
   background: #202022;
   color: #fafafa;
+  cursor: pointer;
 }
 
 .working-tree-picker button:disabled {
@@ -696,7 +708,7 @@ textarea {
 .working-tree-picker-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: auto;
 }
 
 .keymap-reference-dialog {
@@ -1272,7 +1284,8 @@ textarea {
   cursor: pointer;
 }
 
-.comment-actions button[type='submit'] {
+.comment-actions button[type='submit'],
+.working-tree-picker-footer button {
   border-color: #3778c2;
   background: #2463a8;
 }
@@ -1281,7 +1294,8 @@ textarea {
   background: #303033;
 }
 
-.comment-actions button[type='submit']:hover:not(:disabled) {
+.comment-actions button[type='submit']:hover:not(:disabled),
+.working-tree-picker-footer button:hover:not(:disabled) {
   background: #2d74c4;
 }
 

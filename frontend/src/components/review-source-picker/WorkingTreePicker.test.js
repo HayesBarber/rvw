@@ -91,6 +91,8 @@ test('summaries preserve status, rename paths, zero counts, and unavailable coun
   assert.match(html, /title="Git status: added">A/)
   assert.match(html, /title="Git status: deleted">D/)
   assert.equal([...html.matchAll(/(?:Added|Deleted): Unavailable/g)].length, 3)
+  assert.match(html, /color:var\(--trees-git-added-color\)/)
+  assert.match(html, /color:var\(--trees-git-deleted-color\)/)
 })
 
 test('tree navigation expands folders without selecting files for review', () => {

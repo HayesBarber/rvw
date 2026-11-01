@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createWorkingTreeChangesRequest } from './working-tree-changes-request.js'
+import { createWorkingTreeChangesRequest, startWorkingTreeChangesRequest } from './working-tree-changes-request.js'
 
 function fixture() {
   const pending = []
@@ -9,6 +9,35 @@ function fixture() {
   }) })
   return { request, pending }
 }
+
+test('overlay open loads once across an immediate effect cleanup and restart', async () => {
+  const { request, pending } = fixture()
+  const cleanup = startWorkingTreeChangesRequest(request)
+  cleanup()
+  const close = startWorkingTreeChangesRequest(request)
+  await Promise.resolve()
+  assert.equal(pending.length, 1)
+  pending[0].resolve({ files: [] })
+  await Promise.resolve()
+  assert.equal(request.getSnapshot().status, 'success')
+  close()
+})
+
+test('closing before load starts skips it; reopening creates a fresh request', async () => {
+  const first = fixture()
+  startWorkingTreeChangesRequest(first.request)()
+  await Promise.resolve()
+  assert.equal(first.pending.length, 0)
+  const second = fixture()
+  const close = startWorkingTreeChangesRequest(second.request)
+  await Promise.resolve()
+  assert.equal(second.pending.length, 1)
+  close()
+  const before = second.request.getSnapshot()
+  second.pending[0].resolve({ files: [{ path: 'late.txt' }] })
+  await Promise.resolve()
+  assert.equal(second.request.getSnapshot(), before)
+})
 
 test('each load requests fresh files and clears previous results', async () => {
   const { request, pending } = fixture()

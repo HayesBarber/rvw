@@ -1,5 +1,17 @@
 import { RequestStatus } from './request-state.js'
 
+/** Start on overlay open. Skip an effect that React immediately cleans up. */
+export function startWorkingTreeChangesRequest(request) {
+  let active = true
+  queueMicrotask(() => {
+    if (active) request.load()
+  })
+  return () => {
+    active = false
+    request.cancel()
+  }
+}
+
 /** Keep only the latest working-tree request results. */
 export function createWorkingTreeChangesRequest({ listChanges }) {
   let state = { status: RequestStatus.IDLE, files: [], error: null }

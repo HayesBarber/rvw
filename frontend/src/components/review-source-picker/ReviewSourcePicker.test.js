@@ -6,6 +6,7 @@ import { createServer } from 'vite'
 import { ApplicationAction } from '../../actions/application-actions.js'
 import { createApplicationDispatcher } from '../../actions/application-dispatch.js'
 import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-actions.js'
+import { createWorkingTreeChangesRequest } from '../../review/working-tree-changes-request.js'
 
 let server
 let ReviewSourcePicker
@@ -62,6 +63,7 @@ test('each mode displays its corresponding content', () => {
   }
   const html = renderToStaticMarkup(ReviewSourcePickerContent({
     mode: 'working-tree', registerActionAdapter: () => () => {},
+    workingTreeRequest: createWorkingTreeChangesRequest({ listChanges: () => assert.fail('Rendering started a request') }),
   }))
   assert.match(html, /Loading working tree changes/)
   assert.doesNotMatch(html, /selection is not available/)
@@ -85,6 +87,23 @@ test('the working-tree mode receives the source selection callback', () => {
   const onSelect = () => {}
   const content = ReviewSourcePickerContent({ mode: 'working-tree', onSelect })
   assert.equal(content.props.onSelect, onSelect)
+})
+
+test('mode changes reuse the overlay request without starting another load', async () => {
+  let calls = 0
+  const workingTreeRequest = createWorkingTreeChangesRequest({ listChanges: async () => {
+    calls += 1
+    return { files: [] }
+  } })
+  await workingTreeRequest.load()
+  for (const mode of ['working-tree', 'commits', 'pull-requests', 'working-tree']) {
+    const content = ReviewSourcePickerContent({ mode, workingTreeRequest, registerActionAdapter: () => () => {} })
+    if (mode === 'working-tree') {
+      assert.equal(content.props.request, workingTreeRequest)
+      assert.match(renderToStaticMarkup(content), /No working tree changes\./)
+    }
+  }
+  assert.equal(calls, 1)
 })
 
 test('the picker registration blocks all workspace actions until it closes', () => {

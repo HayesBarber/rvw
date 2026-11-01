@@ -1,7 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { createWorkingTreePickerActionAdapter, createWorkingTreePickerSubmit } from '../../actions/working-tree-picker-actions.js'
-import { listWorkingTreeChanges } from '../../review/api.js'
-import { createWorkingTreeChangesRequest } from '../../review/working-tree-changes-request.js'
 import WorkingTreePickerTree from './WorkingTreePickerTree.jsx'
 
 export function WorkingTreePickerView({ status, files, error, onRetry, onSubmit, registerActionAdapter }) {
@@ -30,15 +28,10 @@ export function WorkingTreePickerView({ status, files, error, onRetry, onSubmit,
   )
 }
 
-export default function WorkingTreePicker({ onSelect, registerActionAdapter }) {
-  const [request] = useState(() => createWorkingTreeChangesRequest({ listChanges: listWorkingTreeChanges }))
+export default function WorkingTreePicker({ request, onSelect, registerActionAdapter }) {
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
   const submit = useMemo(() => createWorkingTreePickerSubmit({ getSnapshot: request.getSnapshot, onSelect }), [request, onSelect])
 
-  useEffect(() => {
-    request.load()
-    return () => request.cancel()
-  }, [request])
   const hasTree = state.status === 'success' && state.files.length > 0
   useLayoutEffect(() => {
     if (!hasTree) return registerActionAdapter(createWorkingTreePickerActionAdapter(submit))
