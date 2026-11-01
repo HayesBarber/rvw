@@ -70,7 +70,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_LAST], [['G']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.DIFF_SWITCH_SIDE], [['<leader>', 's']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_CENTER], [['z', 'z']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.FILE_TREE_ITEM_ACTIVATE], [['<Enter>']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.ITEM_ACTIVATE], [['<Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_COLLAPSE_OR_PARENT], [['h'], ['<Left>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_EXPAND], [['l'], ['<Right>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.TREE_SIZE_INCREASE], [['>']])
@@ -89,7 +89,6 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_FILE_PATH_RELATIVE], [['<leader>', 'y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_FILE_PATH_ABSOLUTE], [['<leader>', 'Y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_COMMENTS], [['<leader>', 'c']])
-  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_COMMENT_LOCATION], [['<Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_REVIEW_COMMENT], [['c']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.COPY_COMMENTS], [['y']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.ADD_COMMENT], [['c']])
@@ -115,9 +114,9 @@ test('contextual bindings are inferred from action scopes', () => {
     binding.mode === VimMode.NORMAL && binding.keys[0] === '<Enter>'
   ))
   assert.deepEqual(locationBinding.args.actions, [
-    ApplicationAction.FILE_TREE_ITEM_ACTIVATE, ApplicationAction.OPEN_COMMENT_LOCATION,
+    ApplicationAction.ITEM_ACTIVATE,
   ])
-  assert.equal(applicationActionCatalog[ApplicationAction.OPEN_COMMENT_LOCATION].scope, ActionScope.COMMENTS_LIST)
+  assert.equal(Object.hasOwn(applicationActionCatalog[ApplicationAction.ITEM_ACTIVATE], 'scope'), false)
   assert.equal(
     applicationActionCatalog[ApplicationAction.SHOW_CHANGES].scope,
     ActionScope.FILE_TREE,
@@ -152,7 +151,7 @@ test('user-configured duplicate keys compile for disjoint surface scopes', () =>
   assert.deepEqual(compileApplicationKeymap({
     [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: [['x']],
     [ApplicationAction.ADD_FILE_COMMENT]: [['x']],
-    [ApplicationAction.OPEN_COMMENT_LOCATION]: [['x']],
+    [ApplicationAction.ADD_REVIEW_COMMENT]: [['x']],
   }).filter((binding) => binding.mode === VimMode.NORMAL), [{
     mode: VimMode.NORMAL,
     keys: ['x'],
@@ -161,7 +160,7 @@ test('user-configured duplicate keys compile for disjoint surface scopes', () =>
       actions: [
         ApplicationAction.TREE_COLLAPSE_OR_PARENT,
         ApplicationAction.ADD_FILE_COMMENT,
-        ApplicationAction.OPEN_COMMENT_LOCATION,
+        ApplicationAction.ADD_REVIEW_COMMENT,
       ],
     },
   }])
@@ -244,9 +243,9 @@ test('duplicate bindings produce a deterministic error', () => {
 })
 
 test('bindings without a scope conflict with each workspace surface', () => {
-  for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP]) {
+  for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP, ApplicationAction.ITEM_ACTIVATE]) {
     assert.equal(Object.hasOwn(applicationActionCatalog[unrestricted], 'scope'), false)
-    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT, ApplicationAction.OPEN_COMMENT_LOCATION]) {
+    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT, ApplicationAction.ADD_REVIEW_COMMENT]) {
       assert.throws(
         () => compileApplicationKeymap({
           [unrestricted]: [['x']],

@@ -76,7 +76,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_CENTER]: actionBindings(keySequence('z', 'z')),
   [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
   [ApplicationAction.DIFF_SWITCH_SIDE]: actionBindings(keySequence(LEADER_KEY, 's')),
-  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
+  [ApplicationAction.ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: actionBindings(
     keySequence('h'),
     keySequence('<Left>'),
@@ -115,7 +115,6 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.COPY_FILE_PATH_RELATIVE]: actionBindings(keySequence(LEADER_KEY, 'y')),
   [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
   [ApplicationAction.OPEN_COMMENTS]: actionBindings(keySequence(LEADER_KEY, 'c')),
-  [ApplicationAction.OPEN_COMMENT_LOCATION]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.ADD_REVIEW_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),

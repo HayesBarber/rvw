@@ -92,6 +92,7 @@ test('item navigation appears under Navigation with its effective bindings', () 
   const groups = createKeymapReference(defaultNormalKeymap)
   const navigation = groups.find((group) => group.id === 'navigation')
   for (const [id, keys] of [
+    [ApplicationAction.ITEM_ACTIVATE, ['<Enter>']],
     [ApplicationAction.ITEM_NEXT, [']', 'b']],
     [ApplicationAction.ITEM_PREVIOUS, ['[', 'b']],
   ]) {

@@ -21,10 +21,12 @@ function bindingKeys(bindings, action) {
     .map((binding) => binding.keys)
 }
 
-test('item navigation accepts new configuration names and rejects old names', () => {
+test('shared item actions accept new configuration names and reject old names', () => {
   for (const [oldName, action] of [
     ['file.open.next', ApplicationAction.ITEM_NEXT],
     ['file.open.previous', ApplicationAction.ITEM_PREVIOUS],
+    ['file_tree.item.activate', ApplicationAction.ITEM_ACTIVATE],
+    ['comments.location.open', ApplicationAction.ITEM_ACTIVATE],
   ]) {
     const result = resolveConfiguration({ configuration: {
       keybindings: { normal: { [action]: [['<leader>', 'x']] } },

@@ -39,7 +39,7 @@ test('search uses finder navigation and activates the selected result', async ()
   assert.equal(request.getSnapshot().activeIndex, 2)
   request.select(1) // Hover selects a result without activating it.
   assert.equal(workspace.selectedPath, 'keep.txt')
-  dispatch(Action.FILE_TREE_ITEM_ACTIVATE)
+  dispatch(Action.ITEM_ACTIVATE)
   assert.equal(request.getSnapshot().activeIndex, 1)
   assert.equal(workspace.selectedPath, 'two')
   assert.equal(workspace.treeMode, 'files')

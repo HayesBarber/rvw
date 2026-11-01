@@ -235,7 +235,7 @@ test('file-tree actions are unhandled unless the file tree is active', () => {
   let activations = 0
   const registry = createSurfaceActionRegistry()
   registry.register(ActiveSurface.FILE_TREE, {
-    [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => {
+    [ApplicationAction.ITEM_ACTIVATE]: () => {
       activations += 1
       return true
     },
@@ -245,9 +245,9 @@ test('file-tree actions are unhandled unless the file tree is active', () => {
     getSurfaceActions: registry.get,
   })
 
-  assert.equal(dispatch(ApplicationAction.FILE_TREE_ITEM_ACTIVATE), false)
+  assert.equal(dispatch(ApplicationAction.ITEM_ACTIVATE), false)
   activeSurface = ActiveSurface.FILE_TREE
-  assert.equal(dispatch(ApplicationAction.FILE_TREE_ITEM_ACTIVATE), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_ACTIVATE), true)
   assert.equal(activations, 1)
 })
 

@@ -86,11 +86,10 @@
     "description": "Switch diff side."
   },
   {
-    "name": "FILE_TREE_ITEM_ACTIVATE",
-    "id": "file_tree.item.activate",
-    "scope": "file_tree",
-    "group": "file_tree",
-    "description": "Activate the focused file-tree item."
+    "name": "ITEM_ACTIVATE",
+    "id": "item.activate",
+    "group": "navigation",
+    "description": "Activate the focused item."
   },
   {
     "name": "TREE_COLLAPSE_OR_PARENT",
@@ -232,13 +231,6 @@
     "id": "comments.open",
     "group": "review",
     "description": "Open the list of saved comments for the current review."
-  },
-  {
-    "name": "OPEN_COMMENT_LOCATION",
-    "id": "comments.location.open",
-    "scope": "comments_list",
-    "group": "review",
-    "description": "Open the file or line of the selected comment."
   },
   {
     "name": "ADD_REVIEW_COMMENT",

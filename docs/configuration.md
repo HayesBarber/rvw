@@ -20,7 +20,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `diff.visual_line` | `V` | Enter linewise Visual selection at the active code row. |
 | `diff.side.switch` | `<leader> s` | Switch diff side on the same visual row. If the opposite side is empty, keep the cursor in place. |
 | `cursor.center` | `z z` | Center the active cursor in its viewport without moving it. |
-| `file_tree.item.activate` | `<Enter>` | Open the focused file, toggle the focused directory, or open the highlighted finder result. |
+| `item.activate` | `<Enter>` | Activate the focused item. |
 | `tree.collapse_or_parent` | `h`, `<Left>` | Collapse a directory or focus its parent. |
 | `tree.expand` | `l`, `<Right>` | Expand the focused directory. |
 | `tree.size.increase` | `>` | Widen the file-tree pane by one step. |
@@ -43,7 +43,6 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `file.path.copy_relative` | `<leader> y` | Copy the active file's canonical repository-relative path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
 | `file.path.copy_absolute` | `<leader> Y` | Copy the active file's absolute filesystem path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
 | `comments.open` | `<leader> c` | Open the list of saved comments for the current review. |
-| `comments.location.open` | `<Enter>` | Open the file or line of the selected comment in the comments list. |
 | `comments.add_review` | `c` | Add a review-level comment from the comments list. |
 | `comments.copy` | `y` | Copy all review comments as Markdown. |
 | `comments.add` | `c` | Add a line comment at the active diff cursor. |

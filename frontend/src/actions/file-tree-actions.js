@@ -119,7 +119,7 @@ export function createFileTreeActionAdapter(
       model.scrollToPath(path, { focus: false, offset: 'center' })
       return true
     },
-    [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => {
+    [ApplicationAction.ITEM_ACTIVATE]: () => {
       const item = model.getFocusedItem()
       if (!item) return false
 
