@@ -150,13 +150,13 @@
     "name": "ITEM_NEXT",
     "id": "item.next",
     "group": "navigation",
-    "description": "Move to the next item."
+    "description": "Move to the next file, mode, etc."
   },
   {
     "name": "ITEM_PREVIOUS",
     "id": "item.previous",
     "group": "navigation",
-    "description": "Move to the previous item."
+    "description": "Move to the previous file, mode, etc."
   },
   {
     "name": "FILE_HISTORY_BACK",

@@ -29,8 +29,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `focus.diff_pane` | `<leader> o` | Focus the diff pane. |
 | `tree_mode.changes` | `c` | Show changed files. |
 | `tree_mode.files` | `f` | Show all repository files. |
-| `item.next` | `] b` | Move to the next item. |
-| `item.previous` | `[ b` | Move to the previous item. |
+| `item.next` | `] b` | Move to the next file, mode, etc. |
+| `item.previous` | `[ b` | Move to the previous file, mode, etc. |
 | `file.history.back` | `<C-o>` | Open the previous available file in navigation history. |
 | `file.history.forward` | `<C-i>` | Open the next available file in navigation history. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
