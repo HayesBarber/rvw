@@ -118,6 +118,7 @@ test('overlay buttons keep native activation but capture other configured keys',
   for (const key of [']', '[', 'b', 'j', '2']) {
     assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(target), key }), true)
   }
+  assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(target), key: 'Enter', shiftKey: true }), true)
   const treeButton = element('BUTTON', { attributes: { 'data-vim-capture': '' } })
   for (const key of [' ', 'Enter']) {
     assert.equal(shouldCaptureKeyboardEvent({ ...keyboardEvent(treeButton), key }), true)

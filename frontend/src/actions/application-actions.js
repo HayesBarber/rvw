@@ -8,7 +8,7 @@ import { isNormalizedVimKey } from '../vim/keyboard.js'
 export const ActionScope = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
-  COMMENTS_LIST: 'comments_list',
+  OVERLAY: 'overlay',
 })
 
 export const ActionGroup = Object.freeze({
@@ -61,6 +61,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: actionBindings(keySequence(LEADER_KEY, 'i')),
   [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
   [ApplicationAction.OPEN_COMMAND_LINE]: actionBindings(keySequence(':')),
+  [ApplicationAction.OVERLAY_SUBMIT]: actionBindings(keySequence('<S-Enter>')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
     keySequence('<Up>'),
@@ -76,7 +77,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.CURSOR_CENTER]: actionBindings(keySequence('z', 'z')),
   [ApplicationAction.VISUAL_LINE]: actionBindings(keySequence('V')),
   [ApplicationAction.DIFF_SWITCH_SIDE]: actionBindings(keySequence(LEADER_KEY, 's')),
-  [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
+  [ApplicationAction.ITEM_ACTIVATE]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.TREE_COLLAPSE_OR_PARENT]: actionBindings(
     keySequence('h'),
     keySequence('<Left>'),
@@ -95,8 +96,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.FOCUS_DIFF_PANE]: actionBindings(keySequence(LEADER_KEY, 'o')),
   [ApplicationAction.SHOW_CHANGES]: actionBindings(keySequence('c')),
   [ApplicationAction.SHOW_FILES]: actionBindings(keySequence('f')),
-  [ApplicationAction.OPEN_NEXT_FILE]: actionBindings(keySequence(']', 'b')),
-  [ApplicationAction.OPEN_PREVIOUS_FILE]: actionBindings(keySequence('[', 'b')),
+  [ApplicationAction.ITEM_NEXT]: actionBindings(keySequence(']', 'b')),
+  [ApplicationAction.ITEM_PREVIOUS]: actionBindings(keySequence('[', 'b')),
   [ApplicationAction.FILE_HISTORY_BACK]: actionBindings(keySequence('<C-o>')),
   [ApplicationAction.FILE_HISTORY_FORWARD]: actionBindings(keySequence('<C-i>')),
   [ApplicationAction.OPEN_FILE_FINDER]: actionBindings(
@@ -115,7 +116,6 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.COPY_FILE_PATH_RELATIVE]: actionBindings(keySequence(LEADER_KEY, 'y')),
   [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
   [ApplicationAction.OPEN_COMMENTS]: actionBindings(keySequence(LEADER_KEY, 'c')),
-  [ApplicationAction.OPEN_COMMENT_LOCATION]: actionBindings(keySequence('<Enter>')),
   [ApplicationAction.ADD_REVIEW_COMMENT]: actionBindings(keySequence('c')),
   [ApplicationAction.COPY_COMMENTS]: actionBindings(keySequence('y')),
   [ApplicationAction.ADD_COMMENT]: actionBindings(keySequence('c')),

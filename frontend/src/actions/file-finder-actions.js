@@ -51,7 +51,7 @@ export function createFileFinderActionAdapter({
       setActiveIndex(results.length - 1)
       return true
     },
-    [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => {
+    [ApplicationAction.ITEM_ACTIVATE]: () => {
       const results = getResults()
       if (results.length === 0) return false
 

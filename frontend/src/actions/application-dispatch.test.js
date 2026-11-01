@@ -157,20 +157,20 @@ test('file navigation actions remain global and preserve Vim counts', () => {
     getActiveSurface: () => activeSurface,
     getSurfaceActions: () => null,
     globalActions: {
-      [ApplicationAction.OPEN_NEXT_FILE]: (count) => {
+      [ApplicationAction.ITEM_NEXT]: (count) => {
         calls.push(['next', count])
         return true
       },
-      [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => {
+      [ApplicationAction.ITEM_PREVIOUS]: (count) => {
         calls.push(['previous', count])
         return true
       },
     },
   })
 
-  assert.equal(dispatch(ApplicationAction.OPEN_NEXT_FILE, 3), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_NEXT, 3), true)
   activeSurface = ActiveSurface.DIFF_PANE
-  assert.equal(dispatch(ApplicationAction.OPEN_PREVIOUS_FILE, 2), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_PREVIOUS, 2), true)
   assert.deepEqual(calls, [['next', 3], ['previous', 2]])
 })
 
@@ -235,7 +235,7 @@ test('file-tree actions are unhandled unless the file tree is active', () => {
   let activations = 0
   const registry = createSurfaceActionRegistry()
   registry.register(ActiveSurface.FILE_TREE, {
-    [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => {
+    [ApplicationAction.ITEM_ACTIVATE]: () => {
       activations += 1
       return true
     },
@@ -245,9 +245,9 @@ test('file-tree actions are unhandled unless the file tree is active', () => {
     getSurfaceActions: registry.get,
   })
 
-  assert.equal(dispatch(ApplicationAction.FILE_TREE_ITEM_ACTIVATE), false)
+  assert.equal(dispatch(ApplicationAction.ITEM_ACTIVATE), false)
   activeSurface = ActiveSurface.FILE_TREE
-  assert.equal(dispatch(ApplicationAction.FILE_TREE_ITEM_ACTIVATE), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_ACTIVATE), true)
   assert.equal(activations, 1)
 })
 

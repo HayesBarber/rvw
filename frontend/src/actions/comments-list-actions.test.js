@@ -217,37 +217,44 @@ test('comment locations preserve file, old-side range, and new-side coordinates'
   }
 })
 
-test('the configured location action opens only the selected comment through the overlay', () => {
+test('item activation opens only the selected comment through the overlay', () => {
   const comments = [
     { id: 'review', target: { kind: 'review' } },
     { id: 'line', target: { kind: 'line', path: 'a.txt', side: 'old', startLine: 3, endLine: 5 } },
   ]
-  for (const keys of [['<Enter>'], ['<C-g>']]) {
+  for (const keys of [['<Enter>'], ['<C-g>'], ['<leader>', 'a']]) {
     const result = resolveConfiguration({ configuration: { keybindings: { normal: {
-      [ApplicationAction.OPEN_COMMENT_LOCATION]: [keys],
+      [ApplicationAction.ITEM_ACTIVATE]: [keys],
     } } } })
     assert.equal(result.diagnostic, null)
     let selectedId = 'review'
+    let locationAvailable = true
     const opened = []
     const adapter = createCommentsListActionAdapter({
       getComments: () => comments,
       getSelectedId: () => selectedId,
-      openLocation: (location) => { opened.push(location); return true },
+      openLocation: (location) => {
+        if (!locationAvailable) return false
+        opened.push(location)
+        return true
+      },
     })
     const dispatch = createApplicationDispatcher({
       getActiveSurface: () => 'file_tree',
-      getSurfaceActions: () => ({ [ApplicationAction.FILE_TREE_ITEM_ACTIVATE]: () => assert.fail('Reached tree') }),
+      getSurfaceActions: () => ({ [ApplicationAction.ITEM_ACTIVATE]: () => assert.fail('Reached tree') }),
       getOverlayActions: () => adapter,
     })
     const controller = new VimController({ bindings: result.bindings })
     const open = () => {
       let command
-      for (const key of keys) command = controller.dispatch({ type: 'key', key }).command
+      for (const key of keys) command = controller.dispatch({ type: 'key', key: key === '<leader>' ? '<Space>' : key }).command
       return dispatch(command.args.actions)
     }
     assert.equal(open(), false)
     selectedId = 'line'
     assert.equal(open(), true)
+    locationAvailable = false
+    assert.equal(open(), false)
     selectedId = 'missing'
     assert.equal(open(), false)
     assert.deepEqual(opened, [{ path: 'a.txt', lineNumber: 5, side: 'old' }])
@@ -299,7 +306,7 @@ test('default and custom cursor bindings dispatch only to comments handlers', ()
       getActiveSurface: () => 'diff_pane',
       getOverlayActions: registry.get,
       getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Reached diff pane') }),
-      globalActions: { [ApplicationAction.OPEN_NEXT_FILE]: () => assert.fail('Opened a workspace file') },
+      globalActions: { [ApplicationAction.ITEM_NEXT]: () => assert.fail('Opened a workspace file') },
     })
     const controller = new VimController({ bindings: configuration.bindings })
     controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
@@ -321,7 +328,7 @@ test('default and custom cursor bindings dispatch only to comments handlers', ()
     assert.equal(model.selected(), 'comment-2')
     press(ApplicationAction.CURSOR_PAGE_DOWN)
     assert.equal(model.selected(), 'comment-4')
-    assert.equal(dispatch(ApplicationAction.OPEN_NEXT_FILE), false)
+    assert.equal(dispatch(ApplicationAction.ITEM_NEXT), false)
     model.comments.length = 0
     assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
     registration.unregister()

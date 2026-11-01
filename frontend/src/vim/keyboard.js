@@ -105,7 +105,7 @@ export function shouldCaptureKeyboardEvent(event) {
     // Opted-in buttons keep native activation and capture other configured keys.
     const tagName = target.tagName?.toLowerCase()
     if (tagName === 'button' && target.hasAttribute?.('data-vim-native-activation') &&
-      (event.key === 'Enter' || event.key === ' ') &&
+      ((event.key === 'Enter' && !event.shiftKey) || event.key === ' ') &&
       !event.altKey && !event.ctrlKey && !event.metaKey) return false
     if (typeof target.hasAttribute === 'function') {
       if (target.hasAttribute('data-vim-capture')) return true
@@ -161,7 +161,9 @@ export function attachVimKeyboardCapture({
     if (!key) return
 
     const result = dispatch({ type: 'key', key })
-    if (!result.handled) return
+    // A configured Enter command owns activation even when its handler is
+    // unavailable. Do not fall through to the focused button's native click.
+    if (!result.handled && !(event.key === 'Enter' && result.command)) return
     event.preventDefault()
     event.stopPropagation()
   }

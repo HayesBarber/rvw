@@ -67,7 +67,7 @@ export function createCommentsListActionAdapter({ getComments, getSelectedId, se
       const selected = getComments().find((comment) => comment.id === getSelectedId())
       return selected !== undefined && deleteComment(selected) === true
     },
-    [ApplicationAction.OPEN_COMMENT_LOCATION]: () => {
+    [ApplicationAction.ITEM_ACTIVATE]: () => {
       const comments = getComments()
       const selected = comments.find((comment) => comment.id === getSelectedId())
       const location = commentLocation(selected)

@@ -535,6 +535,33 @@ test "codebase search modes accept independent bindings and command aliases" {
     try std.testing.expect(disabled == .configuration);
 }
 
+test "shared item actions accept new configuration names and reject old alias targets" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    const parsed = try parseConfiguration(allocator,
+        \\{"keybindings":{"normal":{"item.next":[["<leader>","j"]],"item.previous":[["<leader>","k"]],"item.activate":[["<Enter>"]]}},"commandLine":{"aliases":{"next":"item.next","previous":"item.previous","activate":"item.activate"}}}
+    );
+    try std.testing.expect(parsed == .configuration);
+    for ([_][]const u8{ "file.open.next", "file.open.previous", "file_tree.item.activate", "comments.location.open" }) |action| {
+        const input = try std.fmt.allocPrint(allocator, "{{\"commandLine\":{{\"aliases\":{{\"move\":\"{s}\"}}}}}}", .{action});
+        const invalid = try parseConfiguration(allocator, input);
+        try std.testing.expect(invalid == .invalid_schema);
+        try std.testing.expectEqual(error.unknown_alias_target, invalid.invalid_schema);
+    }
+}
+
+test "overlay submission accepts modified keys and command aliases" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const parsed = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"normal":{"overlay.submit":[["<S-Enter>"],["<leader>","x"]]}},"commandLine":{"aliases":{"submit":"overlay.submit"}}}
+    );
+    try std.testing.expect(parsed == .configuration);
+    const aliases = parsed.configuration.object.get("commandLine").?.object.get("aliases").?.object;
+    try std.testing.expectEqualStrings("overlay.submit", aliases.get("submit").?.string);
+}
+
 test "malformed JSON and invalid keybinding schema are distinct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

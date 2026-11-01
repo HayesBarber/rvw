@@ -37,7 +37,7 @@ test('finder actions navigate and activate the current filtered result', () => {
   assert.equal(activeIndex, 0)
 
   results = ['src/main.zig']
-  assert.equal(adapter[ApplicationAction.FILE_TREE_ITEM_ACTIVATE](), true)
+  assert.equal(adapter[ApplicationAction.ITEM_ACTIVATE](), true)
   assert.deepEqual(opened, ['src/main.zig'])
 })
 
@@ -54,7 +54,7 @@ test('finder actions are unhandled when there are no results', () => {
     ApplicationAction.CURSOR_DOWN,
     ApplicationAction.CURSOR_FIRST,
     ApplicationAction.CURSOR_LAST,
-    ApplicationAction.FILE_TREE_ITEM_ACTIVATE,
+    ApplicationAction.ITEM_ACTIVATE,
   ]) {
     assert.equal(adapter[action](3), false)
   }

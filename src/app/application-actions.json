@@ -30,6 +30,13 @@
     "description": "Open the command line to run an application action."
   },
   {
+    "name": "OVERLAY_SUBMIT",
+    "id": "overlay.submit",
+    "scope": "overlay",
+    "group": "application",
+    "description": "Submit the active overlay."
+  },
+  {
     "name": "CURSOR_UP",
     "id": "cursor.up",
     "group": "navigation",
@@ -86,11 +93,10 @@
     "description": "Switch diff side."
   },
   {
-    "name": "FILE_TREE_ITEM_ACTIVATE",
-    "id": "file_tree.item.activate",
-    "scope": "file_tree",
-    "group": "file_tree",
-    "description": "Activate the focused file-tree item."
+    "name": "ITEM_ACTIVATE",
+    "id": "item.activate",
+    "group": "navigation",
+    "description": "Activate the focused item."
   },
   {
     "name": "TREE_COLLAPSE_OR_PARENT",
@@ -147,16 +153,16 @@
     "description": "Show all repository files in the file tree."
   },
   {
-    "name": "OPEN_NEXT_FILE",
-    "id": "file.open.next",
-    "group": "file_tree",
-    "description": "Open the next file in the active file-tree mode."
+    "name": "ITEM_NEXT",
+    "id": "item.next",
+    "group": "navigation",
+    "description": "Move to the next file, mode, etc."
   },
   {
-    "name": "OPEN_PREVIOUS_FILE",
-    "id": "file.open.previous",
-    "group": "file_tree",
-    "description": "Open the previous file in the active file-tree mode."
+    "name": "ITEM_PREVIOUS",
+    "id": "item.previous",
+    "group": "navigation",
+    "description": "Move to the previous file, mode, etc."
   },
   {
     "name": "FILE_HISTORY_BACK",
@@ -234,16 +240,9 @@
     "description": "Open the list of saved comments for the current review."
   },
   {
-    "name": "OPEN_COMMENT_LOCATION",
-    "id": "comments.location.open",
-    "scope": "comments_list",
-    "group": "review",
-    "description": "Open the file or line of the selected comment."
-  },
-  {
     "name": "ADD_REVIEW_COMMENT",
     "id": "comments.add_review",
-    "scope": "comments_list",
+    "scope": "overlay",
     "group": "review",
     "description": "Add a comment to the full review from the comments list."
   },

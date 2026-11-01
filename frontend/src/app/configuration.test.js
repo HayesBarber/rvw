@@ -21,6 +21,31 @@ function bindingKeys(bindings, action) {
     .map((binding) => binding.keys)
 }
 
+test('shared item actions accept new configuration names and reject old names', () => {
+  for (const [oldName, action] of [
+    ['file.open.next', ApplicationAction.ITEM_NEXT],
+    ['file.open.previous', ApplicationAction.ITEM_PREVIOUS],
+    ['file_tree.item.activate', ApplicationAction.ITEM_ACTIVATE],
+    ['comments.location.open', ApplicationAction.ITEM_ACTIVATE],
+  ]) {
+    const result = resolveConfiguration({ configuration: {
+      keybindings: { normal: { [action]: [['<leader>', 'x']] } },
+      commandLine: { aliases: { move: action } },
+    } })
+    assert.equal(result.diagnostic, null)
+    assert.deepEqual(bindingKeys(result.bindings, action), [['<Space>', 'x']])
+    assert.equal(result.commandAliases.move, action)
+    for (const configuration of [
+      { keybindings: { normal: { [oldName]: [['n']] } } },
+      { commandLine: { aliases: { move: oldName } } },
+    ]) {
+      const invalid = resolveConfiguration({ configuration })
+      assert.equal(invalid.diagnostic.code, 'invalid_configuration')
+      assert.equal(invalid.bindings, null)
+    }
+  }
+})
+
 test('configured actions replace defaults while missing actions retain them', () => {
   const result = resolveConfiguration({
     configuration: {

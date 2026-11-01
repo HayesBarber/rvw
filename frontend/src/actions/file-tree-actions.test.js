@@ -127,7 +127,7 @@ test('activation opens files without changing selection during focus movement', 
   assert.deepEqual(model.getSelectedPaths(), [])
   assert.deepEqual(opened, [])
 
-  assert.equal(actions[ApplicationAction.FILE_TREE_ITEM_ACTIVATE](), true)
+  assert.equal(actions[ApplicationAction.ITEM_ACTIVATE](), true)
   assert.deepEqual(opened, ['src/view.js'])
   assert.deepEqual(model.getSelectedPaths(), [])
 })
@@ -291,7 +291,7 @@ test('directory actions toggle, collapse, expand, and move to the parent', (t) =
   assert.equal(directory.isDirectory(), true)
   assert.equal(directory.isExpanded(), true)
 
-  assert.equal(actions[ApplicationAction.FILE_TREE_ITEM_ACTIVATE](), true)
+  assert.equal(actions[ApplicationAction.ITEM_ACTIVATE](), true)
   assert.equal(directory.isExpanded(), false)
   assert.equal(actions[ApplicationAction.TREE_EXPAND](), true)
   assert.equal(directory.isExpanded(), true)
