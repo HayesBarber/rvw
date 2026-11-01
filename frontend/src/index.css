@@ -668,6 +668,8 @@ textarea {
 }
 
 .working-tree-picker-files {
+  display: block;
+  height: min(320px, 45vh);
   max-height: 45vh;
   overflow: auto;
 }
@@ -676,36 +678,6 @@ textarea {
 .working-tree-picker button:focus-visible {
   outline: 2px solid #93c5fd;
   outline-offset: 2px;
-}
-
-.working-tree-picker table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-}
-
-.working-tree-picker th,
-.working-tree-picker td {
-  padding: 8px;
-  border-bottom: 1px solid #303033;
-  text-align: left;
-  vertical-align: top;
-}
-
-.working-tree-picker tbody th {
-  font-weight: normal;
-  overflow-wrap: anywhere;
-}
-
-.working-tree-picker td:nth-last-child(-n+2) {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.working-tree-picker-previous-path {
-  display: block;
-  margin-top: 4px;
-  color: #a1a1aa;
 }
 
 .working-tree-picker button {

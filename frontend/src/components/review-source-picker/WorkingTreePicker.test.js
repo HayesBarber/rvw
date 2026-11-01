@@ -3,6 +3,11 @@ import test, { after, before } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
+import { preloadFileTree } from '@pierre/trees/ssr'
+import { FileTree } from '@pierre/trees'
+import { ApplicationAction } from '../../actions/application-actions.js'
+import { createFileTreeActionAdapter } from '../../actions/file-tree-actions.js'
+import { workingTreePickerTreeOptions } from './working-tree-picker-tree.js'
 
 let server
 let View
@@ -46,11 +51,14 @@ test('errors display a native Retry button connected to the retry handler', () =
 
 test('summaries use tree order for root files and nested directories', () => {
   const paths = ['z.txt', 'src/z.txt', 'README.md', 'src/nested/a.txt', 'assets/icon.png', 'src/a.txt']
-  const html = render({ status: 'success', files: paths.map((path) => ({ path, status: 'modified', additions: 1, deletions: 2 })) })
-  const renderedPaths = [...html.matchAll(/<th scope="row"><span>(.*?)<\/span>/g)].map((match) => match[1])
+  const files = paths.map((path) => ({ path, status: 'modified', additions: 1, deletions: 2 }))
+  const html = preloadFileTree(workingTreePickerTreeOptions(files)).shadowHtml
+  const renderedPaths = [...html.matchAll(/data-item-path="([^"]+)" data-item-type="file"/g)].map((match) => match[1])
   assert.deepEqual(renderedPaths, ['assets/icon.png', 'src/nested/a.txt', 'src/a.txt', 'src/z.txt', 'README.md', 'z.txt'])
-  assert.match(html, /role="region" aria-label="Working tree changes" tabindex="0"/)
-  assert.doesNotMatch(html, /role="option"|aria-selected|<button|<input/)
+  assert.match(html, /aria-expanded="true"/)
+  assert.match(html, /data-icon-name="file-tree-icon-file"/)
+  assert.match(render({ status: 'success', files }), /<file-tree-container[^>]*aria-label="Working tree changes"[^>]*tabIndex="0"/)
+  assert.doesNotMatch(html, /aria-selected="true"|<input|<table/)
 })
 
 test('summaries preserve status, rename paths, zero counts, and unavailable counts', () => {
@@ -59,11 +67,28 @@ test('summaries preserve status, rename paths, zero counts, and unavailable coun
     { path: 'binary.dat', previousPath: null, status: 'added', additions: null, deletions: null },
     { path: 'gone.txt', previousPath: null, status: 'deleted', additions: null, deletions: 5 },
   ]
-  const html = render({ status: 'success', files })
+  const html = preloadFileTree(workingTreePickerTreeOptions(files)).shadowHtml
   assert.match(html, /new 雪.txt/)
   assert.match(html, /From old &amp; file.txt/)
-  assert.match(html, /<td>renamed<\/td><td>0<\/td><td>3<\/td>/)
-  assert.match(html, /<td>added<\/td>/)
-  assert.match(html, /<td>deleted<\/td>/)
-  assert.equal([...html.matchAll(/aria-label="Unavailable" title="Unavailable">—/g)].length, 3)
+  assert.match(html, /title="Git status: renamed">R/)
+  assert.match(html, />\+0<\/span>/)
+  assert.match(html, />\u00a0−3<\/span>/)
+  assert.match(html, /title="Git status: added">A/)
+  assert.match(html, /title="Git status: deleted">D/)
+  assert.equal([...html.matchAll(/(?:Added|Deleted): Unavailable/g)].length, 3)
+})
+
+test('tree navigation expands folders without selecting files for review', () => {
+  const model = new FileTree(workingTreePickerTreeOptions([{ path: 'src/a.txt', status: 'modified', additions: 1, deletions: 0 }]))
+  const actions = createFileTreeActionAdapter(model, () => {})
+  model.focusPath('src/')
+  assert.equal(actions[ApplicationAction.TREE_COLLAPSE_OR_PARENT](), true)
+  assert.equal(model.getItem('src/').isExpanded(), false)
+  assert.equal(actions[ApplicationAction.TREE_EXPAND](), true)
+  assert.equal(model.getItem('src/').isExpanded(), true)
+  assert.equal(actions[ApplicationAction.CURSOR_DOWN](), true)
+  assert.equal(model.getFocusedPath(), 'src/a.txt')
+  assert.equal(actions[ApplicationAction.ITEM_ACTIVATE](), true)
+  assert.deepEqual(model.getSelectedPaths(), [])
+  model.cleanUp()
 })
