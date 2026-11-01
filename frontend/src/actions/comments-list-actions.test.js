@@ -299,7 +299,7 @@ test('default and custom cursor bindings dispatch only to comments handlers', ()
       getActiveSurface: () => 'diff_pane',
       getOverlayActions: registry.get,
       getSurfaceActions: () => ({ [ApplicationAction.CURSOR_DOWN]: () => assert.fail('Reached diff pane') }),
-      globalActions: { [ApplicationAction.OPEN_NEXT_FILE]: () => assert.fail('Opened a workspace file') },
+      globalActions: { [ApplicationAction.ITEM_NEXT]: () => assert.fail('Opened a workspace file') },
     })
     const controller = new VimController({ bindings: configuration.bindings })
     controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
@@ -321,7 +321,7 @@ test('default and custom cursor bindings dispatch only to comments handlers', ()
     assert.equal(model.selected(), 'comment-2')
     press(ApplicationAction.CURSOR_PAGE_DOWN)
     assert.equal(model.selected(), 'comment-4')
-    assert.equal(dispatch(ApplicationAction.OPEN_NEXT_FILE), false)
+    assert.equal(dispatch(ApplicationAction.ITEM_NEXT), false)
     model.comments.length = 0
     assert.equal(dispatch(ApplicationAction.CURSOR_DOWN), false)
     registration.unregister()

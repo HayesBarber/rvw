@@ -147,16 +147,16 @@
     "description": "Show all repository files in the file tree."
   },
   {
-    "name": "OPEN_NEXT_FILE",
-    "id": "file.open.next",
-    "group": "file_tree",
-    "description": "Open the next file in the active file-tree mode."
+    "name": "ITEM_NEXT",
+    "id": "item.next",
+    "group": "navigation",
+    "description": "Open the next file or switch to the next review-source picker mode."
   },
   {
-    "name": "OPEN_PREVIOUS_FILE",
-    "id": "file.open.previous",
-    "group": "file_tree",
-    "description": "Open the previous file in the active file-tree mode."
+    "name": "ITEM_PREVIOUS",
+    "id": "item.previous",
+    "group": "navigation",
+    "description": "Open the previous file or switch to the previous review-source picker mode."
   },
   {
     "name": "FILE_HISTORY_BACK",

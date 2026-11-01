@@ -109,8 +109,8 @@ export function useApplicationActions({
       dispatchWorkspace({ type: 'file_tree_resized', steps: -count })
       return true
     },
-    [ApplicationAction.OPEN_NEXT_FILE]: (count) => navigateFile(1, count),
-    [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => navigateFile(-1, count),
+    [ApplicationAction.ITEM_NEXT]: (count) => navigateFile(1, count),
+    [ApplicationAction.ITEM_PREVIOUS]: (count) => navigateFile(-1, count),
     [ApplicationAction.FILE_HISTORY_BACK]: (count) => navigateHistory(-1, count),
     [ApplicationAction.FILE_HISTORY_FORWARD]: (count) => navigateHistory(1, count),
     [ApplicationAction.OPEN_FILE_FINDER]: () => {

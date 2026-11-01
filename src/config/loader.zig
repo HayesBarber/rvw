@@ -535,6 +535,22 @@ test "codebase search modes accept independent bindings and command aliases" {
     try std.testing.expect(disabled == .configuration);
 }
 
+test "item navigation configuration accepts new names and rejects old alias targets" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    const parsed = try parseConfiguration(allocator,
+        \\{"keybindings":{"normal":{"item.next":[["<leader>","j"]],"item.previous":[["<leader>","k"]]}},"commandLine":{"aliases":{"next":"item.next","previous":"item.previous"}}}
+    );
+    try std.testing.expect(parsed == .configuration);
+    for ([_][]const u8{ "file.open.next", "file.open.previous" }) |action| {
+        const input = try std.fmt.allocPrint(allocator, "{{\"commandLine\":{{\"aliases\":{{\"move\":\"{s}\"}}}}}}", .{action});
+        const invalid = try parseConfiguration(allocator, input);
+        try std.testing.expect(invalid == .invalid_schema);
+        try std.testing.expectEqual(error.unknown_alias_target, invalid.invalid_schema);
+    }
+}
+
 test "malformed JSON and invalid keybinding schema are distinct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

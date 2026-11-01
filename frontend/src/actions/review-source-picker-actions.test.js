@@ -9,10 +9,11 @@ import { VimController } from '../vim/machine.js'
 
 const picker = ApplicationAction.OPEN_REVIEW_SOURCE_PICKER
 
-test('default and configured file navigation bindings change picker modes', () => {
+test('default and configured item navigation bindings change picker modes', () => {
   for (const [normal, nextKeys, previousKeys] of [
     [{}, [']', 'b'], ['[', 'b']],
-    [{ [ApplicationAction.OPEN_NEXT_FILE]: [['n']], [ApplicationAction.OPEN_PREVIOUS_FILE]: [['p']] }, ['n'], ['p']],
+    [{ [ApplicationAction.ITEM_NEXT]: [['n']], [ApplicationAction.ITEM_PREVIOUS]: [['p']] }, ['n'], ['p']],
+    [{ [ApplicationAction.ITEM_NEXT]: [['<leader>', 'j']], [ApplicationAction.ITEM_PREVIOUS]: [['<leader>', 'k']] }, ['<Space>', 'j'], ['<Space>', 'k']],
   ]) {
     let mode = 'commits'
     const result = resolveConfiguration({ configuration: { keybindings: { normal } } })
@@ -45,14 +46,14 @@ test('the shell owns mode navigation while cursor actions retain the child handl
     onChange: (mode) => modes.push(mode),
     modeActions: {
       [ApplicationAction.CURSOR_DOWN]: cursorDown,
-      [ApplicationAction.OPEN_NEXT_FILE]: () => assert.fail('Mode navigation reached child'),
-      [ApplicationAction.OPEN_PREVIOUS_FILE]: () => assert.fail('Mode navigation reached child'),
+      [ApplicationAction.ITEM_NEXT]: () => assert.fail('Mode navigation reached child'),
+      [ApplicationAction.ITEM_PREVIOUS]: () => assert.fail('Mode navigation reached child'),
     },
   })
   assert.equal(actions[ApplicationAction.CURSOR_DOWN], cursorDown)
   assert.equal(actions[ApplicationAction.CURSOR_DOWN](4), true)
-  assert.equal(actions[ApplicationAction.OPEN_NEXT_FILE](1), true)
-  assert.equal(actions[ApplicationAction.OPEN_PREVIOUS_FILE](1), true)
+  assert.equal(actions[ApplicationAction.ITEM_NEXT](1), true)
+  assert.equal(actions[ApplicationAction.ITEM_PREVIOUS](1), true)
   assert.deepEqual(counts, [4])
   assert.deepEqual(modes, ['working-tree', 'commits'])
   assert.equal(actions[ApplicationAction.RELOAD_REVIEW], undefined)

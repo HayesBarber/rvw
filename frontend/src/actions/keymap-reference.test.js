@@ -88,6 +88,20 @@ test('the keymap reference sorts aliases by name and maps them to their target a
   assert.deepEqual(Object.keys(aliases), ['yank', 'up', 'copy'])
 })
 
+test('item navigation appears under Navigation with its effective bindings', () => {
+  const groups = createKeymapReference(defaultNormalKeymap)
+  const navigation = groups.find((group) => group.id === 'navigation')
+  for (const [id, keys] of [
+    [ApplicationAction.ITEM_NEXT, [']', 'b']],
+    [ApplicationAction.ITEM_PREVIOUS, ['[', 'b']],
+  ]) {
+    const action = navigation.actions.find((action) => action.id === id)
+    assert.deepEqual(action.sequences, [keys])
+    assert.match(action.description, /file.*review-source picker mode/)
+    assert.equal(Object.hasOwn(action, 'scope'), false)
+  }
+})
+
 test('default reference motions scroll with Vim counts and arrow keys', () => {
   const { controller, scrolls } = referenceController()
   for (const key of ['j', 'k', '<Down>', '<Up>', '3', 'j']) {

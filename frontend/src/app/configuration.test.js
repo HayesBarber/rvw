@@ -21,6 +21,29 @@ function bindingKeys(bindings, action) {
     .map((binding) => binding.keys)
 }
 
+test('item navigation accepts new configuration names and rejects old names', () => {
+  for (const [oldName, action] of [
+    ['file.open.next', ApplicationAction.ITEM_NEXT],
+    ['file.open.previous', ApplicationAction.ITEM_PREVIOUS],
+  ]) {
+    const result = resolveConfiguration({ configuration: {
+      keybindings: { normal: { [action]: [['<leader>', 'x']] } },
+      commandLine: { aliases: { move: action } },
+    } })
+    assert.equal(result.diagnostic, null)
+    assert.deepEqual(bindingKeys(result.bindings, action), [['<Space>', 'x']])
+    assert.equal(result.commandAliases.move, action)
+    for (const configuration of [
+      { keybindings: { normal: { [oldName]: [['n']] } } },
+      { commandLine: { aliases: { move: oldName } } },
+    ]) {
+      const invalid = resolveConfiguration({ configuration })
+      assert.equal(invalid.diagnostic.code, 'invalid_configuration')
+      assert.equal(invalid.bindings, null)
+    }
+  }
+})
+
 test('configured actions replace defaults while missing actions retain them', () => {
   const result = resolveConfiguration({
     configuration: {

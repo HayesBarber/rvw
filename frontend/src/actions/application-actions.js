@@ -95,8 +95,8 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.FOCUS_DIFF_PANE]: actionBindings(keySequence(LEADER_KEY, 'o')),
   [ApplicationAction.SHOW_CHANGES]: actionBindings(keySequence('c')),
   [ApplicationAction.SHOW_FILES]: actionBindings(keySequence('f')),
-  [ApplicationAction.OPEN_NEXT_FILE]: actionBindings(keySequence(']', 'b')),
-  [ApplicationAction.OPEN_PREVIOUS_FILE]: actionBindings(keySequence('[', 'b')),
+  [ApplicationAction.ITEM_NEXT]: actionBindings(keySequence(']', 'b')),
+  [ApplicationAction.ITEM_PREVIOUS]: actionBindings(keySequence('[', 'b')),
   [ApplicationAction.FILE_HISTORY_BACK]: actionBindings(keySequence('<C-o>')),
   [ApplicationAction.FILE_HISTORY_FORWARD]: actionBindings(keySequence('<C-i>')),
   [ApplicationAction.OPEN_FILE_FINDER]: actionBindings(

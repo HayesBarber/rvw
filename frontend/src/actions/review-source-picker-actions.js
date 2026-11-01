@@ -21,8 +21,8 @@ export function createReviewSourcePickerActionAdapter({ mode, modeActions = bloc
 
   return {
     ...modeActions,
-    [ApplicationAction.OPEN_NEXT_FILE]: (count) => moveMode(1, count),
-    [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => moveMode(-1, count),
+    [ApplicationAction.ITEM_NEXT]: (count) => moveMode(1, count),
+    [ApplicationAction.ITEM_PREVIOUS]: (count) => moveMode(-1, count),
   }
 }
 

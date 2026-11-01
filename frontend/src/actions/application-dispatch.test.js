@@ -157,20 +157,20 @@ test('file navigation actions remain global and preserve Vim counts', () => {
     getActiveSurface: () => activeSurface,
     getSurfaceActions: () => null,
     globalActions: {
-      [ApplicationAction.OPEN_NEXT_FILE]: (count) => {
+      [ApplicationAction.ITEM_NEXT]: (count) => {
         calls.push(['next', count])
         return true
       },
-      [ApplicationAction.OPEN_PREVIOUS_FILE]: (count) => {
+      [ApplicationAction.ITEM_PREVIOUS]: (count) => {
         calls.push(['previous', count])
         return true
       },
     },
   })
 
-  assert.equal(dispatch(ApplicationAction.OPEN_NEXT_FILE, 3), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_NEXT, 3), true)
   activeSurface = ActiveSurface.DIFF_PANE
-  assert.equal(dispatch(ApplicationAction.OPEN_PREVIOUS_FILE, 2), true)
+  assert.equal(dispatch(ApplicationAction.ITEM_PREVIOUS, 2), true)
   assert.deepEqual(calls, [['next', 3], ['previous', 2]])
 })
 
