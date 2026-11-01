@@ -688,6 +688,17 @@ textarea {
   color: #fafafa;
 }
 
+.working-tree-picker button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.working-tree-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .keymap-reference-dialog {
   position: fixed;
   inset: 0;

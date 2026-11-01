@@ -81,6 +81,12 @@ test('mode controls select one mode at a time', () => {
   }
 })
 
+test('the working-tree mode receives the source selection callback', () => {
+  const onSelect = () => {}
+  const content = ReviewSourcePickerContent({ mode: 'working-tree', onSelect })
+  assert.equal(content.props.onSelect, onSelect)
+})
+
 test('the picker registration blocks all workspace actions until it closes', () => {
   const registry = createOverlayActionRegistry()
   const calls = []

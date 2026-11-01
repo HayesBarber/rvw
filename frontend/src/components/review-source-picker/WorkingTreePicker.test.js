@@ -25,6 +25,7 @@ test('loading and idle states announce progress without displaying old files', (
     assert.match(html, /aria-busy="true"/)
     assert.match(html, /role="status">Loading working tree changes…/)
     assert.doesNotMatch(html, /stale.txt|<table/)
+    assert.match(html, /<button[^>]*disabled=""[^>]*>Review working tree<\/button>/)
   }
 })
 
@@ -33,6 +34,8 @@ test('a clean working tree displays the empty message', () => {
   assert.match(html, /No working tree changes\./)
   assert.match(html, /aria-busy="false"/)
   assert.doesNotMatch(html, /<table|Retry/)
+  assert.match(html, /data-vim-native-activation="true">Review working tree<\/button>/)
+  assert.doesNotMatch(html, /disabled/)
 })
 
 test('errors display a native Retry button connected to the retry handler', () => {
@@ -43,10 +46,22 @@ test('errors display a native Retry button connected to the retry handler', () =
   assert.match(html, /Unable to load working tree changes: Repository unavailable/)
   assert.match(html, /<button type="button" data-vim-native-activation="true">Retry<\/button>/)
   assert.doesNotMatch(html, /<table/)
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Review working tree<\/button>/)
   const view = View(props)
   const errorView = view.props.children.find((child) => child?.props?.role === 'alert')
   errorView.props.children.find((child) => child.type === 'button').props.onClick()
   assert.equal(calls, 1)
+})
+
+test('the review button and tree actions receive the same submit handler', () => {
+  const submit = () => true
+  const view = View({ status: 'success', files: [{ path: 'a.txt' }], onSubmit: submit })
+  const tree = view.props.children[2]
+  const button = view.props.children[3].props.children
+  assert.equal(tree.props.onSubmit, submit)
+  assert.equal(button.props.onClick, submit)
+  assert.equal(button.props.disabled, false)
+  assert.equal(button.props['data-vim-native-activation'], true)
 })
 
 test('summaries use tree order for root files and nested directories', () => {

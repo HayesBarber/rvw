@@ -1,9 +1,10 @@
 import { useLayoutEffect } from 'react'
 import { FileTree, useFileTree } from '@pierre/trees/react'
 import { createFileTreeActionAdapter } from '../../actions/file-tree-actions.js'
+import { createWorkingTreePickerActionAdapter } from '../../actions/working-tree-picker-actions.js'
 import { workingTreePickerTreeOptions } from './working-tree-picker-tree.js'
 
-export default function WorkingTreePickerTree({ files, registerActionAdapter }) {
+export default function WorkingTreePickerTree({ files, onSubmit, registerActionAdapter }) {
   const { model } = useFileTree({
     ...workingTreePickerTreeOptions(files),
     // Rows summarize the whole source. No file is selected for review.
@@ -12,7 +13,9 @@ export default function WorkingTreePickerTree({ files, registerActionAdapter }) 
     },
   })
 
-  useLayoutEffect(() => registerActionAdapter(createFileTreeActionAdapter(model, () => {})), [model, registerActionAdapter])
+  useLayoutEffect(() => registerActionAdapter(createWorkingTreePickerActionAdapter(
+    onSubmit, createFileTreeActionAdapter(model, () => {}),
+  )), [model, onSubmit, registerActionAdapter])
 
   return (
     <FileTree
