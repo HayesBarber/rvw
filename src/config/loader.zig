@@ -551,6 +551,17 @@ test "shared item actions accept new configuration names and reject old alias ta
     }
 }
 
+test "overlay submission accepts modified keys and command aliases" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const parsed = try parseConfiguration(arena.allocator(),
+        \\{"keybindings":{"normal":{"overlay.submit":[["<S-Enter>"],["<leader>","x"]]}},"commandLine":{"aliases":{"submit":"overlay.submit"}}}
+    );
+    try std.testing.expect(parsed == .configuration);
+    const aliases = parsed.configuration.object.get("commandLine").?.object.get("aliases").?.object;
+    try std.testing.expectEqualStrings("overlay.submit", aliases.get("submit").?.string);
+}
+
 test "malformed JSON and invalid keybinding schema are distinct" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

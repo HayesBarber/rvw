@@ -30,6 +30,13 @@
     "description": "Open the command line to run an application action."
   },
   {
+    "name": "OVERLAY_SUBMIT",
+    "id": "overlay.submit",
+    "scope": "overlay",
+    "group": "application",
+    "description": "Submit the active overlay."
+  },
+  {
     "name": "CURSOR_UP",
     "id": "cursor.up",
     "group": "navigation",

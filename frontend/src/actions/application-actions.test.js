@@ -62,6 +62,7 @@ test('the default keymap includes navigation, pane, mode, and global bindings', 
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.RELOAD_REVIEW], [['<leader>', 'r']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_REVIEW_SOURCE_PICKER], [['<leader>', 'i']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.OPEN_KEYMAP_REFERENCE], [['?']])
+  assert.deepEqual(defaultNormalKeymap[ApplicationAction.OVERLAY_SUBMIT], [['<S-Enter>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_UP], [['k'], ['<Up>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_DOWN], [['j'], ['<Down>']])
   assert.deepEqual(defaultNormalKeymap[ApplicationAction.CURSOR_PAGE_UP], [['<C-u>']])
@@ -242,10 +243,20 @@ test('duplicate bindings produce a deterministic error', () => {
   )
 })
 
-test('bindings without a scope conflict with each workspace surface', () => {
+test('overlay submission bindings conflict with comments and shared actions', () => {
+  assert.equal(applicationActionCatalog[ApplicationAction.OVERLAY_SUBMIT].scope, ActionScope.OVERLAY)
+  for (const action of [ApplicationAction.ADD_REVIEW_COMMENT, ApplicationAction.ITEM_ACTIVATE, ApplicationAction.CURSOR_DOWN]) {
+    assert.throws(() => compileApplicationKeymap({
+      [ApplicationAction.OVERLAY_SUBMIT]: [['x']],
+      [action]: [['x']],
+    }), /Duplicate Vim binding/)
+  }
+})
+
+test('bindings without a scope conflict with each binding surface', () => {
   for (const unrestricted of [ApplicationAction.CLOSE_APPLICATION, ApplicationAction.CURSOR_UP, ApplicationAction.ITEM_ACTIVATE]) {
     assert.equal(Object.hasOwn(applicationActionCatalog[unrestricted], 'scope'), false)
-    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT, ApplicationAction.ADD_REVIEW_COMMENT]) {
+    for (const contextual of [ApplicationAction.SHOW_CHANGES, ApplicationAction.ADD_COMMENT, ApplicationAction.ADD_REVIEW_COMMENT, ApplicationAction.OVERLAY_SUBMIT]) {
       assert.throws(
         () => compileApplicationKeymap({
           [unrestricted]: [['x']],

@@ -11,6 +11,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `review_source_picker.open` | `<leader> i` | Open the review source picker. |
 | `command_line.open` | `:` | Open the footer command input. |
 | `keymap_reference.open` | `?` | Open a reference showing the bindings currently in effect. |
+| `overlay.submit` | `<S-Enter>` | Submit the active overlay. |
 | `cursor.up` | `k`, `<Up>` | Move the active file-tree, diff, or file-finder cursor up. |
 | `cursor.down` | `j`, `<Down>` | Move the active file-tree, diff, or file-finder cursor down. |
 | `cursor.page.up` | `<C-u>` | Move the active cursor up by half of its visible viewport. |
@@ -143,6 +144,31 @@ both `g` and `g g`.
 - Modified keys use `C` for Control, `M` for Option/Alt, `D` for Command/Meta, and `S` for Shift. Combine modifiers in that order, followed by a lowercase printable key or a named key: `<C-p>`, `<D-p>`, `<C-S-k>`, or `<M-Left>`.
 - Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
 - Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
+
+## Review-source picker controls
+
+The picker screens are placeholders. Issues #279, #280, and #281 will add their
+controls. Those controls must use this contract:
+
+| Mode | `item.activate` (Enter) | `overlay.submit` (Shift+Enter) |
+| --- | --- | --- |
+| Commits | Check or uncheck the focused commit. | Submit the two checked commits. |
+| Pull requests | Submit the focused pull request. | Submit the focused pull request. |
+| Working tree | Activate the focused control. | Submit the working tree. |
+
+Use the existing cursor actions to move through lists. Use `item.next` and
+`item.previous` to switch picker modes. Keep native Enter activation for buttons.
+Register `overlay.submit` through the picker action adapter. Use one submission
+handler for the pointer control and the action.
+
+Block submission during loading, after a request error, or when the required
+selection is incomplete. Commits mode requires two distinct checked commits.
+Pull requests mode requires a focused pull request. Working tree mode allows
+submission after a successful load, including an empty change set.
+
+Shift+Enter dispatches the configured action from picker buttons. It does not
+activate the focused button. Other overlays do not submit unless they register
+a handler for `overlay.submit`.
 
 ## Executable paths
 

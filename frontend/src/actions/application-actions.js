@@ -9,6 +9,7 @@ export const ActionScope = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
   COMMENTS_LIST: 'comments_list',
+  OVERLAY: 'overlay',
 })
 
 export const ActionGroup = Object.freeze({
@@ -61,6 +62,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: actionBindings(keySequence(LEADER_KEY, 'i')),
   [ApplicationAction.OPEN_KEYMAP_REFERENCE]: actionBindings(keySequence('?')),
   [ApplicationAction.OPEN_COMMAND_LINE]: actionBindings(keySequence(':')),
+  [ApplicationAction.OVERLAY_SUBMIT]: actionBindings(keySequence('<S-Enter>')),
   [ApplicationAction.CURSOR_UP]: actionBindings(
     keySequence('k'),
     keySequence('<Up>'),
@@ -140,6 +142,8 @@ const bindingSurfaces = Object.freeze(Object.values(ActionScope))
 function actionBindingSurfaces(action) {
   const definition = applicationActionCatalog[action]
   if (!definition) return []
+  // The comments list is an overlay with its own contextual bindings.
+  if (definition.scope === ActionScope.OVERLAY) return [ActionScope.OVERLAY, ActionScope.COMMENTS_LIST]
   if (definition.scope !== undefined) return [definition.scope]
   return bindingSurfaces
 }
