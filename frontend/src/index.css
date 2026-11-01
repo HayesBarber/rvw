@@ -667,6 +667,50 @@ textarea {
   padding: 20px;
 }
 
+.working-tree-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 140px;
+}
+
+.working-tree-picker p {
+  margin: 0;
+}
+
+.working-tree-picker-files {
+  display: block;
+  height: min(320px, 45vh);
+  max-height: 45vh;
+  overflow: auto;
+}
+
+.working-tree-picker-files:focus-visible,
+.working-tree-picker button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.working-tree-picker button {
+  padding: 6px 10px;
+  border: 1px solid #414145;
+  border-radius: 6px;
+  background: #202022;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.working-tree-picker button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.working-tree-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
 .keymap-reference-dialog {
   position: fixed;
   inset: 0;
@@ -1240,7 +1284,8 @@ textarea {
   cursor: pointer;
 }
 
-.comment-actions button[type='submit'] {
+.comment-actions button[type='submit'],
+.working-tree-picker-footer button {
   border-color: #3778c2;
   background: #2463a8;
 }
@@ -1249,7 +1294,8 @@ textarea {
   background: #303033;
 }
 
-.comment-actions button[type='submit']:hover:not(:disabled) {
+.comment-actions button[type='submit']:hover:not(:disabled),
+.working-tree-picker-footer button:hover:not(:disabled) {
   background: #2d74c4;
 }
 
