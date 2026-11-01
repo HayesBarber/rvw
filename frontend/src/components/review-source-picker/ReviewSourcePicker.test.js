@@ -49,11 +49,10 @@ test('the picker starts with only Commits selected', () => {
   assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
 })
 
-test('each mode displays only its corresponding placeholder', () => {
+test('each mode displays its corresponding content', () => {
   for (const [mode, expected] of [
     ['commits', 'Commit range'],
     ['pull-requests', 'Pull request'],
-    ['working-tree', 'Working tree'],
   ]) {
     const registerActionAdapter = () => () => {}
     const content = ReviewSourcePickerContent({ mode, registerActionAdapter })
@@ -61,6 +60,11 @@ test('each mode displays only its corresponding placeholder', () => {
     const html = renderToStaticMarkup(content)
     assert.equal(html, `<p>${expected} selection is not available yet.</p>`)
   }
+  const html = renderToStaticMarkup(ReviewSourcePickerContent({
+    mode: 'working-tree', registerActionAdapter: () => () => {},
+  }))
+  assert.match(html, /Loading working tree changes/)
+  assert.doesNotMatch(html, /selection is not available/)
 })
 
 test('mode controls select one mode at a time', () => {
