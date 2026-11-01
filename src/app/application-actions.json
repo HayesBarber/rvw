@@ -242,7 +242,7 @@
   {
     "name": "ADD_REVIEW_COMMENT",
     "id": "comments.add_review",
-    "scope": "comments_list",
+    "scope": "overlay",
     "group": "review",
     "description": "Add a comment to the full review from the comments list."
   },

@@ -245,6 +245,7 @@ test('duplicate bindings produce a deterministic error', () => {
 
 test('overlay submission bindings conflict with comments and shared actions', () => {
   assert.equal(applicationActionCatalog[ApplicationAction.OVERLAY_SUBMIT].scope, ActionScope.OVERLAY)
+  assert.equal(applicationActionCatalog[ApplicationAction.ADD_REVIEW_COMMENT].scope, ActionScope.OVERLAY)
   for (const action of [ApplicationAction.ADD_REVIEW_COMMENT, ApplicationAction.ITEM_ACTIVATE, ApplicationAction.CURSOR_DOWN]) {
     assert.throws(() => compileApplicationKeymap({
       [ApplicationAction.OVERLAY_SUBMIT]: [['x']],

@@ -8,7 +8,6 @@ import { isNormalizedVimKey } from '../vim/keyboard.js'
 export const ActionScope = Object.freeze({
   FILE_TREE: 'file_tree',
   DIFF_PANE: 'diff_pane',
-  COMMENTS_LIST: 'comments_list',
   OVERLAY: 'overlay',
 })
 
@@ -142,8 +141,6 @@ const bindingSurfaces = Object.freeze(Object.values(ActionScope))
 function actionBindingSurfaces(action) {
   const definition = applicationActionCatalog[action]
   if (!definition) return []
-  // The comments list is an overlay with its own contextual bindings.
-  if (definition.scope === ActionScope.OVERLAY) return [ActionScope.OVERLAY, ActionScope.COMMENTS_LIST]
   if (definition.scope !== undefined) return [definition.scope]
   return bindingSurfaces
 }
