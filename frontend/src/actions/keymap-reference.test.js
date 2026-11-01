@@ -97,7 +97,6 @@ test('item navigation appears under Navigation with its effective bindings', () 
   ]) {
     const action = navigation.actions.find((action) => action.id === id)
     assert.deepEqual(action.sequences, [keys])
-    assert.match(action.description, /file.*review-source picker mode/)
     assert.equal(Object.hasOwn(action, 'scope'), false)
   }
 })

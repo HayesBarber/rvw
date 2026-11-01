@@ -29,8 +29,8 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `focus.diff_pane` | `<leader> o` | Focus the diff pane. |
 | `tree_mode.changes` | `c` | Show changed files. |
 | `tree_mode.files` | `f` | Show all repository files. |
-| `item.next` | `] b` | Open the next file in the current tree mode, or switch to the next review-source picker mode. |
-| `item.previous` | `[ b` | Open the previous file in the current tree mode, or switch to the previous review-source picker mode. |
+| `item.next` | `] b` | Move to the next item. |
+| `item.previous` | `[ b` | Move to the previous item. |
 | `file.history.back` | `<C-o>` | Open the previous available file in navigation history. |
 | `file.history.forward` | `<C-i>` | Open the next available file in navigation history. |
 | `file_finder.open` | `<C-p>`, `<D-p>`, `<leader> f` | Open the file finder. It respects `.gitignore`: tracked files plus untracked files git does not ignore. |
@@ -168,20 +168,3 @@ Use an absolute path. The selected file must be executable.
 If a setting is absent, Rvw finds the corresponding
 command (`git`, `gh`, or `rg`) on its process `PATH`.
 Omit the `executables` object to use this default for all three tools.
-
-## Action-name migration for the next major version
-
-Update these action names in `keybindings.normal` and `commandLine.aliases`
-targets. The old names are no longer accepted.
-
-| Old name | New name |
-| --- | --- |
-| `file.open.next` | `item.next` |
-| `file.open.previous` | `item.previous` |
-
-The default bindings remain `] b` and `[ b`. These actions open files in the
-workspace and switch modes in the review-source picker. Keyboard help lists
-them under Navigation.
-
-Keep `file.history.back` and `file.history.forward` for visited-file history.
-Their default bindings remain Ctrl+O and Ctrl+I.

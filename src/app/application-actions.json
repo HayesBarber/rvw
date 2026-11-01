@@ -150,13 +150,13 @@
     "name": "ITEM_NEXT",
     "id": "item.next",
     "group": "navigation",
-    "description": "Open the next file or switch to the next review-source picker mode."
+    "description": "Move to the next item."
   },
   {
     "name": "ITEM_PREVIOUS",
     "id": "item.previous",
     "group": "navigation",
-    "description": "Open the previous file or switch to the previous review-source picker mode."
+    "description": "Move to the previous item."
   },
   {
     "name": "FILE_HISTORY_BACK",
