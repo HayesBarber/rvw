@@ -145,31 +145,6 @@ both `g` and `g g`.
 - Multi-key sequences contain one JSON string per key and preserve order: `["g", "d"]`.
 - Use `<Space>`, not a literal space. `<leader>` is a placeholder in `keybindings.normal` sequences that expands to the `keybindings.leader` key, or `<Space>` when `leader` is omitted.
 
-## Review-source picker controls
-
-The picker screens are placeholders. Issues #279, #280, and #281 will add their
-controls. Those controls must use this contract:
-
-| Mode | `item.activate` (Enter) | `overlay.submit` (Shift+Enter) |
-| --- | --- | --- |
-| Commits | Check or uncheck the focused commit. | Submit the two checked commits. |
-| Pull requests | Submit the focused pull request. | Submit the focused pull request. |
-| Working tree | Activate the focused control. | Submit the working tree. |
-
-Use the existing cursor actions to move through lists. Use `item.next` and
-`item.previous` to switch picker modes. Keep native Enter activation for buttons.
-Register `overlay.submit` through the picker action adapter. Use one submission
-handler for the pointer control and the action.
-
-Block submission during loading, after a request error, or when the required
-selection is incomplete. Commits mode requires two distinct checked commits.
-Pull requests mode requires a focused pull request. Working tree mode allows
-submission after a successful load, including an empty change set.
-
-Shift+Enter dispatches the configured action from picker buttons. It does not
-activate the focused button. Other overlays do not submit unless they register
-a handler for `overlay.submit`.
-
 ## Executable paths
 
 Use `executables` in `~/.config/rvw/config.json` to select Git, GitHub CLI,
