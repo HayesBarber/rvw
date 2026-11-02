@@ -9,45 +9,9 @@ import {
   editComment,
   getConfiguration,
   getFilesNotIgnored,
-  listWorkingTreeChanges,
   reloadReview,
   searchText,
 } from './api.js'
-
-test('working-tree changes preserve summaries and failures through both transports', async () => {
-  const result = { files: [
-    { path: 'new 雪.txt', previousPath: 'old.txt', status: 'renamed', additions: 3, deletions: 0 },
-    { path: 'binary.dat', previousPath: null, status: 'added', additions: null, deletions: null },
-  ] }
-  const originalFetch = globalThis.fetch
-  const originalWindow = globalThis.window
-  try {
-    for (const native of [true, false]) {
-      let fail = false
-      globalThis.window = native ? { webkit: { messageHandlers: { native: {
-        async postMessage(request) {
-          assert.deepEqual(request, { type: 'list_working_tree_changes' })
-          if (fail) throw new Error('Repository unavailable')
-          return result
-        },
-      } } } } : {}
-      globalThis.fetch = async (url, options) => {
-        assert.equal(native, false)
-        assert.equal(url, '/api/repository/working-tree-changes')
-        assert.equal(options.method ?? 'GET', 'GET')
-        assert.equal(options.headers.Accept, 'application/json')
-        return { ok: !fail, status: fail ? 503 : 200,
-          json: async () => fail ? { error: { message: 'Repository unavailable' } } : result }
-      }
-      assert.deepEqual(await listWorkingTreeChanges(), result)
-      fail = true
-      await assert.rejects(listWorkingTreeChanges(), /Repository unavailable/)
-    }
-  } finally {
-    globalThis.fetch = originalFetch
-    globalThis.window = originalWindow
-  }
-})
 
 test('review reload uses equivalent native and HTTP requests', async () => {
   const nativeRequests = []

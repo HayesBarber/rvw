@@ -1,33 +1,28 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useId, useMemo, useRef, useState } from 'react'
 import { blockingOverlayActions, OverlayKind } from '../../actions/overlay-actions.js'
 import { createReviewSourcePickerModeActionRegistry } from '../../actions/review-source-picker-mode-actions.js'
 import { createReviewSourcePickerActionAdapter } from '../../actions/review-source-picker-actions.js'
-import { listWorkingTreeChanges } from '../../review/api.js'
-import { createWorkingTreeChangesRequest, startWorkingTreeChangesRequest } from '../../review/working-tree-changes-request.js'
 import Overlay from '../Overlay.jsx'
 import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
 import PullRequestPicker from './PullRequestPicker.jsx'
 import WorkingTreePicker from './WorkingTreePicker.jsx'
 
-export function ReviewSourcePickerContent({ mode, workingTreeRequest, onSelect, registerActionAdapter }) {
+export function ReviewSourcePickerContent({ mode, registerActionAdapter }) {
   switch (mode) {
     case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} />
     case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} />
-    case 'working-tree': return <WorkingTreePicker request={workingTreeRequest} onSelect={onSelect} registerActionAdapter={registerActionAdapter} />
+    case 'working-tree': return <WorkingTreePicker registerActionAdapter={registerActionAdapter} />
     default: return null
   }
 }
 
-export default function ReviewSourcePicker({ onClose, onSelect, registerActionAdapter }) {
+export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
   const [actions, setActions] = useState(blockingOverlayActions)
   const [modeActions] = useState(() => createReviewSourcePickerModeActionRegistry(setActions))
-  const [workingTreeRequest] = useState(() => createWorkingTreeChangesRequest({ listChanges: listWorkingTreeChanges }))
-
-  useEffect(() => startWorkingTreeChangesRequest(workingTreeRequest), [workingTreeRequest])
 
   const changeMode = useCallback((nextMode) => {
     if (nextMode === mode) return
@@ -63,7 +58,7 @@ export default function ReviewSourcePicker({ onClose, onSelect, registerActionAd
       </header>
       <ReviewSourceModeControl mode={mode} onChange={changeMode} />
       <div className="review-source-picker-body">
-        <ReviewSourcePickerContent mode={mode} workingTreeRequest={workingTreeRequest} onSelect={onSelect} registerActionAdapter={modeActions.register} />
+        <ReviewSourcePickerContent mode={mode} registerActionAdapter={modeActions.register} />
       </div>
     </Overlay>
   )

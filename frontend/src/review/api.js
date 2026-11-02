@@ -148,14 +148,6 @@ export async function getFilesNotIgnored() {
 }
 
 /**
- * Lists current working-tree changes against HEAD.
- * @returns {Promise<{ files: FileSummary[] }>}
- */
-export async function listWorkingTreeChanges() {
-  return requestJson('/api/repository/working-tree-changes', { type: 'list_working_tree_changes' })
-}
-
-/**
  * Loads one unchanged repository file in the same display shape as a diff.
  * @param {string} path
  * @returns {Promise<FileDiff>}
