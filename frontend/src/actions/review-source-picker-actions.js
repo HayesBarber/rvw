@@ -4,7 +4,6 @@ import { blockingOverlayActions } from './overlay-actions.js'
 export const reviewSourceModes = Object.freeze([
   Object.freeze({ value: 'commits', label: 'Commits' }),
   Object.freeze({ value: 'pull-requests', label: 'Pull requests' }),
-  Object.freeze({ value: 'working-tree', label: 'Working tree' }),
 ])
 
 /** The shell owns mode navigation; the active component owns list actions. */

@@ -30,14 +30,14 @@ test('the overlay receives the mode adapter directly, without catalog-wide handl
 test('cursor actions reach only the active picker mode and preserve counts', () => {
   const { registry, dispatch } = fixture()
   const calls = []
-  for (const mode of ['commits', 'pull-requests', 'working-tree']) {
+  for (const mode of ['commits', 'pull-requests']) {
     const unregister = registry.register({
       [ApplicationAction.CURSOR_DOWN]: (count) => { calls.push([mode, count]); return true },
     })
     assert.equal(dispatch(ApplicationAction.CURSOR_DOWN, 3), true)
     unregister()
   }
-  assert.deepEqual(calls, [['commits', 3], ['pull-requests', 3], ['working-tree', 3]])
+  assert.deepEqual(calls, [['commits', 3], ['pull-requests', 3]])
 })
 
 test('a mode change blocks actions until the new mode registers', () => {

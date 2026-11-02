@@ -587,10 +587,10 @@ textarea {
 
 .review-source-picker-dialog {
   width: min(640px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  max-height: min(720px, calc(100dvh - 64px));
   margin: auto;
   padding: 0;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #414145;
   border-radius: 10px;
   outline: none;
@@ -599,8 +599,14 @@ textarea {
   color: #fafafa;
 }
 
+.review-source-picker-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 .review-source-picker-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -629,6 +635,7 @@ textarea {
 
 .review-source-mode-control {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   gap: 4px;
   margin: 16px 20px 0;
@@ -663,8 +670,77 @@ textarea {
 }
 
 .review-source-picker-body {
-  min-height: 180px;
+  min-height: 0;
   padding: 20px;
+  overflow: auto;
+}
+
+.pull-request-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pull-request-picker-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #414145;
+  border-radius: 8px;
+  background: #202022;
+  color: #fafafa;
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.pull-request-picker-tile:hover {
+  border-color: #71717a;
+}
+
+.pull-request-picker-tile:focus-visible,
+.pull-request-picker-error button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.pull-request-picker-title,
+.pull-request-picker-branches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.pull-request-picker-number,
+.pull-request-picker-author,
+.pull-request-picker-branches {
+  color: #a1a1aa;
+  font-size: 0.8rem;
+}
+
+.pull-request-picker-draft {
+  padding: 2px 6px;
+  border: 1px solid #71717a;
+  border-radius: 4px;
+  color: #d4d4d8;
+  font-size: 0.75rem;
+}
+
+.pull-request-picker-error button {
+  padding: 6px 10px;
+  border: 1px solid #414145;
+  border-radius: 6px;
+  background: #202022;
+  color: #fafafa;
+  font: inherit;
+  cursor: pointer;
 }
 
 .keymap-reference-dialog {
