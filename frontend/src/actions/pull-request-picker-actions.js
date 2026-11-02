@@ -1,4 +1,6 @@
 import { RequestStatus } from '../review/request-state.js'
+import { ApplicationAction } from './application-actions.js'
+import { moveFileFinderSelection } from './file-finder-actions.js'
 
 /** Check the current request when a tile submits, including after a reload. */
 export function createPullRequestSubmitHandler({ getRequest, onSelect }) {
@@ -9,4 +11,41 @@ export function createPullRequestSubmitHandler({ getRequest, onSelect }) {
     onSelect(number)
     return true
   }
+}
+
+/** Focus a tile without activating it. Keep it inside the visible area. */
+export function focusPullRequestTile(list, number) {
+  const tile = list?.querySelector(`[data-pull-request-number="${number}"]`)
+  if (!tile) return false
+  tile.focus({ preventScroll: true })
+  tile.scrollIntoView({ block: 'nearest' })
+  return true
+}
+
+export function createPullRequestPickerActionAdapter({ getRequest, getFocusedNumber, focus, submit }) {
+  const getResults = () => {
+    const request = getRequest()
+    return request.status === RequestStatus.SUCCESS ? request.data : []
+  }
+  const move = (offset, count) => {
+    const results = getResults()
+    if (results.length === 0) return false
+    const index = results.findIndex(({ number }) => number === getFocusedNumber())
+    return focus(results[moveFileFinderSelection(results.length, index, offset, count)].number)
+  }
+  const edge = (last) => {
+    const results = getResults()
+    if (results.length === 0) return false
+    return focus(results[last ? results.length - 1 : 0].number)
+  }
+  const activate = () => submit(getFocusedNumber())
+
+  return Object.freeze({
+    [ApplicationAction.CURSOR_UP]: (count) => move(-1, count),
+    [ApplicationAction.CURSOR_DOWN]: (count) => move(1, count),
+    [ApplicationAction.CURSOR_FIRST]: () => edge(false),
+    [ApplicationAction.CURSOR_LAST]: () => edge(true),
+    [ApplicationAction.ITEM_ACTIVATE]: activate,
+    [ApplicationAction.OVERLAY_SUBMIT]: activate,
+  })
 }

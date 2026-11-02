@@ -65,13 +65,17 @@ test('loading, empty, and error states have no tiles', () => {
 test('pointer activation uses the guarded callback and sends only the clicked PR number', () => {
   let state = { status: 'success', data: pullRequests }
   const selected = []
+  const focused = []
   const onSubmit = createPullRequestSubmitHandler({
     getRequest: () => state, onSelect: (...args) => selected.push(args),
   })
-  const content = PullRequestPickerContent({ state, onSubmit })
+  const content = PullRequestPickerContent({ state, onSubmit, onFocus: (number) => focused.push(number) })
   const buttons = findAll(content, (node) => node.type === 'button')
   assert.equal(buttons[1].props.type, 'button')
   assert.equal(buttons[1].props['data-vim-native-activation'], true)
+  buttons[1].props.onFocus()
+  assert.deepEqual(focused, [7])
+  assert.deepEqual(selected, [])
   buttons[1].props.onClick()
   assert.deepEqual(selected, [[7]])
   state = { status: 'loading', data: [] }
