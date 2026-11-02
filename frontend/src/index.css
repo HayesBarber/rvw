@@ -587,10 +587,10 @@ textarea {
 
 .review-source-picker-dialog {
   width: min(640px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  max-height: min(720px, calc(100dvh - 64px));
   margin: auto;
   padding: 0;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #414145;
   border-radius: 10px;
   outline: none;
@@ -599,8 +599,14 @@ textarea {
   color: #fafafa;
 }
 
+.review-source-picker-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 .review-source-picker-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -629,6 +635,7 @@ textarea {
 
 .review-source-mode-control {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   gap: 4px;
   margin: 16px 20px 0;
@@ -663,8 +670,9 @@ textarea {
 }
 
 .review-source-picker-body {
-  min-height: 180px;
+  min-height: 0;
   padding: 20px;
+  overflow: auto;
 }
 
 .pull-request-picker-list {
