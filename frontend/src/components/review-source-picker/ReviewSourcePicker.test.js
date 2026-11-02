@@ -6,6 +6,7 @@ import { createServer } from 'vite'
 import { ApplicationAction } from '../../actions/application-actions.js'
 import { createApplicationDispatcher } from '../../actions/application-dispatch.js'
 import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-actions.js'
+import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 
 let server
 let ReviewSourcePicker
@@ -44,7 +45,7 @@ test('the picker starts with only Commits selected', () => {
   assert.match(html, /role="group" aria-label="Review source mode"/)
   assert.match(html, /aria-pressed="true">Commits<\/button>/)
   assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
-  assert.match(html, /aria-pressed="false">Working tree<\/button>/)
+  assert.doesNotMatch(html, /Working tree/)
   assert.match(html, /Commit range selection is not available yet\./)
   assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
 })
@@ -53,10 +54,9 @@ test('each mode displays only its corresponding content', () => {
   for (const [mode, expected] of [
     ['commits', 'Commit range'],
     ['pull-requests', null],
-    ['working-tree', 'Working tree'],
   ]) {
     const registerActionAdapter = () => () => {}
-    const content = ReviewSourcePickerContent({ mode, registerActionAdapter })
+    const content = ReviewSourcePickerContent({ mode, registerActionAdapter, pullRequestsRequest: createPullRequestsRequest() })
     assert.equal(content.props.registerActionAdapter, registerActionAdapter)
     const html = renderToStaticMarkup(content)
     assert.equal(html, expected
@@ -65,16 +65,29 @@ test('each mode displays only its corresponding content', () => {
   }
 })
 
-test('the pull request mode receives the selection callback', () => {
+test('the pull request mode receives the overlay request and selection callback', async () => {
   const onSelectPullRequest = () => {}
-  const content = ReviewSourcePickerContent({ mode: 'pull-requests', onSelectPullRequest })
+  let loads = 0
+  const pullRequestsRequest = createPullRequestsRequest({ list: async () => {
+    loads += 1
+    return { pullRequests: [{ number: 42, title: 'Loaded once', authorLogin: 'author', baseRefName: 'main', headRefName: 'fix' }] }
+  } })
+  await pullRequestsRequest.load()
+  const props = { onSelectPullRequest, pullRequestsRequest }
+  const content = ReviewSourcePickerContent({ ...props, mode: 'pull-requests' })
   assert.equal(content.props.onSelect, onSelectPullRequest)
+  assert.equal(content.props.request, pullRequestsRequest)
+  ReviewSourcePickerContent({ ...props, mode: 'commits' })
+  const reopened = ReviewSourcePickerContent({ ...props, mode: 'pull-requests' })
+  assert.equal(reopened.props.request, pullRequestsRequest)
+  assert.match(renderToStaticMarkup(reopened), /Loaded once/)
+  assert.equal(loads, 1)
 })
 
 test('mode controls select one mode at a time', () => {
   let mode = 'commits'
   const onChange = (value) => { mode = value }
-  for (const value of ['pull-requests', 'working-tree', 'commits']) {
+  for (const value of ['pull-requests', 'commits']) {
     const controls = ReviewSourceModeControl({ mode, onChange })
     const button = controls.props.children.find((child) => child.key === value)
     assert.equal(button.props.type, 'button')

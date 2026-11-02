@@ -1,7 +1,7 @@
 import { listOpenPullRequests } from './api.js'
 import { RequestStatus } from './request-state.js'
 
-/** Owns one picker's requests. Cancel when the picker unmounts. */
+/** Owns one overlay's requests. Cancel when the overlay unmounts. */
 export function createPullRequestsRequest({ list = listOpenPullRequests } = {}) {
   let state = { status: RequestStatus.IDLE, data: [], error: null }
   let generation = 0

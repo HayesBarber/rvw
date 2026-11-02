@@ -44,7 +44,7 @@ test('default and custom submit bindings reach only the registered picker mode h
     })
     assert.equal(dispatch(ApplicationAction.OVERLAY_SUBMIT), false)
     const submitted = []
-    for (const mode of ['commits', 'pull-requests', 'working-tree']) {
+    for (const mode of ['commits', 'pull-requests']) {
       const unregister = modes.register({
         [ApplicationAction.OVERLAY_SUBMIT]: () => { submitted.push(mode); return true },
         [ApplicationAction.ITEM_ACTIVATE]: () => assert.fail('Submission activated an item'),
@@ -54,7 +54,7 @@ test('default and custom submit bindings reach only the registered picker mode h
       unregister()
       assert.equal(dispatch(ApplicationAction.OVERLAY_SUBMIT), false)
     }
-    assert.deepEqual(submitted, ['commits', 'pull-requests', 'working-tree'])
+    assert.deepEqual(submitted, ['commits', 'pull-requests'])
     modes.register({ [ApplicationAction.OVERLAY_SUBMIT]: () => false })
     assert.equal(dispatch(ApplicationAction.OVERLAY_SUBMIT), false)
     modes.clear()

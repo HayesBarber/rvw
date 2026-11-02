@@ -26,10 +26,10 @@ test('default and configured item navigation bindings change picker modes', () =
     const controller = new VimController({ bindings: result.bindings })
     controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
     for (const [keys, expected] of [
-      [nextKeys, 'pull-requests'], [nextKeys, 'working-tree'], [nextKeys, 'commits'],
-      [previousKeys, 'working-tree'], [previousKeys, 'pull-requests'], [previousKeys, 'commits'],
-      [['2', ...nextKeys], 'working-tree'], [['9', ...previousKeys], 'working-tree'],
-      [['4', ...nextKeys], 'commits'], [['4', ...previousKeys], 'working-tree'],
+      [nextKeys, 'pull-requests'], [nextKeys, 'commits'],
+      [previousKeys, 'pull-requests'], [previousKeys, 'commits'],
+      [['2', ...nextKeys], 'commits'], [['9', ...previousKeys], 'pull-requests'],
+      [['4', ...nextKeys], 'pull-requests'], [['3', ...previousKeys], 'commits'],
     ]) {
       for (const key of keys) assert.equal(controller.dispatch({ type: 'key', key }).handled, true)
       assert.equal(mode, expected)
@@ -55,7 +55,7 @@ test('the shell owns mode navigation while cursor actions retain the child handl
   assert.equal(actions[ApplicationAction.ITEM_NEXT](1), true)
   assert.equal(actions[ApplicationAction.ITEM_PREVIOUS](1), true)
   assert.deepEqual(counts, [4])
-  assert.deepEqual(modes, ['working-tree', 'commits'])
+  assert.deepEqual(modes, ['commits', 'commits'])
   assert.equal(actions[ApplicationAction.RELOAD_REVIEW], undefined)
 })
 

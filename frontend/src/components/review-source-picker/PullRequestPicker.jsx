@@ -1,7 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { createPullRequestSubmitHandler } from '../../actions/pull-request-picker-actions.js'
 import { blockingOverlayActions } from '../../actions/overlay-actions.js'
-import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 
 export function PullRequestPickerContent({ state, onSubmit, onRetry }) {
   if (state.status === 'idle' || state.status === 'loading') {
@@ -44,18 +43,12 @@ export function PullRequestPickerContent({ state, onSubmit, onRetry }) {
   )
 }
 
-export default function PullRequestPicker({ registerActionAdapter, onSelect }) {
-  const [request] = useState(createPullRequestsRequest)
+export default function PullRequestPicker({ registerActionAdapter, onSelect, request }) {
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
   const submit = useMemo(() => createPullRequestSubmitHandler({
     getRequest: request.getSnapshot, onSelect,
   }), [onSelect, request])
 
   useLayoutEffect(() => registerActionAdapter(blockingOverlayActions), [registerActionAdapter])
-  useEffect(() => {
-    request.load()
-    return () => request.cancel()
-  }, [request])
-
   return <PullRequestPickerContent state={state} onSubmit={submit} onRetry={request.load} />
 }
