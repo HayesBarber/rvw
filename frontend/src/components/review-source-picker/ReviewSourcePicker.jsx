@@ -8,16 +8,16 @@ import CommitRangePicker from './CommitRangePicker.jsx'
 import PullRequestPicker from './PullRequestPicker.jsx'
 import WorkingTreePicker from './WorkingTreePicker.jsx'
 
-export function ReviewSourcePickerContent({ mode, registerActionAdapter }) {
+export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest }) {
   switch (mode) {
     case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} />
-    case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} />
+    case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} onSelect={onSelectPullRequest} />
     case 'working-tree': return <WorkingTreePicker registerActionAdapter={registerActionAdapter} />
     default: return null
   }
 }
 
-export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
+export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
@@ -58,7 +58,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter }) {
       </header>
       <ReviewSourceModeControl mode={mode} onChange={changeMode} />
       <div className="review-source-picker-body">
-        <ReviewSourcePickerContent mode={mode} registerActionAdapter={modeActions.register} />
+        <ReviewSourcePickerContent mode={mode} registerActionAdapter={modeActions.register} onSelectPullRequest={onSelectPullRequest} />
       </div>
     </Overlay>
   )

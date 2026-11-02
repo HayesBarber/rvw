@@ -49,18 +49,26 @@ test('the picker starts with only Commits selected', () => {
   assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
 })
 
-test('each mode displays only its corresponding placeholder', () => {
+test('each mode displays only its corresponding content', () => {
   for (const [mode, expected] of [
     ['commits', 'Commit range'],
-    ['pull-requests', 'Pull request'],
+    ['pull-requests', null],
     ['working-tree', 'Working tree'],
   ]) {
     const registerActionAdapter = () => () => {}
     const content = ReviewSourcePickerContent({ mode, registerActionAdapter })
     assert.equal(content.props.registerActionAdapter, registerActionAdapter)
     const html = renderToStaticMarkup(content)
-    assert.equal(html, `<p>${expected} selection is not available yet.</p>`)
+    assert.equal(html, expected
+      ? `<p>${expected} selection is not available yet.</p>`
+      : '<p role="status">Loading pull requests…</p>')
   }
+})
+
+test('the pull request mode receives the selection callback', () => {
+  const onSelectPullRequest = () => {}
+  const content = ReviewSourcePickerContent({ mode: 'pull-requests', onSelectPullRequest })
+  assert.equal(content.props.onSelect, onSelectPullRequest)
 })
 
 test('mode controls select one mode at a time', () => {
