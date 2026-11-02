@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { createPullRequestPickerActionAdapter, createPullRequestSubmitHandler, focusPullRequestTile } from '../../actions/pull-request-picker-actions.js'
+import { centerPullRequestTile, createPullRequestPickerActionAdapter, createPullRequestSubmitHandler, focusPullRequestTile } from '../../actions/pull-request-picker-actions.js'
 
 export function PullRequestPickerContent({ state, onSubmit, onRetry, listRef, onFocus }) {
   if (state.status === 'idle' || state.status === 'loading') {
@@ -51,6 +51,7 @@ export default function PullRequestPicker({ registerActionAdapter, onSelect, req
   const rememberFocus = useCallback((number) => { focusedNumber.current = number }, [])
   const getFocusedNumber = useCallback(() => focusedNumber.current, [])
   const focus = useCallback((number) => focusPullRequestTile(listRef.current, number), [])
+  const center = useCallback((number) => centerPullRequestTile(listRef.current, number), [])
   const submit = useMemo(() => createPullRequestSubmitHandler({
     getRequest: request.getSnapshot, onSelect,
   }), [onSelect, request])
@@ -59,8 +60,9 @@ export default function PullRequestPicker({ registerActionAdapter, onSelect, req
     getRequest: request.getSnapshot,
     getFocusedNumber,
     focus,
+    center,
     submit,
-  })), [focus, getFocusedNumber, registerActionAdapter, request, submit])
+  })), [center, focus, getFocusedNumber, registerActionAdapter, request, submit])
   useLayoutEffect(() => {
     focusedNumber.current = null
     if (state.status === 'success' && state.data.length > 0) focus(state.data[0].number)

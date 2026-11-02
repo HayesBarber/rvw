@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createPullRequestPickerActionAdapter, createPullRequestSubmitHandler, focusPullRequestTile } from './pull-request-picker-actions.js'
+import { centerPullRequestTile, createPullRequestPickerActionAdapter, createPullRequestSubmitHandler, focusPullRequestTile } from './pull-request-picker-actions.js'
 import { createPullRequestsRequest } from '../review/pull-requests-request.js'
 import { ApplicationAction } from './application-actions.js'
 import { createApplicationDispatcher } from './application-dispatch.js'
@@ -14,11 +14,13 @@ function fixture(normal = {}) {
   let state = { status: 'success', data: [{ number: 42 }, { number: 7 }, { number: 18 }] }
   let focused = 42
   const selected = []
+  const centered = []
   const getRequest = () => state
   const submit = createPullRequestSubmitHandler({ getRequest, onSelect: (number) => selected.push(number) })
   const actions = createPullRequestPickerActionAdapter({
     getRequest, getFocusedNumber: () => focused,
     focus: (number) => { focused = number; return true }, submit,
+    center: (number) => { centered.push(number); return true },
   })
   const overlays = createOverlayActionRegistry()
   const overlay = overlays.register(OverlayKind.REVIEW_SOURCE_PICKER)
@@ -36,7 +38,7 @@ function fixture(normal = {}) {
   const controller = new VimController({ bindings: configuration.bindings })
   controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
   return {
-    actions, dispatch, modes, selected,
+    actions, dispatch, modes, selected, centered,
     getFocus: () => focused,
     setFocus: (number) => { focused = number },
     setState: (next) => { state = next },
@@ -63,6 +65,19 @@ test('Enter and Shift+Enter use the focused PR and the same guarded submit handl
   assert.deepEqual(selected, [7, 7])
 })
 
+test('default and custom center bindings center the focused PR without moving focus or submitting', () => {
+  for (const [normal, keys] of [
+    [{}, ['z', 'z']],
+    [{ [ApplicationAction.CURSOR_CENTER]: [['<leader>', 'z']] }, ['<Space>', 'z']],
+  ]) {
+    const { press, getFocus, selected, centered } = fixture(normal)
+    press(['j', ...keys])
+    assert.equal(getFocus(), 7)
+    assert.deepEqual(centered, [7])
+    assert.deepEqual(selected, [])
+  }
+})
+
 test('custom cursor, activation, and submission bindings reach the PR mode', () => {
   const { press, getFocus, selected } = fixture({
     [ApplicationAction.CURSOR_DOWN]: [['<leader>', 'j']],
@@ -77,7 +92,7 @@ test('custom cursor, activation, and submission bindings reach the PR mode', () 
 })
 
 test('PR actions reject unavailable data and missing focus without reaching workspace actions', () => {
-  const { dispatch, setState, setFocus, selected } = fixture()
+  const { dispatch, setState, setFocus, selected, centered } = fixture()
   for (const state of [
     { status: 'idle', data: [{ number: 42 }] },
     { status: 'loading', data: [{ number: 42 }] },
@@ -95,10 +110,12 @@ test('PR actions reject unavailable data and missing focus without reaching work
     setFocus(number)
     assert.equal(dispatch(ApplicationAction.ITEM_ACTIVATE), false)
     assert.equal(dispatch(ApplicationAction.OVERLAY_SUBMIT), false)
+    assert.equal(dispatch(ApplicationAction.CURSOR_CENTER), false)
   }
   assert.equal(dispatch(ApplicationAction.RELOAD_REVIEW), false)
   assert.equal(dispatch(ApplicationAction.ADD_COMMENT), false)
   assert.deepEqual(selected, [])
+  assert.deepEqual(centered, [])
 })
 
 test('leaving the PR mode removes its submission handlers', () => {
@@ -123,6 +140,21 @@ test('tile focus prevents automatic page scrolling and reveals the focused tile'
   assert.deepEqual(calls, [['focus', { preventScroll: true }], ['scroll', { block: 'nearest' }]])
   assert.equal(focusPullRequestTile(null, 42), false)
   assert.equal(focusPullRequestTile({ querySelector: () => null }, 42), false)
+})
+
+test('centering scrolls to the tile center without moving DOM focus', () => {
+  const calls = []
+  const list = { querySelector: (selector) => {
+    assert.equal(selector, '[data-pull-request-number="42"]')
+    return {
+      focus: () => assert.fail('Centering moved focus'),
+      scrollIntoView: (options) => calls.push(options),
+    }
+  } }
+  assert.equal(centerPullRequestTile(list, 42), true)
+  assert.deepEqual(calls, [{ block: 'center' }])
+  assert.equal(centerPullRequestTile(null, 42), false)
+  assert.equal(centerPullRequestTile({ querySelector: () => null }, 42), false)
 })
 
 test('submission reports only the PR number', () => {

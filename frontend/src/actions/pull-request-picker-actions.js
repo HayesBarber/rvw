@@ -22,7 +22,15 @@ export function focusPullRequestTile(list, number) {
   return true
 }
 
-export function createPullRequestPickerActionAdapter({ getRequest, getFocusedNumber, focus, submit }) {
+/** Center the focused tile without changing focus or submitting a PR. */
+export function centerPullRequestTile(list, number) {
+  const tile = list?.querySelector(`[data-pull-request-number="${number}"]`)
+  if (!tile) return false
+  tile.scrollIntoView({ block: 'center' })
+  return true
+}
+
+export function createPullRequestPickerActionAdapter({ getRequest, getFocusedNumber, focus, center, submit }) {
   const getResults = () => {
     const request = getRequest()
     return request.status === RequestStatus.SUCCESS ? request.data : []
@@ -45,6 +53,11 @@ export function createPullRequestPickerActionAdapter({ getRequest, getFocusedNum
     [ApplicationAction.CURSOR_DOWN]: (count) => move(1, count),
     [ApplicationAction.CURSOR_FIRST]: () => edge(false),
     [ApplicationAction.CURSOR_LAST]: () => edge(true),
+    [ApplicationAction.CURSOR_CENTER]: () => {
+      const number = getFocusedNumber()
+      if (!getResults().some((pullRequest) => pullRequest.number === number)) return false
+      return center(number)
+    },
     [ApplicationAction.ITEM_ACTIVATE]: activate,
     [ApplicationAction.OVERLAY_SUBMIT]: activate,
   })
