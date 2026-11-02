@@ -9,9 +9,68 @@ import {
   editComment,
   getConfiguration,
   getFilesNotIgnored,
+  listOpenPullRequests,
   reloadReview,
   searchText,
 } from './api.js'
+
+for (const pullRequests of [[], [
+  { number: 42, title: 'Fix 雪', authorLogin: 'author', url: 'https://github.com/owner/repo/pull/42',
+    isDraft: true, baseRefName: 'main', headRefName: 'feature/雪' },
+  { number: 7, title: 'Earlier PR', authorLogin: 'other', url: 'https://github.com/owner/repo/pull/7',
+    isDraft: false, baseRefName: 'release', headRefName: 'fix' },
+]]) {
+  test(`open PR listing preserves ${pullRequests.length} results on native and HTTP transports`, async () => {
+    const previousWindow = globalThis.window
+    const previousFetch = globalThis.fetch
+    const result = { pullRequests }
+    const requests = []
+    try {
+      globalThis.window = { webkit: { messageHandlers: { native: {
+        postMessage: async (request) => { requests.push(request); return result },
+      } } } }
+      globalThis.fetch = () => assert.fail('Native listing used HTTP')
+      assert.deepEqual(await listOpenPullRequests(), result)
+      assert.deepEqual(requests, [{ type: 'list_open_pull_requests' }])
+
+      globalThis.window = {}
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/api/repository/pull-requests')
+        assert.equal(options.method ?? 'GET', 'GET')
+        assert.equal(options.headers.Accept, 'application/json')
+        assert.equal(options.body, undefined)
+        return { ok: true, status: 200, json: async () => result }
+      }
+      assert.deepEqual(await listOpenPullRequests(), result)
+    } finally {
+      globalThis.window = previousWindow
+      globalThis.fetch = previousFetch
+    }
+  })
+}
+
+test('open PR listing reports native, HTTP, and invalid-response errors', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.window = { webkit: { messageHandlers: { native: {
+      postMessage: async () => { throw new Error('GitHub authentication failed') },
+    } } } }
+    await assert.rejects(listOpenPullRequests(), /GitHub authentication failed/)
+    globalThis.window = {}
+    globalThis.fetch = async () => ({ ok: false, status: 503,
+      json: async () => ({ error: { message: 'GitHub CLI is unavailable' } }),
+    })
+    await assert.rejects(listOpenPullRequests(), /GitHub CLI is unavailable/)
+    globalThis.fetch = async () => ({ ok: true, status: 200,
+      json: async () => { throw new SyntaxError('Invalid JSON') },
+    })
+    await assert.rejects(listOpenPullRequests(), /invalid response \(200\)/)
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.fetch = previousFetch
+  }
+})
 
 test('review reload uses equivalent native and HTTP requests', async () => {
   const nativeRequests = []

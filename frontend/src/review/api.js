@@ -148,6 +148,25 @@ export async function getFilesNotIgnored() {
 }
 
 /**
+ * @typedef {Object} PullRequest
+ * @property {number} number
+ * @property {string} title
+ * @property {string} authorLogin
+ * @property {string} url
+ * @property {boolean} isDraft
+ * @property {string} baseRefName
+ * @property {string} headRefName
+ */
+
+/**
+ * Lists open pull requests, including drafts, in the API response order.
+ * @returns {Promise<{ pullRequests: PullRequest[] }>}
+ */
+export async function listOpenPullRequests() {
+  return requestJson('/api/repository/pull-requests', { type: 'list_open_pull_requests' })
+}
+
+/**
  * Loads one unchanged repository file in the same display shape as a diff.
  * @param {string} path
  * @returns {Promise<FileDiff>}
