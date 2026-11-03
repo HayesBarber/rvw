@@ -8,15 +8,15 @@ import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
 import PullRequestPicker from './PullRequestPicker.jsx'
 
-export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest, pullRequestsRequest }) {
+export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest, onSelectComparison, pullRequestsRequest }) {
   switch (mode) {
-    case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} />
+    case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} onSelect={onSelectComparison} />
     case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} onSelect={onSelectPullRequest} request={pullRequestsRequest} />
     default: return null
   }
 }
 
-export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest }) {
+export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest, onSelectComparison }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
@@ -67,6 +67,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
           mode={mode}
           registerActionAdapter={modeActions.register}
           onSelectPullRequest={onSelectPullRequest}
+          onSelectComparison={onSelectComparison}
           pullRequestsRequest={pullRequestsRequest}
         />
       </div>

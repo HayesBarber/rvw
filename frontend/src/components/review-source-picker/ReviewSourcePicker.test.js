@@ -45,23 +45,28 @@ test('the picker starts with only Commits selected', () => {
   assert.match(html, /role="group" aria-label="Review source mode"/)
   assert.match(html, /aria-pressed="true">Commits<\/button>/)
   assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
-  assert.doesNotMatch(html, /Working tree/)
-  assert.match(html, /Commit range selection is not available yet\./)
+  assert.match(html, /Working tree/)
+  assert.match(html, /Loading commits…/)
+  assert.doesNotMatch(html, /aria-pressed="false">Working tree<\/button>/)
   assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
 })
 
 test('each mode displays only its corresponding content', () => {
   for (const [mode, expected] of [
-    ['commits', 'Commit range'],
+    ['commits', 'Loading commits…'],
     ['pull-requests', null],
   ]) {
     const registerActionAdapter = () => () => {}
     const content = ReviewSourcePickerContent({ mode, registerActionAdapter, pullRequestsRequest: createPullRequestsRequest() })
     assert.equal(content.props.registerActionAdapter, registerActionAdapter)
     const html = renderToStaticMarkup(content)
-    assert.equal(html, expected
-      ? `<p>${expected} selection is not available yet.</p>`
-      : '<p role="status">Loading pull requests…</p>')
+    if (expected) {
+      assert(html.includes(expected))
+      assert.match(html, /Working tree/)
+      assert.doesNotMatch(html, /Loading pull requests/)
+    } else {
+      assert.equal(html, '<p role="status">Loading pull requests…</p>')
+    }
   }
 })
 
@@ -118,4 +123,10 @@ test('the picker registration blocks all workspace actions until it closes', () 
   assert.equal(dispatch(ApplicationAction.ADD_COMMENT), true)
   assert.equal(dispatch(ApplicationAction.RELOAD_REVIEW), true)
   assert.deepEqual(calls, ['comment', 'reload'])
+})
+
+test('the commits mode receives the comparison callback', () => {
+  const onSelectComparison = () => {}
+  const content = ReviewSourcePickerContent({ mode: 'commits', onSelectComparison })
+  assert.equal(content.props.onSelect, onSelectComparison)
 })
