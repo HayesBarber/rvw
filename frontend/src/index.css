@@ -599,6 +599,11 @@ textarea {
   color: #fafafa;
 }
 
+/* A definite height prevents WebKit from collapsing the nested flex body. */
+.review-source-picker-dialog-commits {
+  height: min(720px, calc(100dvh - 64px));
+}
+
 .review-source-picker-dialog[open] {
   display: flex;
   flex-direction: column;

@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
 import test, { after, before } from 'node:test'
+import { execFile } from 'node:child_process'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import process from 'node:process'
+import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
@@ -153,5 +160,30 @@ test('the review button is outside the scroll area in every request state', () =
     const submit = (node) => node.props.className === 'comparison-picker-submit'
     assert.equal(findAll(scroll, submit).length, 0)
     assert.equal(findAll(footer, submit).length, 1)
+  }
+})
+
+test('WebKit keeps the comparison body and submit button visible at supported window sizes', {
+  skip: process.platform !== 'darwin', timeout: 60000,
+}, async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'rvw-comparison-layout-'))
+  try {
+    const { default: Picker } = await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourcePicker.jsx')
+    const shell = renderToStaticMarkup(createElement(Picker, { registerActionAdapter: () => {} }))
+    const idle = render({ status: 'idle', data: [], error: null })
+    const history = Array.from({ length: 30 }, (_, index) => ({ ...commits[0], sha: String(index).padStart(40, '0') }))
+    const content = render({ status: 'success', data: history }, comparisonEndpoints(history).slice(1, 3))
+    assert(shell.includes(idle))
+    const css = await readFile(new URL('../../index.css', import.meta.url), 'utf8')
+    const fixture = join(directory, 'picker.html')
+    await writeFile(fixture, `<!doctype html><meta charset="utf-8"><style>${css}</style>${shell.replace(idle, content)}`)
+    const run = promisify(execFile)
+    const binary = join(directory, 'layout-test')
+    const source = fileURLToPath(new URL('../../../../macos/web/comparison_picker_layout_tests.swift', import.meta.url))
+    await run('xcrun', ['swiftc', source, '-o', binary], { timeout: 30000 })
+    const { stdout } = await run(binary, [fixture], { timeout: 25000 })
+    assert.match(stdout, /WebKit comparison layout passed/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
   }
 })
