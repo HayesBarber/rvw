@@ -148,6 +148,22 @@ export async function getFilesNotIgnored() {
 }
 
 /**
+ * @typedef {Object} Commit
+ * @property {string} sha Full commit SHA.
+ * @property {string} subject
+ * @property {string} authorName
+ * @property {string} commitDate
+ */
+
+/**
+ * Lists recent commits in API order. The result contains only commits.
+ * @returns {Promise<{ commits: Commit[] }>}
+ */
+export async function listCommits() {
+  return requestJson('/api/repository/commits', { type: 'list_commits' })
+}
+
+/**
  * @typedef {Object} PullRequest
  * @property {number} number
  * @property {string} title

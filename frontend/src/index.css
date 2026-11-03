@@ -586,8 +586,10 @@ textarea {
 }
 
 .review-source-picker-dialog {
-  width: min(640px, calc(100vw - 32px));
-  max-height: min(720px, calc(100dvh - 64px));
+  width: min(736px, calc(100vw - 32px));
+  /* A definite height also prevents WebKit from collapsing the flex body. */
+  height: min(828px, calc(100dvh - 64px));
+  max-height: min(828px, calc(100dvh - 64px));
   margin: auto;
   padding: 0;
   overflow: hidden;
@@ -741,6 +743,190 @@ textarea {
   color: #fafafa;
   font: inherit;
   cursor: pointer;
+}
+
+.review-source-picker-body[data-mode='commits'] {
+  display: flex;
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.comparison-picker {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.comparison-picker-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
+}
+
+.comparison-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-top: 1px solid #303033;
+}
+
+.comparison-picker-metadata {
+  color: #a1a1aa;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.comparison-picker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comparison-picker-list li {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.comparison-picker-list li:not(:last-child)::before {
+  position: absolute;
+  z-index: 1;
+  top: 22px;
+  bottom: -22px;
+  left: 19px;
+  width: 2px;
+  background: #52525b;
+  content: '';
+  pointer-events: none;
+}
+
+.comparison-picker-node {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #fafafa;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comparison-picker-node:hover:not(:disabled) {
+  background: #202022;
+}
+
+.comparison-picker-list li[data-in-comparison='true'] .comparison-picker-node {
+  background: #1b2735;
+}
+
+.comparison-picker-list li[data-in-comparison='true']:not([data-comparison-role='Base'])::before {
+  background: #93c5fd;
+}
+
+.comparison-picker-node[aria-pressed='true'] {
+  border-color: #3b526d;
+  background: #1b2735;
+}
+
+.comparison-picker-node:focus-visible,
+.comparison-picker-error button:focus-visible,
+.comparison-picker-submit:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.comparison-picker-marker {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 2px solid #71717a;
+  border-radius: 50%;
+  background: #141415;
+  color: #141415;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.comparison-picker-marker-working-tree {
+  border-radius: 4px;
+  border-color: #d4d4d8;
+}
+
+.comparison-picker-node[aria-pressed='true'] .comparison-picker-marker {
+  border-color: #93c5fd;
+  background: #93c5fd;
+}
+
+.comparison-picker-details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.comparison-picker-title,
+.comparison-picker-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.comparison-picker-title code {
+  color: #a1a1aa;
+  font-size: 0.8rem;
+}
+
+.comparison-picker-title strong {
+  min-width: 0;
+}
+
+.comparison-picker-role {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #31455e;
+  color: #bfdbfe;
+  font-size: 0.75rem;
+}
+
+.comparison-picker-metadata {
+  margin-top: 6px;
+}
+
+.comparison-picker-submit,
+.comparison-picker-error button {
+  padding: 8px 12px;
+  border: 1px solid #414145;
+  border-radius: 6px;
+  background: #202022;
+  color: #fafafa;
+  font: inherit;
+  cursor: pointer;
+}
+
+.comparison-picker-submit {
+  border-color: #3778c2;
+  background: #2463a8;
+}
+
+.comparison-picker-submit:hover:not(:disabled) {
+  background: #2d74c4;
+}
+
+.comparison-picker button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .keymap-reference-dialog {

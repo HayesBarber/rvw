@@ -6,6 +6,7 @@ import { createServer } from 'vite'
 import { ApplicationAction } from '../../actions/application-actions.js'
 import { createApplicationDispatcher } from '../../actions/application-dispatch.js'
 import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-actions.js'
+import { createCommitsRequest } from '../../review/commits-request.js'
 import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 
 let server
@@ -45,23 +46,28 @@ test('the picker starts with only Commits selected', () => {
   assert.match(html, /role="group" aria-label="Review source mode"/)
   assert.match(html, /aria-pressed="true">Commits<\/button>/)
   assert.match(html, /aria-pressed="false">Pull requests<\/button>/)
-  assert.doesNotMatch(html, /Working tree/)
-  assert.match(html, /Commit range selection is not available yet\./)
+  assert.match(html, /Working tree/)
+  assert.match(html, /Loading commits…/)
+  assert.doesNotMatch(html, /aria-pressed="false">Working tree<\/button>/)
   assert.doesNotMatch(html, /Pull request selection|Working tree selection/)
 })
 
 test('each mode displays only its corresponding content', () => {
   for (const [mode, expected] of [
-    ['commits', 'Commit range'],
+    ['commits', 'Loading commits…'],
     ['pull-requests', null],
   ]) {
     const registerActionAdapter = () => () => {}
-    const content = ReviewSourcePickerContent({ mode, registerActionAdapter, pullRequestsRequest: createPullRequestsRequest() })
+    const content = ReviewSourcePickerContent({ mode, registerActionAdapter, commitsRequest: createCommitsRequest(), pullRequestsRequest: createPullRequestsRequest() })
     assert.equal(content.props.registerActionAdapter, registerActionAdapter)
     const html = renderToStaticMarkup(content)
-    assert.equal(html, expected
-      ? `<p>${expected} selection is not available yet.</p>`
-      : '<p role="status">Loading pull requests…</p>')
+    if (expected) {
+      assert(html.includes(expected))
+      assert.match(html, /Working tree/)
+      assert.doesNotMatch(html, /Loading pull requests/)
+    } else {
+      assert.equal(html, '<p role="status">Loading pull requests…</p>')
+    }
   }
 })
 
@@ -118,4 +124,24 @@ test('the picker registration blocks all workspace actions until it closes', () 
   assert.equal(dispatch(ApplicationAction.ADD_COMMENT), true)
   assert.equal(dispatch(ApplicationAction.RELOAD_REVIEW), true)
   assert.deepEqual(calls, ['comment', 'reload'])
+})
+
+test('the commits mode retains the overlay request and comparison callback across mode changes', async () => {
+  const onSelectComparison = () => {}
+  let loads = 0
+  const commitsRequest = createCommitsRequest({ list: async () => {
+    loads += 1
+    return { commits: [{ sha: 'a'.repeat(40), subject: 'Loaded once', authorName: 'Author', commitDate: '2026-11-03' }] }
+  } })
+  await commitsRequest.load()
+  const props = { onSelectComparison, commitsRequest }
+  const content = ReviewSourcePickerContent({ ...props, mode: 'commits' })
+  assert.equal(content.props.onSelect, onSelectComparison)
+  assert.equal(content.props.request, commitsRequest)
+  assert.match(renderToStaticMarkup(content), /Loaded once/)
+  ReviewSourcePickerContent({ ...props, mode: 'pull-requests' })
+  const returned = ReviewSourcePickerContent({ ...props, mode: 'commits' })
+  assert.equal(returned.props.request, commitsRequest)
+  assert.match(renderToStaticMarkup(returned), /Loaded once/)
+  assert.equal(loads, 1)
 })

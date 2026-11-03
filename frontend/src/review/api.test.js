@@ -9,10 +9,67 @@ import {
   editComment,
   getConfiguration,
   getFilesNotIgnored,
+  listCommits,
   listOpenPullRequests,
   reloadReview,
   searchText,
 } from './api.js'
+
+for (const commits of [[], [
+  { sha: 'b'.repeat(40), subject: 'Fix 雪', authorName: 'Test Author', commitDate: '2026-11-03T10:00:00-05:00' },
+  { sha: 'a'.repeat(40), subject: 'Earlier commit', authorName: 'Other Author', commitDate: '2026-11-02T09:00:00-05:00' },
+]]) {
+  test(`commit listing preserves ${commits.length} results on native and HTTP transports`, async () => {
+    const previousWindow = globalThis.window
+    const previousFetch = globalThis.fetch
+    const result = { commits }
+    const requests = []
+    try {
+      globalThis.window = { webkit: { messageHandlers: { native: {
+        postMessage: async (request) => { requests.push(request); return result },
+      } } } }
+      globalThis.fetch = () => assert.fail('Native commit listing used HTTP')
+      assert.deepEqual(await listCommits(), result)
+      assert.deepEqual(requests, [{ type: 'list_commits' }])
+
+      globalThis.window = {}
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/api/repository/commits')
+        assert.equal(options.method ?? 'GET', 'GET')
+        assert.equal(options.headers.Accept, 'application/json')
+        assert.equal(options.body, undefined)
+        return { ok: true, status: 200, json: async () => result }
+      }
+      assert.deepEqual(await listCommits(), result)
+    } finally {
+      globalThis.window = previousWindow
+      globalThis.fetch = previousFetch
+    }
+  })
+}
+
+test('commit listing reports native, HTTP, and invalid-response errors', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.window = { webkit: { messageHandlers: { native: {
+      postMessage: async () => { throw new Error('Repository unavailable') },
+    } } } }
+    await assert.rejects(listCommits(), /Repository unavailable/)
+    globalThis.window = {}
+    globalThis.fetch = async () => ({ ok: false, status: 503,
+      json: async () => ({ error: { message: 'Git is unavailable' } }),
+    })
+    await assert.rejects(listCommits(), /Git is unavailable/)
+    globalThis.fetch = async () => ({ ok: true, status: 200,
+      json: async () => { throw new SyntaxError('Invalid JSON') },
+    })
+    await assert.rejects(listCommits(), /invalid response \(200\)/)
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.fetch = previousFetch
+  }
+})
 
 for (const pullRequests of [[], [
   { number: 42, title: 'Fix 雪', authorLogin: 'author', url: 'https://github.com/owner/repo/pull/42',

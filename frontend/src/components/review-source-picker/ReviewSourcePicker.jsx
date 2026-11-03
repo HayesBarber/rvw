@@ -2,32 +2,38 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { blockingOverlayActions, OverlayKind } from '../../actions/overlay-actions.js'
 import { createReviewSourcePickerModeActionRegistry } from '../../actions/review-source-picker-mode-actions.js'
 import { createReviewSourcePickerActionAdapter } from '../../actions/review-source-picker-actions.js'
+import { createCommitsRequest } from '../../review/commits-request.js'
 import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 import Overlay from '../Overlay.jsx'
 import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
 import PullRequestPicker from './PullRequestPicker.jsx'
 
-export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest, pullRequestsRequest }) {
+export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest, onSelectComparison, commitsRequest, pullRequestsRequest }) {
   switch (mode) {
-    case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} />
+    case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} onSelect={onSelectComparison} request={commitsRequest} />
     case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} onSelect={onSelectPullRequest} request={pullRequestsRequest} />
     default: return null
   }
 }
 
-export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest }) {
+export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest, onSelectComparison }) {
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
   const [actions, setActions] = useState(blockingOverlayActions)
   const [modeActions] = useState(() => createReviewSourcePickerModeActionRegistry(setActions))
+  const [commitsRequest] = useState(createCommitsRequest)
   const [pullRequestsRequest] = useState(createPullRequestsRequest)
 
   useEffect(() => {
+    commitsRequest.load()
     pullRequestsRequest.load()
-    return () => pullRequestsRequest.cancel()
-  }, [pullRequestsRequest])
+    return () => {
+      commitsRequest.cancel()
+      pullRequestsRequest.cancel()
+    }
+  }, [commitsRequest, pullRequestsRequest])
 
   const changeMode = useCallback((nextMode) => {
     if (nextMode === mode) return
@@ -62,11 +68,13 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
         </button>
       </header>
       <ReviewSourceModeControl mode={mode} onChange={changeMode} />
-      <div className="review-source-picker-body">
+      <div className="review-source-picker-body" data-mode={mode}>
         <ReviewSourcePickerContent
           mode={mode}
           registerActionAdapter={modeActions.register}
           onSelectPullRequest={onSelectPullRequest}
+          onSelectComparison={onSelectComparison}
+          commitsRequest={commitsRequest}
           pullRequestsRequest={pullRequestsRequest}
         />
       </div>
