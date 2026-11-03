@@ -743,19 +743,42 @@ textarea {
   cursor: pointer;
 }
 
-.comparison-picker-help,
+.review-source-picker-body[data-mode='commits'] {
+  display: flex;
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.comparison-picker {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.comparison-picker-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
+}
+
+.comparison-picker-footer {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-top: 1px solid #303033;
+}
+
 .comparison-picker-metadata {
   color: #a1a1aa;
   font-size: 0.8rem;
   line-height: 1.5;
 }
 
-.comparison-picker-help:first-child {
-  margin-top: 0;
-}
-
 .comparison-picker-list {
-  margin: 16px 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -794,6 +817,14 @@ textarea {
 
 .comparison-picker-node:hover:not(:disabled) {
   background: #202022;
+}
+
+.comparison-picker-list li[data-in-comparison='true'] .comparison-picker-node {
+  background: #1b2735;
+}
+
+.comparison-picker-list li[data-in-comparison='true']:not([data-comparison-role='Base'])::before {
+  background: #93c5fd;
 }
 
 .comparison-picker-node[aria-pressed='true'] {
@@ -878,6 +909,15 @@ textarea {
   color: #fafafa;
   font: inherit;
   cursor: pointer;
+}
+
+.comparison-picker-submit {
+  border-color: #3778c2;
+  background: #2463a8;
+}
+
+.comparison-picker-submit:hover:not(:disabled) {
+  background: #2d74c4;
 }
 
 .comparison-picker button:disabled {

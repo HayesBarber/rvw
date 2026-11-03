@@ -62,7 +62,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
         </button>
       </header>
       <ReviewSourceModeControl mode={mode} onChange={changeMode} />
-      <div className="review-source-picker-body">
+      <div className="review-source-picker-body" data-mode={mode}>
         <ReviewSourcePickerContent
           mode={mode}
           registerActionAdapter={modeActions.register}

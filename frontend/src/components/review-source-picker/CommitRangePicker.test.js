@@ -38,8 +38,7 @@ test('the timeline renders Working tree above commit metadata in API order', () 
   assert.match(html, /dateTime="2026-11-03T10:00:00-05:00"/)
   assert.match(html, /comparison-picker-marker-working-tree/)
   assert.equal((html.match(/class="comparison-picker-marker/g) ?? []).length, 3)
-  assert.match(html, /Compare the file state at Base with the file state at Target/)
-  assert.match(html, /Lines show list order/)
+  assert.doesNotMatch(html, /Compare the file state|Select two endpoints|Lines show list order/)
   assert.match(html, /data-endpoint="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"/)
 })
 
@@ -122,4 +121,37 @@ test('Retry replaces the error with a fresh commit list', async () => {
   assert.equal(calls, 2)
   assert.match(render(request.getSnapshot()), /Fix &lt;quoted&gt; 雪/)
   assert.doesNotMatch(render(request.getSnapshot()), />Retry<\/button>/)
+})
+
+test('the range includes all rows between Target and Base but only the endpoints are checked', () => {
+  const history = Array.from({ length: 5 }, (_, index) => ({ ...commits[0], sha: String(index + 1).repeat(40) }))
+  const timeline = comparisonEndpoints(history)
+  const state = { status: 'success', data: history }
+  for (const [target, base] of [[1, 4], [0, 4]]) {
+    for (const selected of [[timeline[target], timeline[base]], [timeline[base], timeline[target]]]) {
+      const content = Content({ state, selected })
+      const rows = findAll(content, (node) => node.type === 'li')
+      assert.deepEqual(rows.map((row) => row.props['data-in-comparison'] === true),
+        timeline.map((_, index) => index >= target && index <= base))
+      assert.equal(rows[target].props['data-comparison-role'], 'Target')
+      assert.equal(rows[base].props['data-comparison-role'], 'Base')
+      const checked = findAll(content, (node) => node.props['aria-pressed'] === true)
+      assert.equal(checked.length, 2)
+    }
+  }
+  for (const selected of [[], [timeline[1]], [timeline[0]]]) {
+    const rows = findAll(Content({ state, selected }), (node) => node.type === 'li')
+    assert(rows.every((row) => row.props['data-in-comparison'] === undefined))
+  }
+})
+
+test('the review button is outside the scroll area in every request state', () => {
+  for (const status of ['idle', 'loading', 'error', 'success']) {
+    const content = Content({ state: { status, data: commits, error: 'Failed' }, selected: [] })
+    const [scroll] = findAll(content, (node) => node.props.className === 'comparison-picker-scroll')
+    const [footer] = findAll(content, (node) => node.type === 'footer')
+    const submit = (node) => node.props.className === 'comparison-picker-submit'
+    assert.equal(findAll(scroll, submit).length, 0)
+    assert.equal(findAll(footer, submit).length, 1)
+  }
 })

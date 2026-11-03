@@ -7,55 +7,62 @@ export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, 
   const loaded = state.status === 'success'
   const endpoints = comparisonEndpoints(loaded ? state.data : [])
   const pair = loaded ? comparisonPair(endpoints, selected) : null
+  const targetIndex = pair ? endpoints.indexOf(pair.target) : -1
+  const baseIndex = pair ? endpoints.indexOf(pair.base) : -1
 
   return (
     <div className="comparison-picker">
-      <p className="comparison-picker-help">Compare the file state at Base with the file state at Target.</p>
-      <p className="comparison-picker-help">Select two endpoints. A new selection replaces the nearest endpoint. Equal distances replace Base.</p>
-      {(state.status === 'idle' || state.status === 'loading') && <p role="status">Loading commits…</p>}
-      {state.status === 'error' && (
-        <div className="comparison-picker-error" role="alert">
-          <p>Unable to load commits: {state.error}</p>
-          <button type="button" data-vim-native-activation onClick={onRetry}>Retry</button>
-        </div>
-      )}
-      {loaded && state.data.length === 0 && <p role="status">No commits. Two endpoints are required for a comparison.</p>}
-      <ul className="comparison-picker-list" aria-label="Comparison endpoints">
-        {endpoints.map((endpoint) => {
-          const workingTree = endpoint.kind === 'working-tree'
-          const checked = selected.some((item) => item.kind === endpoint.kind && item.sha === endpoint.sha)
-          const role = pair?.target === endpoint ? 'Target' : pair?.base === endpoint ? 'Base' : null
-          return (
-            <li key={workingTree ? 'working-tree' : endpoint.sha}>
-              <button
-                type="button"
-                className="comparison-picker-node"
-                data-endpoint={workingTree ? 'working-tree' : endpoint.sha}
-                data-vim-native-activation
-                aria-pressed={checked}
-                disabled={!loaded}
-                onClick={() => onToggle(endpoint)}
+      <div className="comparison-picker-scroll">
+        {(state.status === 'idle' || state.status === 'loading') && <p role="status">Loading commits…</p>}
+        {state.status === 'error' && (
+          <div className="comparison-picker-error" role="alert">
+            <p>Unable to load commits: {state.error}</p>
+            <button type="button" data-vim-native-activation onClick={onRetry}>Retry</button>
+          </div>
+        )}
+        {loaded && state.data.length === 0 && <p role="status">No commits. Two endpoints are required for a comparison.</p>}
+        <ul className="comparison-picker-list" aria-label="Comparison endpoints">
+          {endpoints.map((endpoint, index) => {
+            const workingTree = endpoint.kind === 'working-tree'
+            const checked = selected.some((item) => item.kind === endpoint.kind && item.sha === endpoint.sha)
+            const role = pair?.target === endpoint ? 'Target' : pair?.base === endpoint ? 'Base' : null
+            return (
+              <li
+                key={workingTree ? 'working-tree' : endpoint.sha}
+                data-in-comparison={pair && index >= targetIndex && index <= baseIndex ? true : undefined}
+                data-comparison-role={role ?? undefined}
               >
-                <span className={`comparison-picker-marker${workingTree ? ' comparison-picker-marker-working-tree' : ''}`} aria-hidden="true">{checked ? '✓' : ''}</span>
-                <span className="comparison-picker-details">
-                  <span className="comparison-picker-title">
-                    {workingTree ? <strong>Working tree</strong> : <><code>{endpoint.sha.slice(0, 7)}</code><strong>{endpoint.subject}</strong></>}
-                    {role && <span className="comparison-picker-role">{role}</span>}
-                  </span>
-                  {!workingTree && (
-                    <span className="comparison-picker-metadata">
-                      <span>{endpoint.authorName}</span>
-                      <time dateTime={endpoint.commitDate} title={endpoint.commitDate}>{endpoint.commitDate.slice(0, 10)}</time>
+                <button
+                  type="button"
+                  className="comparison-picker-node"
+                  data-endpoint={workingTree ? 'working-tree' : endpoint.sha}
+                  data-vim-native-activation
+                  aria-pressed={checked}
+                  disabled={!loaded}
+                  onClick={() => onToggle(endpoint)}
+                >
+                  <span className={`comparison-picker-marker${workingTree ? ' comparison-picker-marker-working-tree' : ''}`} aria-hidden="true">{checked ? '✓' : ''}</span>
+                  <span className="comparison-picker-details">
+                    <span className="comparison-picker-title">
+                      {workingTree ? <strong>Working tree</strong> : <><code>{endpoint.sha.slice(0, 7)}</code><strong>{endpoint.subject}</strong></>}
+                      {role && <span className="comparison-picker-role">{role}</span>}
                     </span>
-                  )}
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-      <p className="comparison-picker-help">Lines show list order. They do not show branch or merge relationships.</p>
-      <button type="button" className="comparison-picker-submit" data-vim-native-activation disabled={!pair} onClick={onSubmit}>Review comparison</button>
+                    {!workingTree && (
+                      <span className="comparison-picker-metadata">
+                        <span>{endpoint.authorName}</span>
+                        <time dateTime={endpoint.commitDate} title={endpoint.commitDate}>{endpoint.commitDate.slice(0, 10)}</time>
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+      <footer className="comparison-picker-footer">
+        <button type="button" className="comparison-picker-submit" data-vim-native-activation disabled={!pair} onClick={onSubmit}>Review comparison</button>
+      </footer>
     </div>
   )
 }
