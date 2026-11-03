@@ -586,10 +586,10 @@ textarea {
 }
 
 .review-source-picker-dialog {
-  width: min(640px, calc(100vw - 32px));
+  width: min(736px, calc(100vw - 32px));
   /* A definite height also prevents WebKit from collapsing the flex body. */
-  height: min(720px, calc(100dvh - 64px));
-  max-height: min(720px, calc(100dvh - 64px));
+  height: min(828px, calc(100dvh - 64px));
+  max-height: min(828px, calc(100dvh - 64px));
   margin: auto;
   padding: 0;
   overflow: hidden;
