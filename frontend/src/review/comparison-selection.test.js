@@ -21,11 +21,10 @@ test('endpoints put the working tree above commits without changing API order or
   assert.equal('kind' in commits[0], false)
 })
 
-test('either checked endpoint can be unchecked and replaced, but a third cannot be checked', () => {
+test('either checked endpoint can be unchecked and replaced', () => {
   let selected = toggleComparisonEndpoint(endpoints, [], recent)
   selected = toggleComparisonEndpoint(endpoints, selected, earlier)
   assert.deepEqual(selected, [recent, earlier])
-  assert.equal(toggleComparisonEndpoint(endpoints, selected, workingTree), selected)
   for (const removed of [recent, earlier]) {
     const remaining = toggleComparisonEndpoint(endpoints, selected, { ...removed })
     assert.deepEqual(remaining, selected.filter((endpoint) => endpoint !== removed))
@@ -39,6 +38,44 @@ test('either checked endpoint can be unchecked and replaced, but a third cannot 
   assert.deepEqual(selected, [recent])
   assert.deepEqual(toggleComparisonEndpoint(endpoints, selected, earlier), [recent, earlier])
 })
+
+const history = Array.from({ length: 7 }, (_, index) => ({ sha: String(index + 1).repeat(40) }))
+const timeline = comparisonEndpoints(history)
+
+for (const [description, initial, clicked, expected] of [
+  ['above Target', [2, 6], 1, [1, 6]],
+  ['below Base', [2, 6], 7, [2, 7]],
+  ['between endpoints nearer Target', [2, 6], 3, [3, 6]],
+  ['between endpoints nearer Base', [2, 6], 5, [2, 5]],
+  ['between endpoints at equal distance', [2, 6], 4, [2, 4]],
+  ['Working tree above Target', [2, 6], 0, [0, 6]],
+  ['commit nearer a selected Working tree', [0, 6], 1, [1, 6]],
+  ['commit nearer Base with Working tree selected', [0, 6], 5, [0, 5]],
+  ['commit at equal distance with Working tree selected', [0, 6], 3, [0, 3]],
+]) {
+  test(`a third selection ${description} replaces the nearest endpoint; ties replace Base`, () => {
+    for (const order of [initial, [...initial].reverse()]) {
+      const selected = order.map((index) => timeline[index])
+      const before = [...selected]
+      const next = toggleComparisonEndpoint(timeline, selected, { ...timeline[clicked] })
+      assert.equal(next.length, 2)
+      assert.deepEqual(comparisonPair(timeline, next), {
+        target: timeline[expected[0]], base: timeline[expected[1]],
+      })
+      assert.deepEqual(selected, before)
+      const calls = []
+      const submit = createComparisonSubmitHandler({
+        getRequest: () => ({ status: 'success', data: history }),
+        getSelection: () => next,
+        onSelect: (source) => calls.push(source),
+      })
+      assert.equal(submit(), true)
+      assert.deepEqual(calls, [expected[0] === 0
+        ? { kind: 'working-tree', base: timeline[expected[1]].sha }
+        : { kind: 'commit-range', base: timeline[expected[1]].sha, head: timeline[expected[0]].sha }])
+    }
+  })
+}
 
 for (const pair of [[recent, earlier], [workingTree, recent], [workingTree, earlier]]) {
   test(`roles follow list order for ${pair.map((endpoint) => endpoint.kind === 'commit' ? endpoint.sha.slice(0, 7) : endpoint.kind).join(' and ')}`, () => {

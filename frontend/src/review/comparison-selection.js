@@ -21,14 +21,23 @@ function sameEndpoint(left, right) {
     && left.kind === right.kind && left.sha === right.sha
 }
 
-/** Toggle one available endpoint. A third endpoint requires an uncheck first. */
+/** Toggle an endpoint, or replace the nearest selected endpoint. Ties replace Base. */
 export function toggleComparisonEndpoint(endpoints, selected, endpoint) {
   const available = endpoints.find((item) => sameEndpoint(item, endpoint))
   if (!available) return selected
   if (selected.some((item) => sameEndpoint(item, available))) {
     return selected.filter((item) => !sameEndpoint(item, available))
   }
-  if (selected.length >= 2) return selected
+  if (selected.length === 2) {
+    const pair = comparisonPair(endpoints, selected)
+    if (!pair) return selected
+    const index = endpoints.indexOf(available)
+    const targetDistance = Math.abs(index - endpoints.indexOf(pair.target))
+    const baseDistance = Math.abs(index - endpoints.indexOf(pair.base))
+    const replaced = targetDistance < baseDistance ? pair.target : pair.base
+    return selected.map((item) => sameEndpoint(item, replaced) ? available : item)
+  }
+  if (selected.length > 2) return selected
   return [...selected, available]
 }
 
