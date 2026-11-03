@@ -587,6 +587,8 @@ textarea {
 
 .review-source-picker-dialog {
   width: min(640px, calc(100vw - 32px));
+  /* A definite height also prevents WebKit from collapsing the flex body. */
+  height: min(720px, calc(100dvh - 64px));
   max-height: min(720px, calc(100dvh - 64px));
   margin: auto;
   padding: 0;
@@ -597,11 +599,6 @@ textarea {
   background: #141415;
   box-shadow: 0 24px 80px rgb(0 0 0 / 60%);
   color: #fafafa;
-}
-
-/* A definite height prevents WebKit from collapsing the nested flex body. */
-.review-source-picker-dialog-commits {
-  height: min(720px, calc(100dvh - 64px));
 }
 
 .review-source-picker-dialog[open] {
@@ -771,6 +768,8 @@ textarea {
 }
 
 .comparison-picker-footer {
+  display: flex;
+  justify-content: flex-end;
   flex-shrink: 0;
   padding: 12px 20px;
   border-top: 1px solid #303033;

@@ -163,7 +163,7 @@ test('the review button is outside the scroll area in every request state', () =
   }
 })
 
-test('WebKit keeps the comparison body and submit button visible at supported window sizes', {
+test('WebKit preserves mode height and keeps the right-aligned submit button visible', {
   skip: process.platform !== 'darwin', timeout: 60000,
 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'rvw-comparison-layout-'))
@@ -174,9 +174,16 @@ test('WebKit keeps the comparison body and submit button visible at supported wi
     const history = Array.from({ length: 30 }, (_, index) => ({ ...commits[0], sha: String(index).padStart(40, '0') }))
     const content = render({ status: 'success', data: history }, comparisonEndpoints(history).slice(1, 3))
     assert(shell.includes(idle))
+    const { PullRequestPickerContent } = await server.ssrLoadModule('/src/components/review-source-picker/PullRequestPicker.jsx')
+    const pullRequests = history.map((_, index) => ({
+      number: index + 1, title: 'Pull request', authorLogin: 'author', baseRefName: 'main', headRefName: 'feature',
+    }))
+    const templates = [[], pullRequests].map((data, index) =>
+      `<template id="pull-requests-${index}">${renderToStaticMarkup(createElement(PullRequestPickerContent, { state: { status: 'success', data } }))}</template>`,
+    ).join('')
     const css = await readFile(new URL('../../index.css', import.meta.url), 'utf8')
     const fixture = join(directory, 'picker.html')
-    await writeFile(fixture, `<!doctype html><meta charset="utf-8"><style>${css}</style>${shell.replace(idle, content)}`)
+    await writeFile(fixture, `<!doctype html><meta charset="utf-8"><style>${css}</style>${shell.replace(idle, content)}${templates}`)
     const run = promisify(execFile)
     const binary = join(directory, 'layout-test')
     const source = fileURLToPath(new URL('../../../../macos/web/comparison_picker_layout_tests.swift', import.meta.url))

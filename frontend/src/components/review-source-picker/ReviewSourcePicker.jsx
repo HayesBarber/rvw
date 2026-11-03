@@ -46,7 +46,7 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
       dialogRef={dialogRef}
       initialFocusRef={dialogRef}
       nativeDialog
-      className={`review-source-picker-dialog${mode === 'commits' ? ' review-source-picker-dialog-commits' : ''}`}
+      className="review-source-picker-dialog"
       labelledBy={titleId}
       onClose={onClose}
     >

@@ -32,7 +32,7 @@ test('the picker shell uses a labelled native dialog and a Close control', () =>
   const titleId = html.match(/<h2 id="([^"]+)">Choose review source<\/h2>/)?.[1]
   assert(titleId)
   assert(html.includes(`aria-labelledby="${titleId}"`))
-  assert.match(html, /<dialog class="review-source-picker-dialog review-source-picker-dialog-commits"/)
+  assert.match(html, /<dialog class="review-source-picker-dialog"/)
   assert.match(html, /tabindex="-1" data-vim-capture="true"/)
   assert.match(html, /<button type="button" data-vim-native-activation="true" aria-label="Close review source picker">Close<\/button>/)
 })

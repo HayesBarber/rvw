@@ -39,13 +39,33 @@ final class LayoutCheck: NSObject, WKNavigationDelegate {
                 };
                 const before = visible();
                 scroll.scrollTop = scroll.scrollHeight;
+                const after = visible();
+                const footer = document.querySelector('.comparison-picker-footer');
+                const footerBounds = footer.getBoundingClientRect();
+                const rightAligned = Math.abs(button.getBoundingClientRect().right
+                    - footerBounds.right + parseFloat(getComputedStyle(footer).paddingRight)) < 1;
+                const bodyHeight = scroll.clientHeight;
+                const listScrolls = scroll.scrollHeight > scroll.clientHeight;
+                const body = document.querySelector('.review-source-picker-body');
+                const comparison = body.innerHTML;
+                let modeHeightStable = true;
+                for (const id of ['pull-requests-0', 'pull-requests-1']) {
+                    body.dataset.mode = 'pull-requests';
+                    body.innerHTML = document.getElementById(id).innerHTML;
+                    modeHeightStable &&= Math.abs(dialog.getBoundingClientRect().height - bounds.height) < 1;
+                    body.dataset.mode = 'commits';
+                    body.innerHTML = comparison;
+                    modeHeightStable &&= Math.abs(dialog.getBoundingClientRect().height - bounds.height) < 1;
+                }
                 return {
-                    bodyVisible: scroll.clientHeight > 100,
-                    listScrolls: scroll.scrollHeight > scroll.clientHeight,
+                    bodyVisible: bodyHeight > 100,
+                    listScrolls,
                     submitVisibleBeforeScroll: before,
-                    submitVisibleAfterScroll: visible(),
+                    submitVisibleAfterScroll: after,
+                    rightAligned,
+                    modeHeightStable,
                     viewportHeight: innerHeight,
-                    bodyHeight: scroll.clientHeight
+                    bodyHeight
                 };
             })()
             """) { result, error in
@@ -53,7 +73,9 @@ final class LayoutCheck: NSObject, WKNavigationDelegate {
                   checks["bodyVisible"] as? Bool == true,
                   checks["listScrolls"] as? Bool == true,
                   checks["submitVisibleBeforeScroll"] as? Bool == true,
-                  checks["submitVisibleAfterScroll"] as? Bool == true else {
+                  checks["submitVisibleAfterScroll"] as? Bool == true,
+                  checks["rightAligned"] as? Bool == true,
+                  checks["modeHeightStable"] as? Bool == true else {
                 fputs("WebKit layout failed at \(size): \(String(describing: result)), \(String(describing: error))\n", stderr)
                 exit(1)
             }
