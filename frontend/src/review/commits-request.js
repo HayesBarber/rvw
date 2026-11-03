@@ -1,7 +1,7 @@
 import { listCommits } from './api.js'
 import { RequestStatus } from './request-state.js'
 
-/** Loads fresh history on each entry. Cancel on mode change or dismissal. */
+/** Owns one overlay's commit requests. Cancel when the overlay unmounts. */
 export function createCommitsRequest({ list = listCommits } = {}) {
   let state = { status: RequestStatus.IDLE, data: [], error: null }
   let generation = 0

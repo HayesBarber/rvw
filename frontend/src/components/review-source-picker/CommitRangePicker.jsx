@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { blockingOverlayActions } from '../../actions/overlay-actions.js'
-import { createCommitsRequest } from '../../review/commits-request.js'
 import { comparisonEndpoints, comparisonPair, createComparisonSubmitHandler, toggleComparisonEndpoint } from '../../review/comparison-selection.js'
 
 export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, onRetry }) {
@@ -67,15 +66,10 @@ export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, 
   )
 }
 
-export default function CommitRangePicker({ registerActionAdapter, onSelect, request: providedRequest }) {
-  const [request] = useState(() => providedRequest ?? createCommitsRequest())
+export default function CommitRangePicker({ registerActionAdapter, onSelect, request }) {
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
   const [selected, setSelected] = useState([])
 
-  useEffect(() => {
-    request.load()
-    return () => request.cancel()
-  }, [request])
   useLayoutEffect(() => registerActionAdapter(blockingOverlayActions), [registerActionAdapter])
 
   const toggle = useCallback((endpoint) => {

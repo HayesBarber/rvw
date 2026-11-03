@@ -6,6 +6,7 @@ import { createServer } from 'vite'
 import { ApplicationAction } from '../../actions/application-actions.js'
 import { createApplicationDispatcher } from '../../actions/application-dispatch.js'
 import { createOverlayActionRegistry, OverlayKind } from '../../actions/overlay-actions.js'
+import { createCommitsRequest } from '../../review/commits-request.js'
 import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 
 let server
@@ -57,7 +58,7 @@ test('each mode displays only its corresponding content', () => {
     ['pull-requests', null],
   ]) {
     const registerActionAdapter = () => () => {}
-    const content = ReviewSourcePickerContent({ mode, registerActionAdapter, pullRequestsRequest: createPullRequestsRequest() })
+    const content = ReviewSourcePickerContent({ mode, registerActionAdapter, commitsRequest: createCommitsRequest(), pullRequestsRequest: createPullRequestsRequest() })
     assert.equal(content.props.registerActionAdapter, registerActionAdapter)
     const html = renderToStaticMarkup(content)
     if (expected) {
@@ -125,8 +126,22 @@ test('the picker registration blocks all workspace actions until it closes', () 
   assert.deepEqual(calls, ['comment', 'reload'])
 })
 
-test('the commits mode receives the comparison callback', () => {
+test('the commits mode retains the overlay request and comparison callback across mode changes', async () => {
   const onSelectComparison = () => {}
-  const content = ReviewSourcePickerContent({ mode: 'commits', onSelectComparison })
+  let loads = 0
+  const commitsRequest = createCommitsRequest({ list: async () => {
+    loads += 1
+    return { commits: [{ sha: 'a'.repeat(40), subject: 'Loaded once', authorName: 'Author', commitDate: '2026-11-03' }] }
+  } })
+  await commitsRequest.load()
+  const props = { onSelectComparison, commitsRequest }
+  const content = ReviewSourcePickerContent({ ...props, mode: 'commits' })
   assert.equal(content.props.onSelect, onSelectComparison)
+  assert.equal(content.props.request, commitsRequest)
+  assert.match(renderToStaticMarkup(content), /Loaded once/)
+  ReviewSourcePickerContent({ ...props, mode: 'pull-requests' })
+  const returned = ReviewSourcePickerContent({ ...props, mode: 'commits' })
+  assert.equal(returned.props.request, commitsRequest)
+  assert.match(renderToStaticMarkup(returned), /Loaded once/)
+  assert.equal(loads, 1)
 })
