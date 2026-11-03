@@ -194,3 +194,18 @@ test('WebKit preserves mode height and keeps the right-aligned submit button vis
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('timeline focus reports an explicit endpoint without checking or submitting it', () => {
+  const focused = []
+  const content = Content({ state: success, selected: [], onFocus: (endpoint) => focused.push(endpoint) })
+  const nodes = findAll(content, (node) => node.props.className === 'comparison-picker-node')
+  for (const node of nodes) {
+    assert.equal(node.props['data-vim-capture'], true)
+    assert.equal(node.props['data-vim-native-activation'], undefined)
+    node.props.onFocus()
+  }
+  assert.deepEqual(focused, endpoints)
+  assert(nodes.every((node) => node.props['aria-pressed'] === false))
+  const [submit] = findAll(content, (node) => node.props.className === 'comparison-picker-submit')
+  assert.equal(submit.props['data-vim-native-activation'], true)
+})

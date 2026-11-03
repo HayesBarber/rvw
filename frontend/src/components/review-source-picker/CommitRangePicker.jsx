@@ -1,8 +1,8 @@
-import { useCallback, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { blockingOverlayActions } from '../../actions/overlay-actions.js'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { centerComparisonEndpoint, createComparisonPickerActionAdapter, focusComparisonEndpoint } from '../../actions/comparison-picker-actions.js'
 import { comparisonEndpoints, comparisonPair, createComparisonSubmitHandler, toggleComparisonEndpoint } from '../../review/comparison-selection.js'
 
-export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, onRetry }) {
+export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, onRetry, listRef, onFocus }) {
   const loaded = state.status === 'success'
   const endpoints = comparisonEndpoints(loaded ? state.data : [])
   const pair = loaded ? comparisonPair(endpoints, selected) : null
@@ -20,7 +20,7 @@ export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, 
           </div>
         )}
         {loaded && state.data.length === 0 && <p role="status">No commits. Two endpoints are required for a comparison.</p>}
-        <ul className="comparison-picker-list" aria-label="Comparison endpoints">
+        <ul ref={listRef} className="comparison-picker-list" aria-label="Comparison endpoints">
           {endpoints.map((endpoint, index) => {
             const workingTree = endpoint.kind === 'working-tree'
             const checked = selected.some((item) => item.kind === endpoint.kind && item.sha === endpoint.sha)
@@ -35,7 +35,8 @@ export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, 
                   type="button"
                   className="comparison-picker-node"
                   data-endpoint={workingTree ? 'working-tree' : endpoint.sha}
-                  data-vim-native-activation
+                  data-vim-capture
+                  onFocus={() => onFocus?.(endpoint)}
                   aria-pressed={checked}
                   disabled={!loaded}
                   onClick={() => onToggle(endpoint)}
@@ -69,13 +70,18 @@ export function CommitRangePickerContent({ state, selected, onToggle, onSubmit, 
 export default function CommitRangePicker({ registerActionAdapter, onSelect, request }) {
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
   const [selected, setSelected] = useState([])
-
-  useLayoutEffect(() => registerActionAdapter(blockingOverlayActions), [registerActionAdapter])
+  const listRef = useRef(null)
+  const focusedEndpoint = useRef(null)
+  const rememberFocus = useCallback((endpoint) => { focusedEndpoint.current = endpoint }, [])
+  const getFocusedEndpoint = useCallback(() => focusedEndpoint.current, [])
+  const focus = useCallback((endpoint) => focusComparisonEndpoint(listRef.current, endpoint), [])
+  const center = useCallback((endpoint) => centerComparisonEndpoint(listRef.current, endpoint), [])
 
   const toggle = useCallback((endpoint) => {
     const current = request.getSnapshot()
-    if (current.status !== 'success') return
+    if (current.status !== 'success') return false
     setSelected((previous) => toggleComparisonEndpoint(comparisonEndpoints(current.data), previous, endpoint))
+    return true
   }, [request])
   const retry = useCallback(() => {
     setSelected([])
@@ -85,5 +91,13 @@ export default function CommitRangePicker({ registerActionAdapter, onSelect, req
     getRequest: request.getSnapshot, getSelection: () => selected, onSelect,
   }), [request, selected, onSelect])
 
-  return <CommitRangePickerContent state={state} selected={selected} onToggle={toggle} onSubmit={submit} onRetry={retry} />
+  useLayoutEffect(() => registerActionAdapter(createComparisonPickerActionAdapter({
+    getRequest: request.getSnapshot, getFocusedEndpoint, focus, center, toggle, submit,
+  })), [registerActionAdapter, request, getFocusedEndpoint, focus, center, toggle, submit])
+  useLayoutEffect(() => {
+    focusedEndpoint.current = null
+    if (state.status === 'success') focus(comparisonEndpoints(state.data)[0])
+  }, [focus, state.data, state.status])
+
+  return <CommitRangePickerContent listRef={listRef} onFocus={rememberFocus} state={state} selected={selected} onToggle={toggle} onSubmit={submit} onRetry={retry} />
 }
