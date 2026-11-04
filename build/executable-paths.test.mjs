@@ -94,12 +94,17 @@ async function startServer(t, fixture, env = fixture.env) {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
     await exited
   })
+  let sessionId
   const request = async (route, body) => {
     const response = await fetch('http://127.0.0.1:' + port + '/api/' + route, {
-      ...(body ? { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : {}),
+      ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
+      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(sessionId ? { 'X-Rvw-Session': String(sessionId) } : {}) },
       signal: AbortSignal.timeout(2000),
     })
-    return { status: response.status, body: await response.json() }
+    const result = await response.json()
+    // The next test request acts as the document loaded after a successful reset.
+    if (route === 'review/reload' && response.ok) sessionId = result.sessionId
+    return { status: response.status, body: result }
   }
   const deadline = Date.now() + 5000
   while (Date.now() < deadline) {
@@ -235,4 +240,31 @@ test('CLI resolves both last-commit revisions and PR refs with the selected Git 
   calls = await readFile(f.executables.git + '.calls', 'utf8')
   assert.match(calls, /remote get-url origin/)
   assert.match(calls, /fetch --atomic origin/)
+})
+
+test('HTTP duplicate reloads replace once and failed construction retains the current review', async (t) => {
+  const f = await fixture(t)
+  const request = await startServer(t, f)
+  const before = (await request('diffs/active')).body
+  await request('comments', { type: 'create_comment', body: 'discard', target: { kind: 'review' } })
+  const resets = await Promise.all([
+    request('review/reload', { type: 'reload_review' }),
+    request('review/reload', { type: 'reload_review' }),
+  ])
+  assert.deepEqual(resets.map((result) => result.status).sort(), [200, 409])
+  assert.equal((await request('review/session')).body.id, 2)
+  assert.deepEqual((await request('comments')).body, [])
+  assert.deepEqual((await request('diffs/active')).body, before)
+  await request('comments', { type: 'create_comment', body: 'retain', target: { kind: 'review' } })
+  const failed = await request('review/reload', {
+    type: 'reload_review', source: { kind: 'working-tree', base: 'missing-commit' },
+  })
+  assert.equal(failed.status, 400)
+  assert.equal(failed.body.error.code, 'invalid_revision')
+  assert.equal((await request('review/session')).body.id, 2)
+  assert.equal((await request('comments')).body[0].body, 'retain')
+  assert.deepEqual((await request('diffs/active')).body, before)
+  assert.equal((await request('review/reload', { type: 'reload_review' })).status, 200)
+  assert.equal((await request('review/session')).body.id, 3)
+  assert.deepEqual((await request('comments')).body, [])
 })

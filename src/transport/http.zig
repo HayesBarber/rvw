@@ -36,7 +36,7 @@ const Handler = struct {
             null;
         const scoped = self.dispatcher.dispatchScoped(request, session_id) catch |err| {
             const code = model.errorCode(err);
-            const status = errorStatus(code);
+            const status = if (request == .reload_review and code == .invalid_revision) .bad_request else errorStatus(code);
             return self.failure(res, status, code);
         };
         defer scoped.deinit();
@@ -69,7 +69,7 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
         .missing_origin,
         .unsupported_origin,
         => .bad_request,
-        .search_unavailable, .repository_unavailable, .pull_request_list_unavailable, .pull_request_authentication_failed => .service_unavailable,
+        .search_unavailable, .repository_unavailable, .pull_request_list_unavailable, .pull_request_authentication_failed, .pull_request_unavailable => .service_unavailable,
         else => .internal_server_error,
     };
 }
@@ -674,4 +674,210 @@ test "HTTP session scopes reject stale mutations and release after serialization
     const current = try owner.dispatcher().dispatchScoped(.get_comments, 2);
     defer current.deinit();
     try std.testing.expectEqual(@as(usize, 1), current.response.comments.len);
+}
+
+const ReloadTransportTest = struct {
+    owner: *@import("../app/session_owner.zig").SessionOwner,
+    transport: enum { http, native },
+    session_id: u64 = 1,
+
+    fn reload(self: *@This(), source: ?model.DiffSource, expected_error: ?model.ErrorCode) !void {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{
+            .type = "reload_review",
+            .source = source,
+            .sessionId = self.session_id,
+        }, .{ .emit_null_optional_fields = false });
+        defer std.testing.allocator.free(input);
+        try self.request(input, expected_error);
+    }
+
+    fn request(self: *@This(), input: []const u8, expected_error: ?model.ErrorCode) !void {
+        const allocator = std.testing.allocator;
+        const encoded = switch (self.transport) {
+            .native => try json_protocol.dispatchJson(allocator, self.owner.dispatcher(), input),
+            .http => blk: {
+                var ht = httpz.testing.init(.{});
+                defer ht.deinit();
+                var handler: Handler = .{ .dispatcher = self.owner.dispatcher() };
+                const id = try std.fmt.allocPrint(allocator, "{d}", .{self.session_id});
+                defer allocator.free(id);
+                ht.header("x-rvw-session", id);
+                ht.body(input);
+                try reloadReview(&handler, ht.req, ht.res);
+                try ht.expectStatusCode(if (expected_error) |code|
+                    if (code == .invalid_revision) .bad_request else errorStatus(code)
+                else
+                    .ok);
+                break :blk try allocator.dupe(u8, ht.res.body);
+            },
+        };
+        defer allocator.free(encoded);
+        var parsed = try std.json.parseFromSlice(std.json.Value, allocator, encoded, .{});
+        defer parsed.deinit();
+        const fields = parsed.value.object;
+        if (expected_error) |code| {
+            if (self.transport == .native) try std.testing.expect(!fields.get("ok").?.bool);
+            try std.testing.expectEqualStrings(@tagName(code), fields.get("error").?.object.get("code").?.string);
+            return;
+        }
+        const data = if (self.transport == .native) fields.get("data").? else parsed.value;
+        const next_id: u64 = @intCast(data.object.get("sessionId").?.integer);
+        try std.testing.expectEqual(self.session_id + 1, next_id);
+        self.session_id = next_id;
+    }
+
+    fn addComment(self: *@This()) !void {
+        const scoped = try self.owner.dispatcher().dispatchScoped(.{ .create_comment = .{ .body = "discard on success", .target = .review } }, self.session_id);
+        defer scoped.deinit();
+    }
+
+    fn expectFile(self: *@This(), expected: []const u8) !void {
+        const id = blk: {
+            const overview = try self.owner.dispatcher().dispatchScoped(.get_diff_overview, self.session_id);
+            defer overview.deinit();
+            break :blk try std.testing.allocator.dupe(u8, overview.response.diff_overview.id);
+        };
+        defer std.testing.allocator.free(id);
+        const file = try self.owner.dispatcher().dispatchScoped(.{ .get_file_diff = .{ .diff_id = id, .path = "file.txt" } }, self.session_id);
+        defer file.deinit();
+        try std.testing.expectEqualStrings("base\n", file.response.file_diff.content.diff.oldFile.?.contents);
+        try std.testing.expectEqualStrings(expected, file.response.file_diff.content.diff.newFile.?.contents);
+    }
+
+    fn expectReview(self: *@This(), source: model.DiffSource, comment_count: usize) !void {
+        {
+            const overview = try self.owner.dispatcher().dispatchScoped(.get_diff_overview, self.session_id);
+            defer overview.deinit();
+            try std.testing.expectEqualDeep(source, overview.response.diff_overview.source);
+        }
+        const comments = try self.owner.dispatcher().dispatchScoped(.get_comments, self.session_id);
+        defer comments.deinit();
+        try std.testing.expectEqual(comment_count, comments.response.comments.len);
+    }
+};
+
+test "HTTP and native reload replace every source type and hard reset unchanged snapshots" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const Session = @import("../app/session.zig").Session;
+    const Owner = @import("../app/session_owner.zig").SessionOwner;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    const base = try repository.revision("HEAD");
+    defer allocator.free(base);
+    try repository.write("file.txt", "head\n");
+    try repository.commit("head");
+    const head = try repository.revision("HEAD");
+    defer allocator.free(head);
+    try repository.git(&.{ "remote", "add", "origin", repository.root });
+    try repository.git(&.{ "update-ref", "refs/pull/100/head", head });
+    try repository.git(&.{ "update-ref", "refs/pull/100/merge", head });
+    try repository.write("file.txt", "working\n");
+    const index_before = try repository.temporary.dir.readFileAlloc(io, ".git/index", allocator, .unlimited);
+    defer allocator.free(index_before);
+    const branch_before = try repository.temporary.dir.readFileAlloc(io, ".git/HEAD", allocator, .unlimited);
+    defer allocator.free(branch_before);
+    const sources = [_]model.DiffSource{
+        .{ .working_tree = .{ .base = base } },
+        .{ .commit_range = .{ .base = base, .head = head } },
+        .{ .pull_request = .{ .number = 100 } },
+    };
+    for (std.enums.values(@FieldType(ReloadTransportTest, "transport"))) |transport| {
+        var owner = Owner.init(io, try Session.create(allocator, io, .{
+            .directory = repository.root,
+            .configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+            .logger = @import("../log/log.zig").stderrLogger(allocator),
+        }));
+        defer owner.deinit();
+        var client: ReloadTransportTest = .{ .owner = &owner, .transport = transport };
+        for (sources) |from| {
+            for (sources) |to| {
+                try client.reload(from, null);
+                try client.addComment();
+                try client.reload(to, null);
+                try client.expectReview(to, 0);
+                try client.addComment();
+                try client.reload(null, null);
+                try client.expectReview(to, 0);
+            }
+        }
+        // A failed construction retains both the source and its comments.
+        try client.addComment();
+        try client.reload(.{ .working_tree = .{ .base = "missing-commit" } }, .invalid_revision);
+        try client.expectReview(sources[2], 1);
+        const malformed = try std.fmt.allocPrint(
+            allocator,
+            "{{\"type\":\"reload_review\",\"sessionId\":{d},\"source\":{{\"kind\":\"working-tree\",\"base\":\"HEAD\",\"head\":\"fake\"}}}}",
+            .{client.session_id},
+        );
+        defer allocator.free(malformed);
+        try client.request(malformed, .malformed_request);
+        try client.expectReview(sources[2], 1);
+        // Retry the retained PR source; a successful reset still clears comments.
+        try client.reload(null, null);
+        try client.expectReview(sources[2], 0);
+    }
+    const index_after = try repository.temporary.dir.readFileAlloc(io, ".git/index", allocator, .unlimited);
+    defer allocator.free(index_after);
+    try std.testing.expectEqualSlices(u8, index_before, index_after);
+    const branch_after = try repository.temporary.dir.readFileAlloc(io, ".git/HEAD", allocator, .unlimited);
+    defer allocator.free(branch_after);
+    try std.testing.expectEqualSlices(u8, branch_before, branch_after);
+    const contents = try repository.temporary.dir.readFileAlloc(io, "file.txt", allocator, .unlimited);
+    defer allocator.free(contents);
+    try std.testing.expectEqualStrings("working\n", contents);
+}
+
+test "HTTP and native ordinary PR reload fetch force pushes and preserve the review on fetch failure" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const Repository = @import("../testing/repository.zig").Repository;
+    const Session = @import("../app/session.zig").Session;
+    const Owner = @import("../app/session_owner.zig").SessionOwner;
+    for (std.enums.values(@FieldType(ReloadTransportTest, "transport"))) |transport| {
+        var remote = try Repository.init(allocator);
+        defer remote.deinit();
+        try remote.write("file.txt", "base\n");
+        try remote.commit("base");
+        const base = try remote.revision("HEAD");
+        defer allocator.free(base);
+        try remote.write("file.txt", "first\n");
+        try remote.commit("first");
+        try remote.git(&.{ "update-ref", "refs/pull/100/head", "HEAD" });
+        try remote.git(&.{ "update-ref", "refs/pull/100/merge", "HEAD" });
+        var local = try Repository.init(allocator);
+        defer local.deinit();
+        try local.write("local.txt", "local\n");
+        try local.commit("local");
+        try local.git(&.{ "remote", "add", "origin", remote.root });
+        var owner = Owner.init(io, try Session.create(allocator, io, .{
+            .directory = local.root,
+            .configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+            .logger = @import("../log/log.zig").stderrLogger(allocator),
+        }));
+        defer owner.deinit();
+        var client: ReloadTransportTest = .{ .owner = &owner, .transport = transport };
+        const source: model.DiffSource = .{ .pull_request = .{ .number = 100 } };
+        try client.reload(source, null);
+        try client.expectFile("first\n");
+        try remote.git(&.{ "checkout", "--quiet", "--detach", base });
+        try remote.write("file.txt", "rewritten\n");
+        try remote.commit("rewritten");
+        try remote.git(&.{ "update-ref", "refs/pull/100/head", "HEAD" });
+        try remote.git(&.{ "update-ref", "refs/pull/100/merge", "HEAD" });
+        try client.addComment();
+        try client.reload(null, null);
+        try client.expectReview(source, 0);
+        try client.expectFile("rewritten\n");
+        try client.addComment();
+        try local.git(&.{ "remote", "set-url", "origin", "/nonexistent/rvw-test-remote" });
+        try client.reload(null, .pull_request_unavailable);
+        try client.expectReview(source, 1);
+        try client.expectFile("rewritten\n");
+        try local.git(&.{ "remote", "set-url", "origin", remote.root });
+        try client.reload(null, null);
+        try client.expectReview(source, 0);
+    }
 }

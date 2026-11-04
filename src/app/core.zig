@@ -20,7 +20,6 @@ pub const Core = struct {
     text_search_all_files_provider: provider_module.text_search.TextSearchProvider,
     comment_provider: provider_module.comment.CommentProvider,
     clipboard: output.Clipboard,
-    review_generation: usize = 0,
     logger: log.Logger,
     configuration: config.Snapshot,
 
@@ -79,12 +78,7 @@ pub const Core = struct {
         return switch (request) {
             .log => unreachable,
             .get_configuration => .{ .configuration = self.configuration },
-            .get_review_session => error.SessionOwnerRequired,
-            .reload_review => blk: {
-                self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
-                self.review_generation +%= 1;
-                break :blk .{ .reload_review_result = .{ .generation = self.review_generation } };
-            },
+            .get_review_session, .reload_review => error.SessionOwnerRequired,
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
             .list_commits => .{ .commit_list = try self.repository_provider.listCommits(self.io, self.review_provider.repositoryRoot()) },
             .list_working_tree_changes => .{ .working_tree_changes = try self.repository_provider.listWorkingTreeChanges(self.io, self.review_provider.repositoryRoot()) },
@@ -490,117 +484,6 @@ test "core routes file listings and text search through their providers" {
     try std.testing.expectEqualStrings("a.txt", visible_files[0]);
 }
 
-test "core reload replaces the review snapshot without touching comments and preserves it on failure" {
-    const ReviewStub = struct {
-        version: usize = 1,
-        fail_reload: bool = false,
-
-        const first_files = [_]model.FileSummary{.{
-            .path = "before.txt",
-            .status = .modified,
-            .additions = 1,
-            .deletions = 0,
-        }};
-        const second_files = [_]model.FileSummary{.{
-            .path = "after.txt",
-            .status = .added,
-            .additions = 1,
-            .deletions = 0,
-        }};
-
-        fn getDiffOverview(context: *anyopaque, _: Io) !model.DiffOverview {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            return if (self.version == 1) .{
-                .id = "snapshot-1",
-                .repository = .{ .name = "repository" },
-                .source = .{ .working_tree = .{ .base = "base" } },
-                .files = &first_files,
-            } else .{
-                .id = "snapshot-2",
-                .repository = .{ .name = "repository" },
-                .source = .{ .working_tree = .{ .base = "base" } },
-                .files = &second_files,
-            };
-        }
-        fn getFileDiff(_: *anyopaque, _: Io, _: []const u8, _: []const u8) !model.FileDiff {
-            return error.UnknownFile;
-        }
-        fn getFiles(_: *anyopaque, _: Io) ![]const []const u8 {
-            return &.{};
-        }
-        fn getFilesNotIgnored(context: *anyopaque, io: Io) ![]const []const u8 {
-            return getFiles(context, io);
-        }
-        fn getFile(_: *anyopaque, _: Io, _: []const u8) !model.FileContent {
-            return error.UnknownFile;
-        }
-        fn reload(context: *anyopaque, _: Io) !void {
-            const self: *@This() = @ptrCast(@alignCast(context));
-            if (self.fail_reload) return error.SnapshotBuildFailed;
-            self.version += 1;
-        }
-        fn repositoryRoot(_: *anyopaque) []const u8 {
-            return "/repository";
-        }
-        const vtable: provider_module.review.ReviewProvider.VTable = .{
-            .getDiffOverview = getDiffOverview,
-            .getFileDiff = getFileDiff,
-            .getFiles = getFiles,
-            .getFilesNotIgnored = getFilesNotIgnored,
-            .getFile = getFile,
-            .reload = reload,
-            .repositoryRoot = repositoryRoot,
-        };
-    };
-
-    var threaded: std.Io.Threaded = .init(std.testing.allocator, .{});
-    defer threaded.deinit();
-    var review: ReviewStub = .{};
-    var comments = provider_module.comment.memory.MemoryProvider.init(std.testing.allocator);
-    defer comments.deinit();
-    var context: u8 = 0;
-    var repository: provider_module.repository.git.GitProvider = .{ .allocator = std.testing.allocator };
-    var pull_requests: provider_module.pull_request.github_cli.GitHubCliProvider = .{ .allocator = std.testing.allocator };
-    var search_ignore_aware: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware" };
-    var search_all_files: provider_module.text_search.ripgrep.RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"all-files" };
-    var core = Core.init(
-        std.testing.allocator,
-        threaded.io(),
-        .{ .context = &review, .vtable = &ReviewStub.vtable },
-        repository.interface(),
-        pull_requests.interface(),
-        search_ignore_aware.interface(),
-        search_all_files.interface(),
-        comments.interface(),
-        .{ .context = &context, .vtable = &noop_clipboard_vtable },
-        .{
-            .allocator = std.testing.allocator,
-            .context = &context,
-            .vtable = &silent_logger_vtable,
-        },
-        .{ .configuration = .{ .object = .empty }, .diagnostic = null },
-    );
-
-    _ = try core.dispatch(.{ .create_comment = .{
-        .body = "keep me",
-        .target = .{ .file = .{ .path = "before.txt" } },
-    } });
-    _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review", .target = .review } });
-    const result = (try core.dispatch(.reload_review)).reload_review_result;
-    try std.testing.expectEqual(@as(usize, 1), result.generation);
-    try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
-    try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
-    const review_comment = (try core.dispatch(.get_comments)).comments[1];
-    try std.testing.expect(review_comment.target == .review);
-    try std.testing.expectEqualStrings("keep review", review_comment.body);
-
-    review.fail_reload = true;
-    try std.testing.expectError(error.ReloadUnavailable, core.dispatch(.reload_review));
-    try std.testing.expectEqualStrings("snapshot-2", (try core.dispatch(.get_diff_overview)).diff_overview.id);
-    try std.testing.expectEqualStrings("keep me", (try core.dispatch(.get_comments)).comments[0].body);
-    try std.testing.expectEqualStrings("keep review", (try core.dispatch(.get_comments)).comments[1].body);
-}
-
 test "core lists current repository data without changing working-tree, range, or PR reviews" {
     const TestRepository = @import("../testing/repository.zig").Repository;
     const Provider = provider_module.pull_request.PullRequestProvider;
@@ -688,7 +571,6 @@ test "core lists current repository data without changing working-tree, range, o
             .{ .allocator = std.testing.allocator, .context = &context, .vtable = &silent_logger_vtable },
             .{ .configuration = .{ .object = .empty }, .diagnostic = null },
         );
-        core.review_generation = 4;
         _ = try core.dispatch(.{ .create_comment = .{ .body = "keep review comment", .target = .review } });
         _ = try core.dispatch(.{ .create_comment = .{ .body = "keep file comment", .target = .{ .file = .{ .path = "tracked.txt" } } } });
         const before_review = try ReviewState.encode(&core);
@@ -767,7 +649,6 @@ test "core lists current repository data without changing working-tree, range, o
             try std.testing.expectError(failure, dispatcher.dispatch(.list_open_pull_requests));
         }
         try std.testing.expectEqual(@as(usize, 3 + failures.len), pull_requests.calls);
-        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
         const after_review = try ReviewState.encode(&core);
         defer std.testing.allocator.free(after_review);
         try std.testing.expectEqualStrings(before_review, after_review);
@@ -789,7 +670,6 @@ test "core lists current repository data without changing working-tree, range, o
         const clean_review = try ReviewState.encode(&core);
         defer std.testing.allocator.free(clean_review);
         try std.testing.expectEqualStrings(before_review, clean_review);
-        try std.testing.expectEqual(@as(usize, 4), core.review_generation);
     }
 }
 

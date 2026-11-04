@@ -16,9 +16,13 @@ private func git(_ directory: URL, _ arguments: [String]) throws {
 }
 
 private func response(_ router: NativeRequestRouter, _ body: [String: Any]) throws -> [String: Any] {
+    var request = body
+    if request["type"] as? String != "get_review_session" && request["sessionId"] == nil {
+        request["sessionId"] = try response(router, ["type": "get_review_session"])["id"]
+    }
     let finished = DispatchSemaphore(value: 0)
     var result: Result<Any?, Error>?
-    router.handle(body) { value in
+    router.handle(request) { value in
         result = value
         finished.signal()
     }
@@ -222,10 +226,9 @@ private func testNativeReviewComments() throws {
         let edited = try response(router, ["type": "edit_comment", "commentId": firstID, "body": "Revised"])
         expect(edited["id"] as? String == firstID, "editing should preserve the ID")
         expect(edited["target"] as? [String: String] == target, "editing should preserve the review target")
-        _ = try response(router, ["type": "reload_review"])
         let saved = try core.dispatch(["type": "get_comments"]) as? [[String: Any]]
-        expect(saved?.count == 2, "reload should preserve both review comments")
-        expect(saved?.first?["body"] as? String == "Revised", "reload should preserve edited text")
+        expect(saved?.count == 2, "editing should retain both review comments")
+        expect(saved?.first?["body"] as? String == "Revised", "editing should retain revised text")
         _ = try response(router, ["type": "delete_comment", "commentId": firstID])
         let remaining = try core.dispatch(["type": "get_comments"]) as? [[String: Any]]
         expect(remaining?.count == 1 && remaining?.first?["id"] as? String == secondID,
@@ -236,6 +239,9 @@ private func testNativeReviewComments() throws {
         expect(empty?.isEmpty == true,
                "clear should remove review comments")
         _ = try response(router, ["type": "create_comment", "body": "Session only", "target": ["kind": "review"]])
+        let reset = try response(router, ["type": "reload_review"])
+        let resetComments = try core.dispatch(["type": "get_comments", "sessionId": reset["sessionId"]!]) as? [Any]
+        expect(resetComments?.isEmpty == true, "reload should discard saved comments")
         let nextSession = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: nil))
         let fresh = try nextSession.dispatch(["type": "get_comments"]) as? [Any]
         expect(fresh?.isEmpty == true,
@@ -373,6 +379,56 @@ private func testNativeSessionIdentity() throws {
     }
 }
 
+private func testNativeReloadOrdering() throws {
+    try withNativeRepository { _, core, router in
+        let initial = try response(router, ["type": "get_review_session"])
+        let id = initial["id"] as! Int
+        _ = try response(router, ["type": "create_comment", "body": "discard", "target": ["kind": "review"], "sessionId": id])
+        let completed = DispatchSemaphore(value: 0)
+        var results: [Result<Any?, Error>] = []
+        // These requests belong to one document and retain its identity while queued.
+        for body: [String: Any] in [
+            ["type": "reload_review", "sessionId": id],
+            ["type": "create_comment", "body": "stale", "target": ["kind": "review"], "sessionId": id],
+            ["type": "reload_review", "sessionId": id],
+        ] {
+            router.handle(body) { result in
+                results.append(result)
+                completed.signal()
+            }
+        }
+        for _ in 0..<3 {
+            expect(completed.wait(timeout: .now() + 5) == .success, "queued reset requests should finish")
+        }
+        let reset = try results[0].get() as! [String: Any]
+        let currentID = reset["sessionId"] as! Int
+        expect(currentID == id + 1, "reload should create one new session")
+        for result in results.dropFirst() {
+            do {
+                _ = try result.get()
+                fatalError("old queued requests must fail")
+            } catch {
+                expect(error.localizedDescription.contains("session has ended"), "queued requests must report a stale session")
+            }
+        }
+        let comments = try core.dispatch(["type": "get_comments", "sessionId": currentID]) as? [Any]
+        expect(comments?.isEmpty == true, "reset must discard comments and reject the queued mutation")
+        let current = try response(router, ["type": "get_review_session"])
+        expect(current["id"] as? Int == currentID, "duplicate reset must not replace the session again")
+        _ = try response(router, ["type": "create_comment", "body": "retain on failure", "target": ["kind": "review"]])
+        do {
+            _ = try response(router, ["type": "reload_review", "source": ["kind": "working-tree", "base": "missing-commit"]])
+            fatalError("an unavailable commit must fail")
+        } catch {
+            expect(error.localizedDescription == "Revision does not identify a commit", "reload should report the invalid revision")
+        }
+        let retained = try core.dispatch(["type": "get_comments", "sessionId": currentID]) as? [[String: Any]]
+        expect(retained?.first?["body"] as? String == "retain on failure", "construction failure must retain comments")
+        let retried = try response(router, ["type": "reload_review"])
+        expect(retried["sessionId"] as? Int == currentID + 1, "ordinary reload must remain available after failure")
+    }
+}
+
 @main
 struct NativeCoreTests {
     static func main() {
@@ -384,6 +440,7 @@ struct NativeCoreTests {
                 try testNativePullRequests()
                 try testNativeExecutableConfiguration()
                 try testNativeSessionIdentity()
+                try testNativeReloadOrdering()
             }
             print("Native core tests passed")
         } catch {

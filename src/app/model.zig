@@ -474,7 +474,7 @@ pub const Request = union(enum) {
     log: logging.Event,
     get_configuration,
     get_review_session,
-    reload_review,
+    reload_review: struct { source: ?DiffSource = null },
     get_diff_overview,
     list_commits,
     list_working_tree_changes,
@@ -530,7 +530,7 @@ pub const ClearCommentsResult = struct {
 };
 
 pub const ReloadReviewResult = struct {
-    generation: usize,
+    sessionId: u64,
 };
 
 pub const LogResult = struct {
@@ -588,7 +588,8 @@ const error_definitions = .{
     .unknown_comment = ErrorDefinition{ .errors = &.{error.UnknownComment}, .message = "Comment was not found" },
     .no_comments = ErrorDefinition{ .errors = &.{error.NoComments}, .message = "No review comments to copy" },
     .invalid_file_path = ErrorDefinition{ .errors = &.{error.InvalidFilePath}, .message = "File path is invalid" },
-    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to reload the review snapshot; check executables.git in ~/.config/rvw/config.json and repository access" },
+    .pull_request_unavailable = ErrorDefinition{ .errors = &.{ error.PullRequestUnavailable, error.InvalidPullRequestRefs }, .message = "Unable to fetch the pull request; check the origin remote, PR number, and repository access" },
+    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to replace the review session; check executables.git in ~/.config/rvw/config.json and repository access" },
     .invalid_search_query = ErrorDefinition{ .errors = &.{error.InvalidSearchQuery}, .message = "Search query must be valid UTF-8 without NUL or line breaks" },
     .search_unavailable = ErrorDefinition{ .errors = &.{error.SearchUnavailable}, .message = "Search is unavailable; check executables.rg in ~/.config/rvw/config.json or rg on the process PATH" },
     .search_failed = ErrorDefinition{ .errors = &.{error.SearchFailed}, .message = "Search failed; check executables.rg in ~/.config/rvw/config.json and directory access" },

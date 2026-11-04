@@ -57,11 +57,32 @@ pub const SessionOwner = struct {
             // silently reach a replacement when queued by the old document.
             return error.StaleSession;
         }
-        const response: model.Response = if (request == .get_review_session)
-            .{ .review_session = .{ .id = self.session_id } }
-        else
-            try self.active.core.dispatch(request);
+        const response: model.Response = switch (request) {
+            .get_review_session => .{ .review_session = .{ .id = self.session_id } },
+            .reload_review => |details| try self.reload(details.source),
+            else => try self.active.core.dispatch(request),
+        };
         return .{ .response = response, .context = self, .releaseFn = release };
+    }
+
+    fn reload(self: *SessionOwner, source: ?model.DiffSource) !model.Response {
+        var options = self.active.options;
+        if (source) |value| options.source = value;
+        const replacement = session_module.Session.create(self.active.allocator, self.io, options) catch |err| {
+            self.active.options.logger.log(self.io, .{
+                .level = .err,
+                .source = .backend,
+                .message = "review session replacement failed",
+            });
+            return switch (err) {
+                error.InvalidRevision, error.PullRequestUnavailable, error.InvalidPullRequestRefs => err,
+                error.MissingOrigin => error.PullRequestUnavailable,
+                else => error.ReloadUnavailable,
+            };
+        };
+        errdefer replacement.destroy();
+        try self.replaceLocked(replacement);
+        return .{ .reload_review_result = .{ .sessionId = self.session_id } };
     }
 
     fn release(context: *anyopaque) void {
@@ -70,7 +91,7 @@ pub const SessionOwner = struct {
     }
 };
 
-test "replacement waits for response serialization and rejects requests from the old document" {
+test "reload waits for response serialization and rejects requests from the old document" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;
     var repository = try @import("../testing/repository.zig").Repository.init(allocator);
@@ -81,32 +102,28 @@ test "replacement waits for response serialization and rejects requests from the
     var owner = SessionOwner.init(io, try session_module.Session.create(allocator, io, testOptions(repository.root)));
     defer owner.deinit();
     try repository.write("file.txt", "new snapshot\n");
-    const replacement = try session_module.Session.create(allocator, io, owner.active.options);
-    var owns_replacement = true;
-    defer if (owns_replacement) replacement.destroy();
     const old_id = (try owner.active.core.dispatch(.get_diff_overview)).diff_overview.id;
     const scoped = try owner.dispatcher().dispatchScoped(.{ .get_file_diff = .{ .diff_id = old_id, .path = "file.txt" } }, 1);
     var scope_active = true;
     defer if (scope_active) scoped.deinit();
     const Replacement = struct {
         owner: *SessionOwner,
-        session: *session_module.Session,
         started: std.Io.Event = .unset,
         finished: std.Io.Event = .unset,
         failure: ?anyerror = null,
 
         fn run(self: *@This()) void {
+            defer self.finished.set(self.owner.io);
             self.started.set(self.owner.io);
-            self.owner.replace(self.session) catch |err| {
+            const reset = self.owner.dispatcher().dispatchScoped(.{ .reload_review = .{} }, 1) catch |err| {
                 self.failure = err;
-                self.session.destroy();
+                return;
             };
-            self.finished.set(self.owner.io);
+            reset.deinit();
         }
     };
-    var replacement_task: Replacement = .{ .owner = &owner, .session = replacement };
+    var replacement_task: Replacement = .{ .owner = &owner };
     const thread = try std.Thread.spawn(.{}, Replacement.run, .{&replacement_task});
-    owns_replacement = false;
     var joined = false;
     defer {
         if (scope_active) {
@@ -187,4 +204,89 @@ fn testOptions(directory: []const u8) session_module.Options {
         .configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null },
         .logger = @import("../log/log.zig").stderrLogger(std.testing.allocator),
     };
+}
+
+test "ordinary reload rebuilds caches and retains symbolic or explicit working-tree source intent" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    const base = try repository.revision("HEAD");
+    defer allocator.free(base);
+    try repository.write("file.txt", "first\n");
+    var owner = SessionOwner.init(io, try session_module.Session.create(allocator, io, testOptions(repository.root)));
+    defer owner.deinit();
+    const original_id = blk: {
+        const scoped = try owner.dispatcher().dispatchScoped(.get_diff_overview, 1);
+        defer scoped.deinit();
+        break :blk try allocator.dupe(u8, scoped.response.diff_overview.id);
+    };
+    defer allocator.free(original_id);
+    {
+        const files = try owner.dispatcher().dispatchScoped(.get_files, 1);
+        defer files.deinit();
+        try std.testing.expectEqual(@as(usize, 1), files.response.files.len);
+    }
+    {
+        const comment = try owner.dispatcher().dispatchScoped(.{ .create_comment = .{ .body = "discard", .target = .review } }, 1);
+        defer comment.deinit();
+    }
+    try repository.write("file.txt", "second\n");
+    try repository.write("new.txt", "new\n");
+    {
+        const reset = try owner.dispatcher().dispatchScoped(.{ .reload_review = .{} }, 1);
+        defer reset.deinit();
+        try std.testing.expectEqual(@as(u64, 2), reset.response.reload_review_result.sessionId);
+    }
+    {
+        const overview = try owner.dispatcher().dispatchScoped(.get_diff_overview, 2);
+        defer overview.deinit();
+        try std.testing.expectEqualStrings(original_id, overview.response.diff_overview.id);
+    }
+    {
+        const file = try owner.dispatcher().dispatchScoped(.{ .get_file_diff = .{ .diff_id = original_id, .path = "file.txt" } }, 2);
+        defer file.deinit();
+        try std.testing.expectEqualStrings("second\n", file.response.file_diff.content.diff.newFile.?.contents);
+    }
+    {
+        const files = try owner.dispatcher().dispatchScoped(.get_files, 2);
+        defer files.deinit();
+        try std.testing.expectEqual(@as(usize, 2), files.response.files.len);
+    }
+    {
+        const comments = try owner.dispatcher().dispatchScoped(.get_comments, 2);
+        defer comments.deinit();
+        try std.testing.expectEqual(@as(usize, 0), comments.response.comments.len);
+    }
+    try repository.commit("advance HEAD");
+    const head = try repository.revision("HEAD");
+    defer allocator.free(head);
+    {
+        const reset = try owner.dispatcher().dispatchScoped(.{ .reload_review = .{} }, 2);
+        defer reset.deinit();
+    }
+    {
+        const overview = try owner.dispatcher().dispatchScoped(.get_diff_overview, 3);
+        defer overview.deinit();
+        try std.testing.expectEqualStrings(head, overview.response.diff_overview.source.working_tree.base);
+        try std.testing.expectEqual(@as(usize, 0), overview.response.diff_overview.files.len);
+    }
+    {
+        const reset = try owner.dispatcher().dispatchScoped(.{ .reload_review = .{ .source = .{ .working_tree = .{ .base = base } } } }, 3);
+        defer reset.deinit();
+    }
+    try repository.write("file.txt", "third\n");
+    try repository.commit("advance HEAD again");
+    {
+        const reset = try owner.dispatcher().dispatchScoped(.{ .reload_review = .{} }, 4);
+        defer reset.deinit();
+    }
+    {
+        const overview = try owner.dispatcher().dispatchScoped(.get_diff_overview, 5);
+        defer overview.deinit();
+        try std.testing.expectEqualStrings(base, overview.response.diff_overview.source.working_tree.base);
+        try std.testing.expectEqual(@as(usize, 2), overview.response.diff_overview.files.len);
+    }
 }
