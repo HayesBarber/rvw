@@ -28,14 +28,65 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         if (err == error.UnknownOperation) .unknown_operation else .malformed_request,
     );
 
-    const response = dispatcher.dispatch(request) catch |err| {
+    const session_id = decodeSessionId(parsed.value) catch return encodeEnvelopeError(allocator, .malformed_request);
+    const scoped = dispatcher.dispatchScoped(request, session_id) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
-    defer response.deinit();
-    const encoded = try switch (response) {
+    defer scoped.deinit();
+    const encoded = try switch (scoped.response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
     return encoded;
+}
+
+pub fn decodeSessionId(value: std.json.Value) error{MalformedRequest}!?u64 {
+    const object = switch (value) {
+        .object => |object| object,
+        else => return error.MalformedRequest,
+    };
+    const id = object.get("sessionId") orelse return null;
+    if (id != .integer or id.integer <= 0 or id.integer > model.maximum_session_id) return error.MalformedRequest;
+    return @intCast(id.integer);
+}
+
+pub fn parseSessionId(value: []const u8) error{MalformedRequest}!u64 {
+    if (value.len == 0) return error.MalformedRequest;
+    for (value) |byte| if (!std.ascii.isDigit(byte)) return error.MalformedRequest;
+    const id = std.fmt.parseInt(u64, value, 10) catch return error.MalformedRequest;
+    if (id == 0 or id > model.maximum_session_id) return error.MalformedRequest;
+    return id;
+}
+
+fn decodeReviewSource(value: std.json.Value) error{MalformedRequest}!model.DiffSource {
+    const object = switch (value) {
+        .object => |object| object,
+        else => return error.MalformedRequest,
+    };
+    const kind = jsonString(object.get("kind")) orelse return error.MalformedRequest;
+    if (std.mem.eql(u8, kind, "commit-range")) {
+        if (object.count() != 3) return error.MalformedRequest;
+        return .{ .commit_range = .{
+            .base = try decodeRevision(object.get("base")),
+            .head = try decodeRevision(object.get("head")),
+        } };
+    }
+    if (std.mem.eql(u8, kind, "working-tree")) {
+        if (object.count() != 2) return error.MalformedRequest;
+        return .{ .working_tree = .{ .base = try decodeRevision(object.get("base")) } };
+    }
+    if (std.mem.eql(u8, kind, "pull-request")) {
+        if (object.count() != 2) return error.MalformedRequest;
+        const number = object.get("number") orelse return error.MalformedRequest;
+        if (number != .integer or number.integer <= 0 or number.integer > std.math.maxInt(u32)) return error.MalformedRequest;
+        return .{ .pull_request = .{ .number = @intCast(number.integer) } };
+    }
+    return error.MalformedRequest;
+}
+
+fn decodeRevision(value: ?std.json.Value) error{MalformedRequest}![]const u8 {
+    const revision = jsonString(value) orelse return error.MalformedRequest;
+    if (revision.len == 0 or std.mem.indexOfScalar(u8, revision, 0) != null) return error.MalformedRequest;
+    return revision;
 }
 
 pub const DecodeError = error{ MalformedRequest, UnknownOperation };
@@ -49,7 +100,10 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
 
     if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
-    if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
+    if (std.mem.eql(u8, operation, "get_review_session")) return .get_review_session;
+    if (std.mem.eql(u8, operation, "reload_review")) return .{ .reload_review = .{
+        .source = if (object.get("source")) |source| try decodeReviewSource(source) else null,
+    } };
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "list_commits")) return .list_commits;
     if (std.mem.eql(u8, operation, "list_working_tree_changes")) return .list_working_tree_changes;
@@ -210,7 +264,7 @@ test "reload review request decodes" {
         .{},
     );
     defer parsed.deinit();
-    try std.testing.expectEqual(model.Request.reload_review, try decodeRequestValue(parsed.value));
+    try std.testing.expect((try decodeRequestValue(parsed.value)).reload_review.source == null);
 }
 
 test "file path copy requests require a supported format" {
@@ -423,5 +477,72 @@ test "native repository responses release result storage when serialization fail
         "{\"type\":\"list_working_tree_changes\"}",
     }) |input| {
         try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{input});
+    }
+}
+
+test "session IDs use positive safe integers and reject malformed payloads" {
+    for ([_][]const u8{ "0", "-1", "1.5", "null", "true", "\"1\"", "9007199254740992" }) |value| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "{{\"sessionId\":{s}}}", .{value});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeSessionId(parsed.value));
+    }
+    for ([_][]const u8{ "", "0", "-1", "+1", "1.5", " 1", "9007199254740992" }) |value| {
+        try std.testing.expectError(error.MalformedRequest, parseSessionId(value));
+    }
+    try std.testing.expectEqual(@as(u64, 1), try parseSessionId("1"));
+    try std.testing.expectEqual(model.maximum_session_id, try parseSessionId("9007199254740991"));
+}
+
+test "reload sources preserve full commit IDs and keep the working tree explicit" {
+    const base = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    for ([_]model.DiffSource{
+        .{ .commit_range = .{ .base = base, .head = head } },
+        .{ .working_tree = .{ .base = base } },
+        .{ .pull_request = .{ .number = 123 } },
+    }) |source| {
+        const input = try std.json.Stringify.valueAlloc(std.testing.allocator, .{ .type = "reload_review", .source = source }, .{});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        const decoded = (try decodeRequestValue(parsed.value)).reload_review.source.?;
+        try std.testing.expectEqualDeep(source, decoded);
+    }
+    for ([_][]const u8{
+        "null", "[]", "{}",
+        \\{"kind":"unknown"}
+        ,
+        \\{"kind":"commit-range","base":"a"}
+        ,
+        \\{"kind":"commit-range","base":"","head":"b"}
+        ,
+        \\{"kind":"commit-range","base":"a","head":2}
+        ,
+        \\{"kind":"working-tree"}
+        ,
+        \\{"kind":"working-tree","base":"a","head":"fake"}
+        ,
+        \\{"kind":"working-tree","base":"a\u0000b"}
+        ,
+        \\{"kind":"pull-request","number":0}
+        ,
+        \\{"kind":"pull-request","number":-1}
+        ,
+        \\{"kind":"pull-request","number":1.5}
+        ,
+        \\{"kind":"pull-request","number":4294967296}
+        ,
+        \\{"kind":"pull-request","number":"123"}
+        ,
+        \\{"kind":"pull-request","number":123,"base":"stale"}
+        ,
+    }) |source| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "{{\"type\":\"reload_review\",\"source\":{s}}}", .{source});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeRequestValue(parsed.value));
     }
 }

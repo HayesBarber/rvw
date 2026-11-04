@@ -37,7 +37,7 @@ test('default and configured item navigation bindings change picker modes', () =
   }
 })
 
-test('the shell owns mode navigation while cursor actions retain the child handler', () => {
+test('the shell owns mode navigation while cursor actions reach the child handler', () => {
   const modes = []
   const counts = []
   const cursorDown = (count) => { counts.push(count); return true }
@@ -50,7 +50,6 @@ test('the shell owns mode navigation while cursor actions retain the child handl
       [ApplicationAction.ITEM_PREVIOUS]: () => assert.fail('Mode navigation reached child'),
     },
   })
-  assert.equal(actions[ApplicationAction.CURSOR_DOWN], cursorDown)
   assert.equal(actions[ApplicationAction.CURSOR_DOWN](4), true)
   assert.equal(actions[ApplicationAction.ITEM_NEXT](1), true)
   assert.equal(actions[ApplicationAction.ITEM_PREVIOUS](1), true)

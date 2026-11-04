@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { reviewSourceLabel } from '../review/source-label.js'
-import { BLOCKED_DURING_DRAFT_MESSAGE } from '../review/reload-request.js'
 import { filePathCopyRequestMessage } from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 
@@ -16,6 +15,7 @@ export function FooterActionsMenu({ id, onReload, onSearchText, onChooseReviewSo
         className="footer-actions-item"
         type="button"
         aria-haspopup="dialog"
+        disabled={reloadDisabled}
         onClick={onChooseReviewSource}
       >
         Choose review source
@@ -24,7 +24,7 @@ export function FooterActionsMenu({ id, onReload, onSearchText, onChooseReviewSo
         className="footer-actions-item"
         type="button"
         disabled={reloadDisabled}
-        title={reloadDisabled ? BLOCKED_DURING_DRAFT_MESSAGE : 'Reload review'}
+        title={reloadDisabled ? 'Reloading…' : 'Reload review'}
         onClick={onReload}
       >
         Reload

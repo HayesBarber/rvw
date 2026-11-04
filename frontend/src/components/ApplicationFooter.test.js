@@ -57,7 +57,7 @@ test('the footer menu opens the picker through the application dispatcher', () =
     onChooseReviewSource: () => dispatch(ApplicationAction.OPEN_REVIEW_SOURCE_PICKER),
     onReload: () => assert.fail('Reload must not run'),
     onSearchText: () => assert.fail('Search must not run'),
-    reloadDisabled: true,
+    reloadDisabled: false,
   })
   const html = renderToStaticMarkup(menu)
   assert.match(html, /<button class="footer-actions-item" type="button" aria-haspopup="dialog">Choose review source<\/button>/)
@@ -177,4 +177,11 @@ test('tree path copy progress, success, and failures appear in the footer', () =
       assert.doesNotMatch(left, /file-path-copy-status/)
     }
   }
+})
+
+test('pending replacement disables both reload and source selection', () => {
+  const menu = FooterActionsMenu({ reloadDisabled: true })
+  const choices = menu.props.children.filter((child) => ['Reload', 'Choose review source'].includes(child.props.children))
+  assert.equal(choices.length, 2)
+  assert(choices.every((choice) => choice.props.disabled))
 })

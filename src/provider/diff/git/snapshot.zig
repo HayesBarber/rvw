@@ -9,20 +9,36 @@ pub const Snapshot = struct {
     head: ?[]const u8 = null,
 };
 
+pub const Comparison = union(enum) {
+    working_tree: struct { base: []const u8 },
+    commit_range: struct { base: []const u8, head: []const u8 },
+};
+
 const Range = struct {
     base: []const u8,
     head: []const u8,
 };
 
 pub fn resolve(allocator: Allocator, io: Io, root: []const u8, range: ?[]const u8, executable: []const u8) !Snapshot {
+    return resolveComparison(allocator, io, root, try comparisonFromRange(range), executable);
+}
+
+pub fn comparisonFromRange(range: ?[]const u8) !Comparison {
     if (range) |value| {
         const revisions = try parseRange(value);
-        return .{
-            .base = try resolveCommit(allocator, io, root, revisions.base, executable),
-            .head = try resolveCommit(allocator, io, root, revisions.head, executable),
-        };
+        return .{ .commit_range = .{ .base = revisions.base, .head = revisions.head } };
     }
-    return .{ .base = try resolveCommit(allocator, io, root, "HEAD", executable) };
+    return .{ .working_tree = .{ .base = "HEAD" } };
+}
+
+pub fn resolveComparison(allocator: Allocator, io: Io, root: []const u8, comparison: Comparison, executable: []const u8) !Snapshot {
+    return switch (comparison) {
+        .working_tree => |source| .{ .base = try resolveCommit(allocator, io, root, source.base, executable) },
+        .commit_range => |source| .{
+            .base = try resolveCommit(allocator, io, root, source.base, executable),
+            .head = try resolveCommit(allocator, io, root, source.head, executable),
+        },
+    };
 }
 
 fn parseRange(value: []const u8) !Range {

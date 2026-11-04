@@ -5,17 +5,10 @@ const allocator = std.heap.page_allocator;
 
 const RvwCore = struct {
     threaded: std.Io.Threaded,
-    review: rvw.provider.review.git.GitReviewProvider,
-    repository: rvw.provider.repository.git.GitProvider,
-    pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider,
-    comments: rvw.provider.comment.memory.MemoryProvider,
-    clipboard: rvw.output.SystemClipboard,
+    owner: rvw.session_owner.SessionOwner,
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
     configuration: rvw.config.Loaded,
-    search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider,
-    search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider,
-    core: rvw.core.Core,
 };
 
 pub const RvwBuffer = extern struct {
@@ -68,43 +61,30 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    const executables = rvw.config.Executables.fromSnapshot(handle.configuration.snapshot);
-    handle.review = rvw.provider.review.git.GitReviewProvider.init(allocator, handle.threaded.io(), directory, range, if (pr_ptr) |pr| pr.* else null, executables.git) catch |err| {
-        rvw.startup.logApplicationStartFailed(
-            handle.logger,
-            handle.threaded.io(),
-            "diff_provider",
-            err,
-        );
+    const source = rvw.session.sourceFromArguments(range, if (pr_ptr) |pr| pr.* else null) catch |err| {
+        rvw.startup.logApplicationStartFailed(handle.logger, handle.threaded.io(), "diff_provider", err);
+        setSessionCreationError(error_out, err);
         handle.configuration.deinit();
         handle.default_logger.deinit();
         handle.threaded.deinit();
-        const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)}) catch null;
-        if (message) |value| {
-            if (error_out) |output| output.* = .{ .ptr = value.ptr, .len = value.len } else allocator.free(value);
-        }
         allocator.destroy(handle);
         return null;
     };
-    handle.comments = rvw.provider.comment.memory.MemoryProvider.init(allocator);
-    handle.repository = .{ .allocator = allocator, .executable = executables.git };
-    handle.pull_requests = .{ .allocator = allocator, .executable = executables.gh, .git_executable = executables.git };
-    handle.clipboard = .{};
-    handle.search_ignore_aware = .{ .allocator = allocator, .mode = .@"ignore-aware", .executable = executables.rg };
-    handle.search_all_files = .{ .allocator = allocator, .mode = .@"all-files", .executable = executables.rg };
-    handle.core = rvw.core.Core.init(
-        allocator,
-        handle.threaded.io(),
-        handle.review.interface(),
-        handle.repository.interface(),
-        handle.pull_requests.interface(),
-        handle.search_ignore_aware.interface(),
-        handle.search_all_files.interface(),
-        handle.comments.interface(),
-        handle.clipboard.interface(),
-        handle.logger,
-        handle.configuration.snapshot,
-    );
+    const session = rvw.session.Session.create(allocator, handle.threaded.io(), .{
+        .directory = directory,
+        .source = source,
+        .configuration = handle.configuration.snapshot,
+        .logger = handle.logger,
+    }) catch |err| {
+        rvw.startup.logApplicationStartFailed(handle.logger, handle.threaded.io(), "diff_provider", err);
+        handle.configuration.deinit();
+        handle.default_logger.deinit();
+        handle.threaded.deinit();
+        setSessionCreationError(error_out, err);
+        allocator.destroy(handle);
+        return null;
+    };
+    handle.owner = .init(handle.threaded.io(), session);
     return handle;
 }
 
@@ -116,7 +96,7 @@ pub export fn rvw_core_dispatch(
     const core = handle orelse return emptyBuffer();
     if (request_ptr == null and request_len != 0) return emptyBuffer();
     const request = request_ptr[0..request_len];
-    const response = rvw.json_protocol.dispatchJson(allocator, core.core.dispatcher(), request) catch
+    const response = rvw.json_protocol.dispatchJson(allocator, core.owner.dispatcher(), request) catch
         return emptyBuffer();
     return .{ .ptr = response.ptr, .len = response.len };
 }
@@ -130,8 +110,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
-    core.comments.deinit();
-    core.review.deinit();
+    core.owner.deinit();
     core.configuration.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();
@@ -151,4 +130,10 @@ fn setCreationError(error_out: ?*RvwBuffer, message: []const u8) void {
     const output = error_out orelse return;
     const owned = allocator.dupe(u8, message) catch return;
     output.* = .{ .ptr = owned.ptr, .len = owned.len };
+}
+
+fn setSessionCreationError(error_out: ?*RvwBuffer, err: anyerror) void {
+    const output = error_out orelse return;
+    const message = std.fmt.allocPrint(allocator, "unable to open Git diff: {s}", .{rvw.session.errorMessage(err)}) catch return;
+    output.* = .{ .ptr = message.ptr, .len = message.len };
 }

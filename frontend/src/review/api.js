@@ -1,3 +1,5 @@
+import { reviewTransport } from './transport.js'
+
 /** Shared review transport for native and development environments. */
 
 /**
@@ -38,31 +40,7 @@
  * @property {{ kind: 'diff', oldFile: FileContents | null, newFile: FileContents | null } | { kind: 'file', file: FileContents } | { kind: 'unavailable', reason: 'binary' | 'invalid-utf8' | 'too-large' | 'symlink' | 'submodule' }} content
  */
 
-async function requestJson(url, nativeRequest, options = {}) {
-  const native = window.webkit?.messageHandlers?.native
-  if (native) return native.postMessage(nativeRequest)
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      ...options.headers,
-    },
-  })
-
-  let body
-  try {
-    body = await response.json()
-  } catch {
-    throw new Error(`The rvw service returned an invalid response (${response.status})`)
-  }
-
-  if (!response.ok) {
-    throw new Error(body?.error?.message ?? `The rvw service returned ${response.status}`)
-  }
-
-  return body
-}
+const requestJson = reviewTransport.request
 
 /**
  * Requests normal application termination from the native host. Development
@@ -107,9 +85,9 @@ export async function getDiffOverview() {
   return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
-/** Rebuilds the repository-backed review snapshot without changing comments. */
-export async function reloadReview() {
-  const request = { type: 'reload_review' }
+/** Replaces the review session. The caller reloads the frontend document on success. */
+export async function reloadReview(source) {
+  const request = { type: 'reload_review', ...(source === undefined ? {} : { source }) }
   return requestJson('/api/review/reload', request, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

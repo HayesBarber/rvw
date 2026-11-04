@@ -208,7 +208,13 @@ pub const SourceLabels = struct {
 
 pub fn formatSourceLabels(allocator: std.mem.Allocator, source: DiffSource) !SourceLabels {
     return switch (source) {
-        .working_tree => .{ .full = "working tree", .compact = "working tree" },
+        .working_tree => |value| if (std.mem.eql(u8, value.base, "HEAD"))
+            .{ .full = "working tree", .compact = "working tree" }
+        else
+            .{
+                .full = try std.fmt.allocPrint(allocator, "{s}..working tree", .{value.base}),
+                .compact = try std.fmt.allocPrint(allocator, "{s}..working tree", .{compactRevision(value.base)}),
+            },
         .pull_request => |value| blk: {
             const label = try std.fmt.allocPrint(allocator, "PR #{d}", .{value.number});
             break :blk .{ .full = label, .compact = label };
@@ -467,7 +473,8 @@ pub fn validTextSearchQuery(query: []const u8) bool {
 pub const Request = union(enum) {
     log: logging.Event,
     get_configuration,
-    reload_review,
+    get_review_session,
+    reload_review: struct { source: ?DiffSource = null },
     get_diff_overview,
     list_commits,
     list_working_tree_changes,
@@ -523,7 +530,7 @@ pub const ClearCommentsResult = struct {
 };
 
 pub const ReloadReviewResult = struct {
-    generation: usize,
+    sessionId: u64,
 };
 
 pub const LogResult = struct {
@@ -533,6 +540,7 @@ pub const LogResult = struct {
 pub const Response = union(enum) {
     log_result: LogResult,
     configuration: config.Snapshot,
+    review_session: struct { id: u64 },
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     commit_list: CommitListResult,
@@ -562,12 +570,15 @@ pub const Response = union(enum) {
     }
 };
 
+pub const maximum_session_id: u64 = 9007199254740991;
+
 const ErrorDefinition = struct {
     errors: []const anyerror = &.{},
     message: []const u8,
 };
 
 const error_definitions = .{
+    .stale_session = ErrorDefinition{ .errors = &.{error.StaleSession}, .message = "This review session has ended. Reload the page to use the current review." },
     .malformed_request = ErrorDefinition{ .message = "Malformed request" },
     .unknown_operation = ErrorDefinition{ .message = "Unknown operation" },
     .unknown_diff = ErrorDefinition{ .errors = &.{error.UnknownDiff}, .message = "Unknown diff" },
@@ -577,7 +588,8 @@ const error_definitions = .{
     .unknown_comment = ErrorDefinition{ .errors = &.{error.UnknownComment}, .message = "Comment was not found" },
     .no_comments = ErrorDefinition{ .errors = &.{error.NoComments}, .message = "No review comments to copy" },
     .invalid_file_path = ErrorDefinition{ .errors = &.{error.InvalidFilePath}, .message = "File path is invalid" },
-    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to reload the review snapshot; check executables.git in ~/.config/rvw/config.json and repository access" },
+    .pull_request_unavailable = ErrorDefinition{ .errors = &.{ error.PullRequestUnavailable, error.InvalidPullRequestRefs }, .message = "Unable to fetch the pull request; check the origin remote, PR number, and repository access" },
+    .reload_unavailable = ErrorDefinition{ .errors = &.{error.ReloadUnavailable}, .message = "Unable to replace the review session; check executables.git in ~/.config/rvw/config.json and repository access" },
     .invalid_search_query = ErrorDefinition{ .errors = &.{error.InvalidSearchQuery}, .message = "Search query must be valid UTF-8 without NUL or line breaks" },
     .search_unavailable = ErrorDefinition{ .errors = &.{error.SearchUnavailable}, .message = "Search is unavailable; check executables.rg in ~/.config/rvw/config.json or rg on the process PATH" },
     .search_failed = ErrorDefinition{ .errors = &.{error.SearchFailed}, .message = "Search failed; check executables.rg in ~/.config/rvw/config.json and directory access" },

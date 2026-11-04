@@ -12,6 +12,7 @@ import { createPullRequestsRequest } from '../../review/pull-requests-request.js
 let server
 let ReviewSourcePicker
 let ReviewSourcePickerContent
+let ReviewSourcePickerStatus
 let ReviewSourceModeControl
 before(async () => {
   server = await createServer({
@@ -21,6 +22,7 @@ before(async () => {
   const pickerModule = await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourcePicker.jsx')
   ReviewSourcePicker = pickerModule.default
   ReviewSourcePickerContent = pickerModule.ReviewSourcePickerContent
+  ReviewSourcePickerStatus = pickerModule.ReviewSourcePickerStatus
   ReviewSourceModeControl = (await server.ssrLoadModule('/src/components/review-source-picker/ReviewSourceModeControl.jsx')).default
 })
 after(async () => { await server?.close() })
@@ -144,4 +146,45 @@ test('the commits mode retains the overlay request and comparison callback acros
   assert.equal(returned.props.request, commitsRequest)
   assert.match(renderToStaticMarkup(returned), /Loaded once/)
   assert.equal(loads, 1)
+})
+
+test('pending replacement shows progress and disables closing, mode controls, and endpoint selection', () => {
+  const html = renderToStaticMarkup(createElement(ReviewSourcePicker, {
+    onClose: () => assert.fail('Closed while replacing'), registerActionAdapter: () => {},
+    reloadRequest: { status: 'loading', isLocked: () => true },
+  }))
+  assert.match(html, /role="status">Loading selected review/)
+  assert.match(html, /disabled="" aria-label="Close review source picker"/)
+  assert.match(html, /aria-pressed="true" disabled="">Commits/)
+  assert.match(html, /aria-pressed="false" disabled="">Pull requests/)
+  assert.match(html, /aria-busy="true"/)
+})
+
+test('a failed replacement keeps picker content available for another submission', () => {
+  const html = renderToStaticMarkup(createElement(ReviewSourcePicker, {
+    onClose: () => {}, registerActionAdapter: () => {},
+    reloadRequest: { status: 'error', error: 'Selected review unavailable', isLocked: () => false },
+  }))
+  assert.match(html, /role="alert"/)
+  assert.match(html, /Selected review unavailable/)
+  assert.match(html, /Working tree/)
+  assert.match(html, /aria-label="Close review source picker">Close/)
+  assert.doesNotMatch(html, /aria-pressed="true" disabled="">Commits/)
+})
+
+test('a document navigation error offers retry while source controls stay locked', () => {
+  let retries = 0
+  const request = {
+    status: 'error', error: 'Unable to load document', data: { sessionId: 2 },
+    isLocked: () => true, reload: () => { retries++ },
+  }
+  const html = renderToStaticMarkup(createElement(ReviewSourcePicker, {
+    onClose: () => {}, registerActionAdapter: () => {}, reloadRequest: request,
+  }))
+  assert.match(html, /disabled="" aria-label="Close review source picker"/)
+  assert.match(html, /Unable to load document/)
+  assert.match(html, /data-vim-native-activation="true">Retry loading review<\/button>/)
+  const status = ReviewSourcePickerStatus({ request })
+  status.props.children[1].props.onClick()
+  assert.equal(retries, 1)
 })

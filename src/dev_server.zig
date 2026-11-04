@@ -45,40 +45,26 @@ pub fn main(init: std.process.Init) !void {
         .home = init.environ_map.get("HOME"),
     });
     defer configuration.deinit();
-    const executables = rvw.config.Executables.fromSnapshot(configuration.snapshot);
-    const range = if (options.pr) |number| rvw.util.pull_request.resolveRange(init.io, init.arena.allocator(), options.directory.?, number, executables.git) catch |err| {
-        std.log.err("{s}", .{rvw.util.pull_request.errorMessage(err)});
-        usage();
-        return err;
-    } else options.range;
-    var review = rvw.provider.review.git.GitReviewProvider.init(init.gpa, init.io, options.directory.?, range, options.pr, executables.git) catch |err| {
+    const source = rvw.session.sourceFromArguments(options.range, options.pr) catch |err| {
         rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
-        std.log.err("unable to open Git diff: {s}", .{rvw.provider.diff.git.errorMessage(err)});
+        std.log.err("unable to open Git diff: {s}", .{rvw.session.errorMessage(err)});
         return err;
     };
-    defer review.deinit();
-    var comments = rvw.provider.comment.memory.MemoryProvider.init(init.gpa);
-    defer comments.deinit();
-    var clipboard: rvw.output.SystemClipboard = .{};
-    var repository: rvw.provider.repository.git.GitProvider = .{ .allocator = init.gpa, .executable = executables.git };
-    var pull_requests: rvw.provider.pull_request.github_cli.GitHubCliProvider = .{ .allocator = init.gpa, .executable = executables.gh, .git_executable = executables.git };
-    var search_ignore_aware: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"ignore-aware", .executable = executables.rg };
-    var search_all_files: rvw.provider.text_search.ripgrep.RipgrepProvider = .{ .allocator = init.gpa, .mode = .@"all-files", .executable = executables.rg };
-    var core = rvw.core.Core.init(
-        init.gpa,
-        init.io,
-        review.interface(),
-        repository.interface(),
-        pull_requests.interface(),
-        search_ignore_aware.interface(),
-        search_all_files.interface(),
-        comments.interface(),
-        clipboard.interface(),
-        logger,
-        configuration.snapshot,
-    );
+    const session = rvw.session.Session.create(init.gpa, init.io, .{
+        .directory = options.directory.?,
+        .source = source,
+        .configuration = configuration.snapshot,
+        .logger = logger,
+    }) catch |err| {
+        rvw.startup.logApplicationStartFailed(logger, init.io, "diff_provider", err);
+        const message = rvw.session.errorMessage(err);
+        std.log.err("unable to open Git diff: {s}", .{message});
+        return err;
+    };
+    var owner = rvw.session_owner.SessionOwner.init(init.io, session);
+    defer owner.deinit();
 
-    try rvw.http.serve(init.gpa, init.io, core.dispatcher(), address);
+    try rvw.http.serve(init.gpa, init.io, owner.dispatcher(), address);
 }
 
 fn parseOptions(args: []const []const u8, environ: *const std.process.Environ.Map) !Options {
