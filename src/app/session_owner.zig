@@ -206,6 +206,74 @@ fn testOptions(directory: []const u8) session_module.Options {
     };
 }
 
+test "launch intent defaults to false and reads retain it until acknowledgement" {
+    const allocator = std.testing.allocator;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    var owner = SessionOwner.init(std.testing.io, try session_module.Session.create(allocator, std.testing.io, testOptions(repository.root)));
+    defer owner.deinit();
+    {
+        const initial = try owner.dispatcher().dispatchScoped(.get_launch_intent, 1);
+        defer initial.deinit();
+        try std.testing.expect(!initial.response.launch_intent.openReviewSourcePicker);
+    }
+    owner.active.core.open_review_source_picker = true;
+    const protocol = @import("json_protocol.zig");
+    for (0..2) |_| {
+        const encoded = try protocol.dispatchJson(allocator, owner.dispatcher(),
+            \\{"type":"get_launch_intent","sessionId":1}
+        );
+        defer allocator.free(encoded);
+        try std.testing.expectEqualStrings(
+            \\{"ok":true,"data":{"openReviewSourcePicker":true}}
+        , encoded);
+    }
+    for (0..2) |_| {
+        const acknowledged = try protocol.dispatchJson(allocator, owner.dispatcher(),
+            \\{"type":"acknowledge_launch_intent","sessionId":1}
+        );
+        defer allocator.free(acknowledged);
+        try std.testing.expectEqualStrings(
+            \\{"ok":true,"data":{"openReviewSourcePicker":false}}
+        , acknowledged);
+        const current = try owner.dispatcher().dispatchScoped(.get_launch_intent, 1);
+        defer current.deinit();
+        try std.testing.expect(!current.response.launch_intent.openReviewSourcePicker);
+    }
+}
+
+test "ordinary reload and source selection create cores without a launch instruction" {
+    const allocator = std.testing.allocator;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    var owner = SessionOwner.init(std.testing.io, try session_module.Session.create(allocator, std.testing.io, testOptions(repository.root)));
+    defer owner.deinit();
+    for ([_]?model.DiffSource{
+        null,
+        .{ .working_tree = .{ .base = "HEAD" } },
+        .{ .commit_range = .{ .base = "HEAD", .head = "HEAD" } },
+    }) |source| {
+        for ([_]bool{ false, true }) |acknowledged| {
+            const previous_id = owner.session_id;
+            owner.active.core.open_review_source_picker = true;
+            if (acknowledged) {
+                const acknowledgement = try owner.dispatcher().dispatchScoped(.acknowledge_launch_intent, previous_id);
+                acknowledgement.deinit();
+            }
+            const replacement = try owner.dispatcher().dispatchScoped(.{ .reload_review = .{ .source = source } }, previous_id);
+            replacement.deinit();
+            try std.testing.expectError(error.StaleSession, owner.dispatcher().dispatchScoped(.acknowledge_launch_intent, previous_id));
+            const current = try owner.dispatcher().dispatchScoped(.get_launch_intent, owner.session_id);
+            defer current.deinit();
+            try std.testing.expect(!current.response.launch_intent.openReviewSourcePicker);
+        }
+    }
+}
+
 test "ordinary reload rebuilds caches and retains symbolic or explicit working-tree source intent" {
     const allocator = std.testing.allocator;
     const io = std.testing.io;

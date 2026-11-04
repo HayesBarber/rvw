@@ -100,6 +100,8 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
 
     if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
+    if (std.mem.eql(u8, operation, "get_launch_intent")) return .get_launch_intent;
+    if (std.mem.eql(u8, operation, "acknowledge_launch_intent")) return .acknowledge_launch_intent;
     if (std.mem.eql(u8, operation, "get_review_session")) return .get_review_session;
     if (std.mem.eql(u8, operation, "reload_review")) return .{ .reload_review = .{
         .source = if (object.get("source")) |source| try decodeReviewSource(source) else null,
