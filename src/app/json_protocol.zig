@@ -28,14 +28,33 @@ pub fn dispatchJson(allocator: Allocator, dispatcher: dispatcher_module.Dispatch
         if (err == error.UnknownOperation) .unknown_operation else .malformed_request,
     );
 
-    const response = dispatcher.dispatch(request) catch |err| {
+    const session_id = decodeSessionId(parsed.value) catch return encodeEnvelopeError(allocator, .malformed_request);
+    const scoped = dispatcher.dispatchScoped(request, session_id) catch |err| {
         return encodeEnvelopeError(allocator, model.errorCode(err));
     };
-    defer response.deinit();
-    const encoded = try switch (response) {
+    defer scoped.deinit();
+    const encoded = try switch (scoped.response) {
         inline else => |data| std.json.Stringify.valueAlloc(allocator, .{ .ok = true, .data = data }, .{}),
     };
     return encoded;
+}
+
+pub fn decodeSessionId(value: std.json.Value) error{MalformedRequest}!?u64 {
+    const object = switch (value) {
+        .object => |object| object,
+        else => return error.MalformedRequest,
+    };
+    const id = object.get("sessionId") orelse return null;
+    if (id != .integer or id.integer <= 0 or id.integer > model.maximum_session_id) return error.MalformedRequest;
+    return @intCast(id.integer);
+}
+
+pub fn parseSessionId(value: []const u8) error{MalformedRequest}!u64 {
+    if (value.len == 0) return error.MalformedRequest;
+    for (value) |byte| if (!std.ascii.isDigit(byte)) return error.MalformedRequest;
+    const id = std.fmt.parseInt(u64, value, 10) catch return error.MalformedRequest;
+    if (id == 0 or id > model.maximum_session_id) return error.MalformedRequest;
+    return id;
 }
 
 pub const DecodeError = error{ MalformedRequest, UnknownOperation };
@@ -49,6 +68,7 @@ pub fn decodeRequestValue(value: std.json.Value) DecodeError!model.Request {
 
     if (std.mem.eql(u8, operation, "log")) return decodeLog(value);
     if (std.mem.eql(u8, operation, "get_configuration")) return .get_configuration;
+    if (std.mem.eql(u8, operation, "get_review_session")) return .get_review_session;
     if (std.mem.eql(u8, operation, "reload_review")) return .reload_review;
     if (std.mem.eql(u8, operation, "get_diff_overview")) return .get_diff_overview;
     if (std.mem.eql(u8, operation, "list_commits")) return .list_commits;
@@ -424,4 +444,19 @@ test "native repository responses release result storage when serialization fail
     }) |input| {
         try std.testing.checkAllAllocationFailures(std.testing.allocator, Test.run, .{input});
     }
+}
+
+test "session IDs use positive safe integers and reject malformed payloads" {
+    for ([_][]const u8{ "0", "-1", "1.5", "null", "true", "\"1\"", "9007199254740992" }) |value| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "{{\"sessionId\":{s}}}", .{value});
+        defer std.testing.allocator.free(input);
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, input, .{});
+        defer parsed.deinit();
+        try std.testing.expectError(error.MalformedRequest, decodeSessionId(parsed.value));
+    }
+    for ([_][]const u8{ "", "0", "-1", "+1", "1.5", " 1", "9007199254740992" }) |value| {
+        try std.testing.expectError(error.MalformedRequest, parseSessionId(value));
+    }
+    try std.testing.expectEqual(@as(u64, 1), try parseSessionId("1"));
+    try std.testing.expectEqual(model.maximum_session_id, try parseSessionId("9007199254740991"));
 }

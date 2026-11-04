@@ -5,7 +5,7 @@ const allocator = std.heap.page_allocator;
 
 const RvwCore = struct {
     threaded: std.Io.Threaded,
-    session: *rvw.session.Session,
+    owner: rvw.session_owner.SessionOwner,
     default_logger: rvw.log.DefaultLogger,
     logger: rvw.log.Logger,
     configuration: rvw.config.Loaded,
@@ -70,7 +70,7 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
-    handle.session = rvw.session.Session.create(allocator, handle.threaded.io(), .{
+    const session = rvw.session.Session.create(allocator, handle.threaded.io(), .{
         .directory = directory,
         .source = source,
         .configuration = handle.configuration.snapshot,
@@ -84,6 +84,7 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    handle.owner = .init(handle.threaded.io(), session);
     return handle;
 }
 
@@ -95,7 +96,7 @@ pub export fn rvw_core_dispatch(
     const core = handle orelse return emptyBuffer();
     if (request_ptr == null and request_len != 0) return emptyBuffer();
     const request = request_ptr[0..request_len];
-    const response = rvw.json_protocol.dispatchJson(allocator, core.session.core.dispatcher(), request) catch
+    const response = rvw.json_protocol.dispatchJson(allocator, core.owner.dispatcher(), request) catch
         return emptyBuffer();
     return .{ .ptr = response.ptr, .len = response.len };
 }
@@ -109,7 +110,7 @@ pub export fn rvw_buffer_free(_: ?*RvwCore, buffer: RvwBuffer) callconv(.c) void
 
 pub export fn rvw_core_destroy(handle: ?*RvwCore) callconv(.c) void {
     const core = handle orelse return;
-    core.session.destroy();
+    core.owner.deinit();
     core.configuration.deinit();
     core.default_logger.deinit();
     core.threaded.deinit();

@@ -29,19 +29,23 @@ const Handler = struct {
             "{\"error\":{\"code\":\"internal_error\",\"message\":\"Internal error\"}}";
     }
 
-    fn dispatchRequest(self: *Handler, res: *httpz.Response, request: model.Request) !void {
-        const response = self.dispatcher.dispatch(request) catch |err| {
+    fn dispatchRequest(self: *Handler, req: *httpz.Request, res: *httpz.Response, request: model.Request) !void {
+        const session_id = if (req.header("x-rvw-session")) |value|
+            json_protocol.parseSessionId(value) catch return self.failure(res, .bad_request, .malformed_request)
+        else
+            null;
+        const scoped = self.dispatcher.dispatchScoped(request, session_id) catch |err| {
             const code = model.errorCode(err);
             const status = errorStatus(code);
             return self.failure(res, status, code);
         };
-        defer response.deinit();
+        defer scoped.deinit();
         setJsonHeaders(res);
-        res.body = try json_protocol.encodeResponse(res.arena, response);
+        res.body = try json_protocol.encodeResponse(res.arena, scoped.response);
     }
 
-    fn dispatchCreated(self: *Handler, res: *httpz.Response, request: model.Request) !void {
-        try self.dispatchRequest(res, request);
+    fn dispatchCreated(self: *Handler, req: *httpz.Request, res: *httpz.Response, request: model.Request) !void {
+        try self.dispatchRequest(req, res, request);
         if (res.status < 400) res.status = @intFromEnum(std.http.Status.created);
     }
 
@@ -55,6 +59,7 @@ const Handler = struct {
 fn errorStatus(code: model.ErrorCode) std.http.Status {
     return switch (code) {
         .unknown_diff, .unknown_file, .unknown_comment => .not_found,
+        .stale_session => .conflict,
         .malformed_request,
         .invalid_comment,
         .invalid_comment_id,
@@ -69,24 +74,28 @@ fn errorStatus(code: model.ErrorCode) std.http.Status {
     };
 }
 
-fn getConfiguration(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_configuration);
+fn getReviewSession(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_review_session);
 }
 
-fn getDiffOverview(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_diff_overview);
+fn getConfiguration(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_configuration);
 }
 
-fn listCommits(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .list_commits);
+fn getDiffOverview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_diff_overview);
 }
 
-fn listWorkingTreeChanges(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .list_working_tree_changes);
+fn listCommits(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .list_commits);
 }
 
-fn listOpenPullRequests(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .list_open_pull_requests);
+fn listWorkingTreeChanges(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .list_working_tree_changes);
+}
+
+fn listOpenPullRequests(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .list_open_pull_requests);
 }
 
 fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -98,7 +107,7 @@ fn reloadReview(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !v
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .reload_review => return handler.dispatchRequest(res, request),
+        .reload_review => return handler.dispatchRequest(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -112,17 +121,17 @@ fn searchText(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !voi
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .search_text => return handler.dispatchRequest(res, request),
+        .search_text => return handler.dispatchRequest(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
 
-fn getFiles(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_files);
+fn getFiles(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_files);
 }
 
-fn getFilesNotIgnored(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_files_not_ignored);
+fn getFilesNotIgnored(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_files_not_ignored);
 }
 
 fn getFile(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -131,7 +140,7 @@ fn getFile(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     const path = query.get("path") orelse
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
-    return handler.dispatchRequest(res, .{ .get_file = .{ .path = path } });
+    return handler.dispatchRequest(req, res, .{ .get_file = .{ .path = path } });
 }
 
 fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -145,14 +154,14 @@ fn getFileDiff(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !vo
         return handler.failure(res, .bad_request, .malformed_request);
     if (path.len == 0) return handler.failure(res, .bad_request, .malformed_request);
 
-    return handler.dispatchRequest(res, .{ .get_file_diff = .{
+    return handler.dispatchRequest(req, res, .{ .get_file_diff = .{
         .diff_id = diff_id,
         .path = path,
     } });
 }
 
-fn getComments(handler: *Handler, _: *httpz.Request, res: *httpz.Response) !void {
-    return handler.dispatchRequest(res, .get_comments);
+fn getComments(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_comments);
 }
 
 fn createComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
@@ -164,7 +173,7 @@ fn createComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .create_comment => return handler.dispatchCreated(res, request),
+        .create_comment => return handler.dispatchCreated(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -183,7 +192,7 @@ fn editComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !vo
             if (!std.mem.eql(u8, comment_id, details.comment_id)) {
                 return handler.failure(res, .bad_request, .invalid_comment_id);
             }
-            return handler.dispatchRequest(res, request);
+            return handler.dispatchRequest(req, res, request);
         },
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
@@ -203,7 +212,7 @@ fn deleteComment(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
             if (!std.mem.eql(u8, comment_id, details.comment_id)) {
                 return handler.failure(res, .bad_request, .invalid_comment_id);
             }
-            return handler.dispatchRequest(res, request);
+            return handler.dispatchRequest(req, res, request);
         },
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
@@ -234,7 +243,7 @@ fn copyCommentsAsMarkdown(handler: *Handler, req: *httpz.Request, res: *httpz.Re
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .copy_comments_as_markdown => return handler.dispatchRequest(res, request),
+        .copy_comments_as_markdown => return handler.dispatchRequest(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -248,7 +257,7 @@ fn copyFilePath(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !v
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .copy_file_path => return handler.dispatchRequest(res, request),
+        .copy_file_path => return handler.dispatchRequest(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -262,7 +271,7 @@ fn clearComments(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !
     const request = json_protocol.decodeRequestValue(parsed.value) catch
         return handler.failure(res, .bad_request, .malformed_request);
     switch (request) {
-        .clear_comments => return handler.dispatchRequest(res, request),
+        .clear_comments => return handler.dispatchRequest(req, res, request),
         else => return handler.failure(res, .bad_request, .malformed_request),
     }
 }
@@ -276,6 +285,7 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     const router = try server.router(.{});
     router.post("/api/log", submitLog, .{});
     router.get("/api/configuration", getConfiguration, .{});
+    router.get("/api/review/session", getReviewSession, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/repository/commits", listCommits, .{});
     router.get("/api/repository/working-tree-changes", listWorkingTreeChanges, .{});
@@ -315,7 +325,7 @@ fn submitLog(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void
     defer parsed.deinit();
     const request = json_protocol.decodeRequestValue(parsed.value) catch return handler.failure(res, .bad_request, .malformed_request);
     if (request != .log) return handler.failure(res, .bad_request, .malformed_request);
-    return handler.dispatchRequest(res, request);
+    return handler.dispatchRequest(req, res, request);
 }
 
 test "HTTP text search validates requests and returns empty results without execution" {
@@ -616,4 +626,52 @@ test "working-tree summaries cross HTTP and native JSON with matching results an
     }
     context.failure = null;
     try context.expectSerializationFailure();
+}
+
+test "HTTP session scopes reject stale mutations and release after serialization failure" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const session_module = @import("../app/session.zig");
+    const Owner = @import("../app/session_owner.zig").SessionOwner;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    const session = try session_module.Session.create(allocator, io, .{
+        .directory = repository.root,
+        .configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+        .logger = @import("../log/log.zig").stderrLogger(allocator),
+    });
+    var owner = Owner.init(io, session);
+    defer owner.deinit();
+    var handler: Handler = .{ .dispatcher = owner.dispatcher() };
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        var failing = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+        ht.res.arena = failing.allocator();
+        try std.testing.expectError(error.OutOfMemory, getDiffOverview(&handler, ht.req, ht.res));
+        try std.testing.expect(owner.mutex.tryLock());
+        owner.mutex.unlock(io);
+    }
+    try owner.replace(try session_module.Session.create(allocator, io, owner.active.options));
+    for ([_]?[]const u8{ null, "1", "2", "invalid", "0" }) |id| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        if (id) |value| ht.header("x-rvw-session", value);
+        ht.json(.{ .type = "create_comment", .body = "new session", .target = .{ .kind = "review" } });
+        try createComment(&handler, ht.req, ht.res);
+        const valid = if (id) |value| std.mem.eql(u8, value, "2") else false;
+        const malformed = if (id) |value| std.mem.eql(u8, value, "invalid") or std.mem.eql(u8, value, "0") else false;
+        try ht.expectStatusCode(if (valid) .created else if (malformed) .bad_request else .conflict);
+    }
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try getReviewSession(&handler, ht.req, ht.res);
+        try ht.expectBody("{\"id\":2}");
+    }
+    const current = try owner.dispatcher().dispatchScoped(.get_comments, 2);
+    defer current.deinit();
+    try std.testing.expectEqual(@as(usize, 1), current.response.comments.len);
 }

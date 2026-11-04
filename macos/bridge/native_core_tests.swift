@@ -343,6 +343,36 @@ private func testNativePullRequests() throws {
     }
 }
 
+private func testNativeSessionIdentity() throws {
+    try withNativeRepository(range: nil) { _, _, router in
+        let session = try response(router, ["type": "get_review_session"])
+        guard let id = session["id"] as? Int else { throw NativeCoreTestError.invalidResponse }
+        expect(id == 1, "startup should expose the initial session identity")
+        for body: [String: Any] in [
+            ["type": "create_comment", "body": "stale", "target": ["kind": "review"], "sessionId": id + 1],
+            ["type": "get_comments", "sessionId": id + 1],
+        ] {
+            do {
+                _ = try response(router, body)
+                fatalError("stale native requests must fail")
+            } catch {
+                expect(error.localizedDescription.contains("session has ended"), "stale requests must report the session error")
+            }
+        }
+        _ = try response(router, ["type": "create_comment", "body": "current", "target": ["kind": "review"], "sessionId": id])
+        for invalid: Any in [0, -1, "1", NSNull(), 1.5] {
+            do {
+                _ = try response(router, ["type": "get_comments", "sessionId": invalid])
+                fatalError("malformed session identity must fail")
+            } catch {
+                expect(error.localizedDescription == "Malformed request", "invalid identity must report a protocol error")
+            }
+        }
+        // Errors must release the scope so later requests can complete.
+        _ = try response(router, ["type": "get_diff_overview", "sessionId": id])
+    }
+}
+
 @main
 struct NativeCoreTests {
     static func main() {
@@ -353,6 +383,7 @@ struct NativeCoreTests {
                 try testNativeRepositoryLists()
                 try testNativePullRequests()
                 try testNativeExecutableConfiguration()
+                try testNativeSessionIdentity()
             }
             print("Native core tests passed")
         } catch {

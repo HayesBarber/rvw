@@ -473,6 +473,7 @@ pub fn validTextSearchQuery(query: []const u8) bool {
 pub const Request = union(enum) {
     log: logging.Event,
     get_configuration,
+    get_review_session,
     reload_review,
     get_diff_overview,
     list_commits,
@@ -539,6 +540,7 @@ pub const LogResult = struct {
 pub const Response = union(enum) {
     log_result: LogResult,
     configuration: config.Snapshot,
+    review_session: struct { id: u64 },
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,
     commit_list: CommitListResult,
@@ -568,12 +570,15 @@ pub const Response = union(enum) {
     }
 };
 
+pub const maximum_session_id: u64 = 9007199254740991;
+
 const ErrorDefinition = struct {
     errors: []const anyerror = &.{},
     message: []const u8,
 };
 
 const error_definitions = .{
+    .stale_session = ErrorDefinition{ .errors = &.{error.StaleSession}, .message = "This review session has ended. Reload the page to use the current review." },
     .malformed_request = ErrorDefinition{ .message = "Malformed request" },
     .unknown_operation = ErrorDefinition{ .message = "Unknown operation" },
     .unknown_diff = ErrorDefinition{ .errors = &.{error.UnknownDiff}, .message = "Unknown diff" },

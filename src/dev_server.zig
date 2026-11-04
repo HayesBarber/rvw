@@ -61,9 +61,10 @@ pub fn main(init: std.process.Init) !void {
         std.log.err("unable to open Git diff: {s}", .{message});
         return err;
     };
-    defer session.destroy();
+    var owner = rvw.session_owner.SessionOwner.init(init.io, session);
+    defer owner.deinit();
 
-    try rvw.http.serve(init.gpa, init.io, session.core.dispatcher(), address);
+    try rvw.http.serve(init.gpa, init.io, owner.dispatcher(), address);
 }
 
 fn parseOptions(args: []const []const u8, environ: *const std.process.Environ.Map) !Options {

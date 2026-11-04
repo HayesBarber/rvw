@@ -4,6 +4,7 @@ pub const provider = @import("provider/provider.zig");
 pub const dispatcher = @import("app/dispatcher.zig");
 pub const core = @import("app/core.zig");
 pub const session = @import("app/session.zig");
+pub const session_owner = @import("app/session_owner.zig");
 pub const startup = @import("app/startup.zig");
 pub const json_protocol = @import("app/json_protocol.zig");
 pub const repository = @import("util/repository.zig");

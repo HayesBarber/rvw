@@ -79,6 +79,7 @@ pub const Core = struct {
         return switch (request) {
             .log => unreachable,
             .get_configuration => .{ .configuration = self.configuration },
+            .get_review_session => error.SessionOwnerRequired,
             .reload_review => blk: {
                 self.review_provider.reload(self.io) catch return error.ReloadUnavailable;
                 self.review_generation +%= 1;
@@ -207,6 +208,7 @@ fn operationName(request: model.Request) []const u8 {
     return switch (request) {
         .log => "log",
         .get_configuration => "get_configuration",
+        .get_review_session => "get_review_session",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",
         .list_commits => "list_commits",
