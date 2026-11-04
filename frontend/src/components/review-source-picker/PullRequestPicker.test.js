@@ -101,3 +101,11 @@ test('Retry starts a fresh request and replaces the error state with results', a
   assert.match(render(request.getSnapshot()), /Fix &lt;quoted&gt; 雪/)
   assert.doesNotMatch(render(request.getSnapshot()), /Request failed|Retry/)
 })
+
+test('pending replacement keeps PR metadata visible and disables every tile', () => {
+  const html = renderToStaticMarkup(createElement(PullRequestPickerContent, {
+    state: { status: 'success', data: pullRequests }, disabled: true,
+  }))
+  assert.match(html, /Fix &lt;quoted&gt; 雪/)
+  assert.equal((html.match(/disabled=""/g) ?? []).length, pullRequests.length)
+})

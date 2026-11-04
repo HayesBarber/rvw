@@ -621,7 +621,8 @@ textarea {
   font-size: 1rem;
 }
 
-.review-source-picker-header button {
+.review-source-picker-header button,
+.review-source-picker-status button {
   padding: 6px 10px;
   border: 1px solid #414145;
   border-radius: 6px;
@@ -1665,4 +1666,26 @@ textarea {
 
 .review-load-error p {
   margin: 0;
+}
+
+.review-source-picker-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin: 12px 20px 0;
+  color: #d4d4d8;
+}
+
+.review-source-picker-status[role='alert'] {
+  color: #fca5a5;
+}
+
+.review-source-picker-dialog button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.review-source-picker-status button {
+  flex-shrink: 0;
 }

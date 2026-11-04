@@ -5,19 +5,39 @@ import { createReviewSourcePickerActionAdapter } from '../../actions/review-sour
 import { createCommitsRequest } from '../../review/commits-request.js'
 import { createPullRequestsRequest } from '../../review/pull-requests-request.js'
 import Overlay from '../Overlay.jsx'
+import { RequestStatus } from '../../review/request-state.js'
 import ReviewSourceModeControl from './ReviewSourceModeControl.jsx'
 import CommitRangePicker from './CommitRangePicker.jsx'
 import PullRequestPicker from './PullRequestPicker.jsx'
 
-export function ReviewSourcePickerContent({ mode, registerActionAdapter, onSelectPullRequest, onSelectComparison, commitsRequest, pullRequestsRequest }) {
+const notBlocked = () => false
+
+export function ReviewSourcePickerContent({ disabled = false, isBlocked = notBlocked, mode, registerActionAdapter, onSelectPullRequest, onSelectComparison, commitsRequest, pullRequestsRequest }) {
   switch (mode) {
-    case 'commits': return <CommitRangePicker registerActionAdapter={registerActionAdapter} onSelect={onSelectComparison} request={commitsRequest} />
-    case 'pull-requests': return <PullRequestPicker registerActionAdapter={registerActionAdapter} onSelect={onSelectPullRequest} request={pullRequestsRequest} />
+    case 'commits': return <CommitRangePicker disabled={disabled} isBlocked={isBlocked} registerActionAdapter={registerActionAdapter} onSelect={onSelectComparison} request={commitsRequest} />
+    case 'pull-requests': return <PullRequestPicker disabled={disabled} isBlocked={isBlocked} registerActionAdapter={registerActionAdapter} onSelect={onSelectPullRequest} request={pullRequestsRequest} />
     default: return null
   }
 }
 
-export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest, onSelectComparison }) {
+export function ReviewSourcePickerStatus({ request }) {
+  if (request?.status === RequestStatus.LOADING) {
+    return <p className="review-source-picker-status" role="status">Loading selected review…</p>
+  }
+  if (request?.status === RequestStatus.ERROR) {
+    return (
+      <div className="review-source-picker-status" role="alert">
+        <span>{request.error}</span>
+        {request.data && <button type="button" data-vim-native-activation onClick={() => request.reload()}>Retry loading review</button>}
+      </div>
+    )
+  }
+  return null
+}
+
+export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest, onSelectComparison, reloadRequest }) {
+  const isBlocked = reloadRequest?.isLocked ?? notBlocked
+  const disabled = isBlocked()
   const dialogRef = useRef(null)
   const titleId = useId()
   const [mode, setMode] = useState('commits')
@@ -36,13 +56,17 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
   }, [commitsRequest, pullRequestsRequest])
 
   const changeMode = useCallback((nextMode) => {
-    if (nextMode === mode) return
+    if (isBlocked() || nextMode === mode) return
     modeActions.clear()
     setMode(nextMode)
-  }, [mode, modeActions])
+  }, [isBlocked, mode, modeActions])
   const pickerActions = useMemo(() => createReviewSourcePickerActionAdapter({
-    mode, modeActions: actions, onChange: changeMode,
-  }), [mode, actions, changeMode])
+    mode, modeActions: actions, onChange: changeMode, isBlocked,
+  }), [mode, actions, changeMode, isBlocked])
+
+  const close = useCallback(() => {
+    if (!isBlocked()) onClose()
+  }, [isBlocked, onClose])
 
   return (
     <Overlay
@@ -54,23 +78,27 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
       nativeDialog
       className="review-source-picker-dialog"
       labelledBy={titleId}
-      onClose={onClose}
+      onClose={close}
     >
       <header className="review-source-picker-header">
         <h2 id={titleId}>Choose review source</h2>
         <button
           type="button"
           data-vim-native-activation
-          onClick={onClose}
+          onClick={close}
+          disabled={disabled}
           aria-label="Close review source picker"
         >
           Close
         </button>
       </header>
-      <ReviewSourceModeControl mode={mode} onChange={changeMode} />
-      <div className="review-source-picker-body" data-mode={mode}>
+      <ReviewSourceModeControl mode={mode} onChange={changeMode} disabled={disabled} />
+      <ReviewSourcePickerStatus request={reloadRequest} />
+      <div className="review-source-picker-body" data-mode={mode} aria-busy={disabled}>
         <ReviewSourcePickerContent
           mode={mode}
+          disabled={disabled}
+          isBlocked={isBlocked}
           registerActionAdapter={modeActions.register}
           onSelectPullRequest={onSelectPullRequest}
           onSelectComparison={onSelectComparison}

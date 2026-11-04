@@ -1,7 +1,9 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { centerPullRequestTile, createPullRequestPickerActionAdapter, createPullRequestSubmitHandler, focusPullRequestTile } from '../../actions/pull-request-picker-actions.js'
 
-export function PullRequestPickerContent({ state, onSubmit, onRetry, listRef, onFocus }) {
+const notBlocked = () => false
+
+export function PullRequestPickerContent({ disabled = false, state, onSubmit, onRetry, listRef, onFocus }) {
   if (state.status === 'idle' || state.status === 'loading') {
     return <p role="status">Loading pull requests…</p>
   }
@@ -9,7 +11,7 @@ export function PullRequestPickerContent({ state, onSubmit, onRetry, listRef, on
     return (
       <div className="pull-request-picker-error" role="alert">
         <p>Unable to load pull requests: {state.error}</p>
-        <button type="button" data-vim-native-activation onClick={onRetry}>Retry</button>
+        <button type="button" data-vim-native-activation disabled={disabled} onClick={onRetry}>Retry</button>
       </div>
     )
   }
@@ -25,6 +27,7 @@ export function PullRequestPickerContent({ state, onSubmit, onRetry, listRef, on
             data-vim-native-activation
             data-pull-request-number={pullRequest.number}
             onFocus={() => onFocus?.(pullRequest.number)}
+            disabled={disabled}
             onClick={() => onSubmit(pullRequest.number)}
           >
             <span className="pull-request-picker-title">
@@ -44,7 +47,7 @@ export function PullRequestPickerContent({ state, onSubmit, onRetry, listRef, on
   )
 }
 
-export default function PullRequestPicker({ registerActionAdapter, onSelect, request }) {
+export default function PullRequestPicker({ registerActionAdapter, onSelect, request, disabled = false, isBlocked = notBlocked }) {
   const listRef = useRef(null)
   const focusedNumber = useRef(null)
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
@@ -53,8 +56,8 @@ export default function PullRequestPicker({ registerActionAdapter, onSelect, req
   const focus = useCallback((number) => focusPullRequestTile(listRef.current, number), [])
   const center = useCallback((number) => centerPullRequestTile(listRef.current, number), [])
   const submit = useMemo(() => createPullRequestSubmitHandler({
-    getRequest: request.getSnapshot, onSelect,
-  }), [onSelect, request])
+    getRequest: request.getSnapshot, onSelect, isBlocked,
+  }), [isBlocked, onSelect, request])
 
   useLayoutEffect(() => registerActionAdapter(createPullRequestPickerActionAdapter({
     getRequest: request.getSnapshot,
@@ -64,9 +67,14 @@ export default function PullRequestPicker({ registerActionAdapter, onSelect, req
     submit,
   })), [center, focus, getFocusedNumber, registerActionAdapter, request, submit])
   useLayoutEffect(() => {
-    focusedNumber.current = null
-    if (state.status === 'success' && state.data.length > 0) focus(state.data[0].number)
-  }, [focus, state.data, state.status])
+    if (disabled || state.status !== 'success' || state.data.length === 0) return
+    const number = state.data.some((item) => item.number === focusedNumber.current)
+      ? focusedNumber.current : state.data[0].number
+    focus(number)
+  }, [disabled, focus, state.data, state.status])
+  const retry = useCallback(() => {
+    if (!isBlocked()) return request.load()
+  }, [isBlocked, request])
 
-  return <PullRequestPickerContent state={state} onSubmit={submit} onRetry={request.load} listRef={listRef} onFocus={rememberFocus} />
+  return <PullRequestPickerContent disabled={disabled} state={state} onSubmit={submit} onRetry={retry} listRef={listRef} onFocus={rememberFocus} />
 }

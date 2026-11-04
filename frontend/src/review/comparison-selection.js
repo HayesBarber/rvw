@@ -54,8 +54,9 @@ export function comparisonPair(endpoints, selected) {
 }
 
 /** Check current data and selection for both button and action submission. */
-export function createComparisonSubmitHandler({ getRequest, getSelection, onSelect }) {
+export function createComparisonSubmitHandler({ getRequest, getSelection, onSelect, isBlocked = () => false }) {
   return () => {
+    if (isBlocked()) return false
     const request = getRequest()
     if (request.status !== RequestStatus.SUCCESS || typeof onSelect !== 'function') return false
     const pair = comparisonPair(comparisonEndpoints(request.data), getSelection())

@@ -7,8 +7,9 @@ export const reviewSourceModes = Object.freeze([
 ])
 
 /** The shell owns mode navigation; the active component owns list actions. */
-export function createReviewSourcePickerActionAdapter({ mode, modeActions = blockingOverlayActions, onChange }) {
+export function createReviewSourcePickerActionAdapter({ mode, modeActions = blockingOverlayActions, onChange, isBlocked = () => false }) {
   function moveMode(direction, count) {
+    if (isBlocked()) return false
     const index = reviewSourceModes.findIndex(({ value }) => value === mode)
     if (index < 0) return false
     const steps = Number.isSafeInteger(count) && count > 0 ? count : 1
@@ -19,7 +20,9 @@ export function createReviewSourcePickerActionAdapter({ mode, modeActions = bloc
   }
 
   return {
-    ...modeActions,
+    ...Object.fromEntries(Object.entries(modeActions).filter(([, handler]) => typeof handler === 'function').map(([action, handler]) => [
+      action, (count) => !isBlocked() && handler(count),
+    ])),
     [ApplicationAction.ITEM_NEXT]: (count) => moveMode(1, count),
     [ApplicationAction.ITEM_PREVIOUS]: (count) => moveMode(-1, count),
   }

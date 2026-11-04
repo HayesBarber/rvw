@@ -154,6 +154,7 @@ export default function App({ onRetryStartup } = {}) {
     commandLine,
     reviewAvailable: Boolean(overview),
     reloadReview: reloadRequest.reload,
+    isReviewReplacing: reloadRequest.isLocked,
     changeTreeMode: handleTreeModeChange,
     copyComments: handleCopyComments,
     clearComments: clearSessionComments,
@@ -413,6 +414,9 @@ export default function App({ onRetryStartup } = {}) {
       )}
       {workspace.reviewSourcePickerOpen && (
         <ReviewSourcePicker
+          onSelectComparison={reloadRequest.reload}
+          onSelectPullRequest={(number) => reloadRequest.reload({ kind: 'pull-request', number })}
+          reloadRequest={reloadRequest}
           onClose={() => dispatchWorkspace({ type: 'review_source_picker_closed' })}
           registerActionAdapter={registerOverlayActions}
         />

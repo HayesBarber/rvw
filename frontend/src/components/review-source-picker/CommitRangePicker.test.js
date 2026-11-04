@@ -170,3 +170,12 @@ test('timeline focus reports an explicit endpoint without checking or submitting
   const [submit] = findAll(content, (node) => node.props.className === 'comparison-picker-submit')
   assert.equal(submit.props['data-vim-native-activation'], true)
 })
+
+test('pending replacement retains checked endpoints and disables all comparison controls', () => {
+  const html = renderToStaticMarkup(createElement(Content, {
+    state: success, selected: [endpoints[0], endpoints[2]], disabled: true,
+  }))
+  assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 2)
+  assert.equal((html.match(/disabled=""/g) ?? []).length, 4)
+  assert.match(html, /disabled="">Review comparison/)
+})

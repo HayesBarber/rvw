@@ -3,8 +3,9 @@ import { ApplicationAction } from './application-actions.js'
 import { moveFileFinderSelection } from './file-finder-actions.js'
 
 /** Check the current request when a tile submits, including after a reload. */
-export function createPullRequestSubmitHandler({ getRequest, onSelect }) {
+export function createPullRequestSubmitHandler({ getRequest, onSelect, isBlocked = () => false }) {
   return (number) => {
+    if (isBlocked()) return false
     const request = getRequest()
     if (request.status !== RequestStatus.SUCCESS || typeof onSelect !== 'function') return false
     if (!request.data.some((pullRequest) => pullRequest.number === number)) return false

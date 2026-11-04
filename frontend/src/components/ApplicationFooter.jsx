@@ -15,6 +15,7 @@ export function FooterActionsMenu({ id, onReload, onSearchText, onChooseReviewSo
         className="footer-actions-item"
         type="button"
         aria-haspopup="dialog"
+        disabled={reloadDisabled}
         onClick={onChooseReviewSource}
       >
         Choose review source

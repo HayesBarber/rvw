@@ -41,6 +41,7 @@ export function createReloadReviewRequest({
 
   return Object.freeze({
     getSnapshot: () => state,
+    isLocked: () => pending || replacement !== null,
     subscribe(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -59,5 +60,5 @@ export function createReloadReviewRequest({
 export function useReloadReview() {
   const [request] = useState(createReloadReviewRequest)
   const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
-  return useMemo(() => ({ ...state, reload: request.reload }), [request, state])
+  return useMemo(() => ({ ...state, reload: request.reload, isLocked: request.isLocked }), [request, state])
 }
