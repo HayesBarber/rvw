@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 
 import { reloadReview } from './api.js'
 import { RequestStatus } from './request-state.js'
-import { MESSAGE_TIMEOUT_MS } from './transient-request.js'
-
-export const BLOCKED_DURING_DRAFT_MESSAGE = 'Cancel the comment draft, then reload.'
 
 const idleRequest = Object.freeze({
   status: RequestStatus.IDLE,
@@ -15,53 +12,52 @@ const idleRequest = Object.freeze({
 export function reloadRequestMessage(request) {
   if (request.status === RequestStatus.LOADING) return 'Reloading…'
   if (request.status === RequestStatus.ERROR) return request.error
-  if (request.status === RequestStatus.SUCCESS) return 'Review reloaded'
   return ''
 }
 
-export function useReloadReview({ hasUnsavedDraft, onReloaded }) {
-  const [request, setRequest] = useState(idleRequest)
-  const pending = useRef(false)
-  const blocked = useRef(false)
+export function createReloadReviewRequest({
+  replace = reloadReview,
+  reloadDocument = () => window.location.reload(),
+} = {}) {
+  let state = idleRequest
+  let pending = false
+  let replacement = null
+  const listeners = new Set()
+  const publish = (next) => {
+    state = next
+    for (const listener of listeners) listener()
+  }
 
-  useEffect(() => {
-    if (blocked.current) {
-      const timeout = setTimeout(() => {
-        blocked.current = false
-        setRequest(idleRequest)
-      }, MESSAGE_TIMEOUT_MS)
-      return () => clearTimeout(timeout)
+  async function run(source) {
+    try {
+      replacement ??= await replace(source)
+      // Keep submissions blocked until the old document has gone away.
+      reloadDocument()
+    } catch (error) {
+      pending = false
+      publish({ status: RequestStatus.ERROR, data: replacement, error: error.message })
     }
-    if (request.status !== RequestStatus.SUCCESS) return undefined
-    const timeout = setTimeout(() => setRequest(idleRequest), MESSAGE_TIMEOUT_MS)
-    return () => clearTimeout(timeout)
-  }, [request])
+  }
 
-  const reload = useCallback(() => {
-    if (pending.current) return true
-    if (hasUnsavedDraft) {
-      blocked.current = true
-      setRequest({
-        status: RequestStatus.ERROR,
-        data: null,
-        error: BLOCKED_DURING_DRAFT_MESSAGE,
-      })
+  return Object.freeze({
+    getSnapshot: () => state,
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    reload(source) {
+      if (pending) return true
+      pending = true
+      publish({ status: RequestStatus.LOADING, data: replacement, error: null })
+      // After a navigation failure, retry only navigation. Replacement already succeeded.
+      void run(source)
       return true
-    }
+    },
+  })
+}
 
-    blocked.current = false
-    pending.current = true
-    setRequest({ status: RequestStatus.LOADING, data: null, error: null })
-    reloadReview().then(async (result) => {
-      await onReloaded(result)
-      setRequest({ status: RequestStatus.SUCCESS, data: result, error: null })
-    }).catch((error) => {
-      setRequest({ status: RequestStatus.ERROR, data: null, error: error.message })
-    }).finally(() => {
-      pending.current = false
-    })
-    return true
-  }, [hasUnsavedDraft, onReloaded])
-
-  return useMemo(() => ({ ...request, reload }), [reload, request])
+export function useReloadReview() {
+  const [request] = useState(createReloadReviewRequest)
+  const state = useSyncExternalStore(request.subscribe, request.getSnapshot, request.getSnapshot)
+  return useMemo(() => ({ ...state, reload: request.reload }), [request, state])
 }

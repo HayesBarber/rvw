@@ -99,7 +99,7 @@ export function useApplicationActions({
   const globalActions = useMemo(() => ({
     [ApplicationAction.OPEN_COMMAND_LINE]: () => reviewAvailable && commandLine.open(),
     [ApplicationAction.CLOSE_APPLICATION]: closeApplication,
-    [ApplicationAction.RELOAD_REVIEW]: reloadReview,
+    [ApplicationAction.RELOAD_REVIEW]: () => reloadReview(),
     [ApplicationAction.OPEN_REVIEW_SOURCE_PICKER]: () => openReviewSourcePicker(dispatchWorkspace, reviewAvailable),
     [ApplicationAction.TREE_SIZE_INCREASE]: (count) => {
       dispatchWorkspace({ type: 'file_tree_resized', steps: count })

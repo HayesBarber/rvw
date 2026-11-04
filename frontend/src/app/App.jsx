@@ -15,6 +15,7 @@ import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
 import ReviewSourcePicker from '../components/review-source-picker/ReviewSourcePicker.jsx'
+import ReviewLoadError from '../components/ReviewLoadError.jsx'
 import { clearRequestMessage } from '../review/comment-clear-request.js'
 import { copyRequestMessage } from '../review/comment-copy-request.js'
 import { useCopyFilePath } from '../review/file-path-copy-request.js'
@@ -32,13 +33,12 @@ import { useVimController, useVimState } from '../vim/index.js'
 import { useApplicationActions } from './use-application-actions.js'
 import { useConfiguration } from './use-configuration.js'
 
-export default function App() {
+export default function App({ onRetryStartup } = {}) {
   const [workspace, dispatchWorkspace] = useReducer(
     workspaceReducer,
     initialWorkspaceState,
   )
   const reviewShellRef = useRef(null)
-  const [hasUnsavedDraft, setHasUnsavedDraft] = useState(false)
   const [reviewCommentDraft, setReviewCommentDraft] = useState(null)
   const [commentEditDrafts, setCommentEditDrafts] = useState({})
   const changeCommentEditDraft = useCallback((id, draft) => {
@@ -115,7 +115,7 @@ export default function App() {
     selectFile,
     changeTreeMode: handleTreeModeChange,
     visibleFiles,
-  } = useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft })
+  } = useReviewSession({ workspace, dispatchWorkspace })
   const clearSessionComments = useCallback(() => (
     handleClearComments(() => setCommentEditDrafts({}))
   ), [handleClearComments])
@@ -182,7 +182,7 @@ export default function App() {
     return (
       <div className="application-shell">
         <main className="fatal-error">
-          Unable to load review: {overviewRequest.error}
+          <ReviewLoadError error={overviewRequest.error} onRetry={onRetryStartup ?? overviewRequest.load} />
         </main>
         <ApplicationFooter diagnostic={configurationDiagnostic} vimState={vimState} />
       </div>
@@ -329,7 +329,6 @@ export default function App() {
             onCreateComment={handleCreateComment}
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
-            onDraftStateChange={setHasUnsavedDraft}
             onCopyFilePath={diffPathCopyRequest.copy}
             onFocusFileTree={focusFileTree}
             onToggleRelativeLineNumbers={toggleRelativeLineNumbers}
@@ -441,10 +440,10 @@ export default function App() {
           if (workspace.commentsOpen) dispatchWorkspace({ type: 'comments_closed' })
           else dispatchApplicationAction(ApplicationAction.OPEN_COMMENTS)
         }}
-        onReload={reloadRequest.reload}
+        onReload={() => reloadRequest.reload()}
         onSearchText={() => dispatchApplicationAction(ApplicationAction.OPEN_CODEBASE_SEARCH)}
         onChooseReviewSource={() => dispatchApplicationAction(ApplicationAction.OPEN_REVIEW_SOURCE_PICKER)}
-        reloadDisabled={hasUnsavedDraft || reloadRequest.status === RequestStatus.LOADING}
+        reloadDisabled={reloadRequest.status === RequestStatus.LOADING}
         reloadMessage={reloadMessage}
         reloadMessageIsError={reloadMessageIsError}
         reloadStatus={reloadRequest.status}

@@ -68,9 +68,8 @@ export function selectDefaultReviewPath(overview, treeMode) {
     : orderedFilePaths(files)[0] ?? null
 }
 
-export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft }) {
+export function useReviewSession({ workspace, dispatchWorkspace }) {
   const [fileCache] = useState(createReviewFileCache)
-  const [generation, setGeneration] = useState(0)
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
   const notIgnoredFilesRequest = useNotIgnoredFiles()
@@ -139,7 +138,6 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
     diffId: overview?.id ?? null,
     path: activePath,
     changed: changedPaths.has(activePath),
-    generation,
   })
 
   const preloadPaths = useMemo(() => [
@@ -147,20 +145,7 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
   ], [changedPaths, allFilesRequest.data, notIgnoredFilesRequest.data])
   useHighlighterPreload(preloadPaths, fileRequest.status === RequestStatus.LOADING)
 
-  const handleReloaded = useCallback((result) => {
-    fileCache.invalidate()
-    dispatchWorkspace({ type: 'file_availability_reset' })
-    setGeneration(result.generation)
-    return Promise.all([
-      overviewRequest.load(),
-      allFilesRequest.load(),
-      notIgnoredFilesRequest.load(),
-    ])
-  }, [allFilesRequest, dispatchWorkspace, fileCache, notIgnoredFilesRequest, overviewRequest])
-  const reloadRequest = useReloadReview({
-    hasUnsavedDraft,
-    onReloaded: handleReloaded,
-  })
+  const reloadRequest = useReloadReview()
 
   const openFileFinder = useCallback(() => {
     dispatchWorkspace({
@@ -390,7 +375,6 @@ export function useReviewSession({ workspace, dispatchWorkspace, hasUnsavedDraft
       ? fileRequest.data
       : null,
     filesModeEntries,
-    generation,
     navigateFile,
     notIgnoredFilesEntries,
     notIgnoredFilesRequest,

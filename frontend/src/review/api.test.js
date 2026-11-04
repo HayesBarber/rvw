@@ -134,20 +134,20 @@ test('review reload uses equivalent native and HTTP requests', async () => {
   globalThis.window = {
     webkit: { messageHandlers: { native: { postMessage(request) {
       nativeRequests.push(request)
-      return Promise.resolve({ generation: 1 })
+      return Promise.resolve({ sessionId: 2 })
     } } } },
   }
-  assert.deepEqual(await reloadReview(), { generation: 1 })
+  assert.deepEqual(await reloadReview(), { sessionId: 2 })
   assert.deepEqual(nativeRequests, [{ type: 'reload_review' }])
 
   const httpRequests = []
   globalThis.window = {}
   globalThis.fetch = async (url, options) => {
     httpRequests.push({ url, options })
-    return { ok: true, status: 200, json: async () => ({ generation: 2 }) }
+    return { ok: true, status: 200, json: async () => ({ sessionId: 3 }) }
   }
   try {
-    assert.deepEqual(await reloadReview(), { generation: 2 })
+    assert.deepEqual(await reloadReview(), { sessionId: 3 })
     assert.equal(httpRequests[0].url, '/api/review/reload')
     assert.equal(httpRequests[0].options.method, 'POST')
     assert.deepEqual(JSON.parse(httpRequests[0].options.body), { type: 'reload_review' })
@@ -546,5 +546,33 @@ test('review comments have no location on native and HTTP transports', async () 
   } finally {
     globalThis.fetch = previousFetch
     globalThis.window = previousWindow
+  }
+})
+
+test('reload sends full selected sources through both transports', async () => {
+  const originalWindow = globalThis.window
+  const originalFetch = globalThis.fetch
+  try {
+    for (const source of [
+      { kind: 'commit-range', base: 'a'.repeat(40), head: 'b'.repeat(40) },
+      { kind: 'working-tree', base: 'a'.repeat(40) },
+      { kind: 'pull-request', number: 123 },
+    ]) {
+      const request = { type: 'reload_review', source }
+      globalThis.window = { webkit: { messageHandlers: { native: {
+        postMessage: async (actual) => { assert.deepEqual(actual, request); return { sessionId: 2 } },
+      } } } }
+      assert.deepEqual(await reloadReview(source), { sessionId: 2 })
+      globalThis.window = {}
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/api/review/reload')
+        assert.deepEqual(JSON.parse(options.body), request)
+        return { ok: true, json: async () => ({ sessionId: 3 }) }
+      }
+      assert.deepEqual(await reloadReview(source), { sessionId: 3 })
+    }
+  } finally {
+    globalThis.window = originalWindow
+    globalThis.fetch = originalFetch
   }
 })
