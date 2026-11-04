@@ -11,6 +11,8 @@ const git_process = @import("../../util/git_process.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
+pub const Comparison = snapshot_module.Comparison;
+
 pub const GitProvider = struct {
     arena: std.heap.ArenaAllocator,
     repository_root: []const u8,
@@ -18,12 +20,16 @@ pub const GitProvider = struct {
     file_contents: []const model.FileContent,
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !GitProvider {
+        return initComparison(backing_allocator, io, path, try snapshot_module.comparisonFromRange(range), pr, executable);
+    }
+
+    pub fn initComparison(backing_allocator: Allocator, io: Io, path: []const u8, comparison: Comparison, pr: ?u32, executable: []const u8) !GitProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
         const allocator = arena.allocator();
 
         const root = try repository.validateRoot(io, allocator, path, executable);
-        const snapshot = try snapshot_module.resolve(allocator, io, root, range, executable);
+        const snapshot = try snapshot_module.resolveComparison(allocator, io, root, comparison, executable);
         const changes = try metadata.enumerate(allocator, io, root, snapshot, executable);
 
         const diff_id = if (snapshot.head) |head|
@@ -41,7 +47,11 @@ pub const GitProvider = struct {
             .{ .commit_range = .{ .base = snapshot.base, .head = head } }
         else
             .{ .working_tree = .{ .base = snapshot.base } };
-        const labels = try model.formatSourceLabels(allocator, source);
+        const label_source: model.DiffSource = if (pr == null and comparison == .working_tree and std.mem.eql(u8, comparison.working_tree.base, "HEAD"))
+            .{ .working_tree = .{ .base = "HEAD" } }
+        else
+            source;
+        const labels = try model.formatSourceLabels(allocator, label_source);
         const overview: model.DiffOverview = .{
             .id = diff_id,
             .repository = .{ .name = std.fs.path.basename(root) },

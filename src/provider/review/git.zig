@@ -16,7 +16,7 @@ pub const GitReviewProvider = struct {
     arena: std.heap.ArenaAllocator,
     backing_allocator: Allocator,
     repository_path: []const u8,
-    range: ?[]const u8,
+    comparison: diff.Comparison,
     pr: ?u32,
     executable: []const u8,
     active: *Snapshot,
@@ -27,11 +27,11 @@ pub const GitReviewProvider = struct {
         visible_files: gitignore.GitignoreFileTreeProvider,
         files: file.FilesystemFileProvider,
 
-        fn init(allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !*Snapshot {
+        fn init(allocator: Allocator, io: Io, path: []const u8, comparison: diff.Comparison, pr: ?u32, executable: []const u8) !*Snapshot {
             const snapshot = try allocator.create(Snapshot);
             errdefer allocator.destroy(snapshot);
 
-            snapshot.git = try diff.GitProvider.init(allocator, io, path, range, pr, executable);
+            snapshot.git = try diff.GitProvider.initComparison(allocator, io, path, comparison, pr, executable);
             errdefer snapshot.git.deinit();
             snapshot.all_files = try walk.WalkFileTreeProvider.init(allocator, io, path);
             errdefer snapshot.all_files.deinit();
@@ -56,18 +56,30 @@ pub const GitReviewProvider = struct {
     };
 
     pub fn init(backing_allocator: Allocator, io: Io, path: []const u8, range: ?[]const u8, pr: ?u32, executable: []const u8) !GitReviewProvider {
+        const comparison = try @import("../diff/git/snapshot.zig").comparisonFromRange(range);
+        return initComparison(backing_allocator, io, path, comparison, pr, executable);
+    }
+
+    pub fn initComparison(backing_allocator: Allocator, io: Io, path: []const u8, comparison: diff.Comparison, pr: ?u32, executable: []const u8) !GitReviewProvider {
         var arena = std.heap.ArenaAllocator.init(backing_allocator);
         errdefer arena.deinit();
-        const active = try Snapshot.init(backing_allocator, io, path, range, pr, executable);
+        const active = try Snapshot.init(backing_allocator, io, path, comparison, pr, executable);
         errdefer active.deinit(backing_allocator);
         const repository_path = try arena.allocator().dupe(u8, active.git.repository_root);
-        const owned_range = if (range) |value| try arena.allocator().dupe(u8, value) else null;
+        const storage = arena.allocator();
+        const owned_comparison: diff.Comparison = switch (comparison) {
+            .working_tree => |value| .{ .working_tree = .{ .base = try storage.dupe(u8, value.base) } },
+            .commit_range => |value| .{ .commit_range = .{
+                .base = try storage.dupe(u8, value.base),
+                .head = try storage.dupe(u8, value.head),
+            } },
+        };
         const owned_executable = try arena.allocator().dupe(u8, executable);
         return .{
             .arena = arena,
             .backing_allocator = backing_allocator,
             .repository_path = repository_path,
-            .range = owned_range,
+            .comparison = owned_comparison,
             .pr = pr,
             .executable = owned_executable,
             .active = active,
@@ -115,7 +127,7 @@ pub const GitReviewProvider = struct {
             self.backing_allocator,
             io,
             self.repository_path,
-            self.range,
+            self.comparison,
             self.pr,
             self.executable,
         );
@@ -374,4 +386,165 @@ test "PR source survives snapshot reload and serializes for transports" {
         try std.testing.expectEqual(@as(u32, 100), parsed.value.number);
         try provider.interface().reload(std.testing.io);
     }
+}
+
+test "explicit working-tree base includes committed staged unstaged and untracked changes without modifying the repository" {
+    const Repository = @import("../../testing/repository.zig").Repository;
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var repository = try Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write(".gitignore", "ignored.txt\n");
+    try repository.write("committed.txt", "base\n");
+    try repository.write("staged.txt", "base\n");
+    try repository.write("mixed.txt", "base\n");
+    try repository.write("deleted.txt", "removed\n");
+    try repository.write("old.txt", "rename content\n");
+    try repository.write("binary.dat", "base\x00\n");
+    try repository.commit("base");
+    const base = try repository.revision("HEAD");
+    defer allocator.free(base);
+    try repository.write("committed.txt", "head\n");
+    try repository.commit("head");
+    try repository.write("staged.txt", "staged\n");
+    try repository.write("mixed.txt", "index\n");
+    try repository.git(&.{ "add", "staged.txt", "mixed.txt" });
+    try repository.write("mixed.txt", "working\n");
+    try repository.git(&.{ "mv", "old.txt", "renamed.txt" });
+    try repository.temporary.dir.deleteFile(io, "deleted.txt");
+    try repository.write("binary.dat", "working\x00\n");
+    try repository.write("untracked.txt", "untracked\n");
+    try repository.write("ignored.txt", "ignored\n");
+
+    const paths = [_][]const u8{ ".git/HEAD", "committed.txt", "staged.txt", "mixed.txt", "renamed.txt", "binary.dat", "untracked.txt", "ignored.txt" };
+    var contents_before: [paths.len][]u8 = undefined;
+    for (paths, &contents_before) |path, *contents| {
+        contents.* = try repository.temporary.dir.readFileAlloc(io, path, allocator, .unlimited);
+    }
+    defer for (contents_before) |contents| allocator.free(contents);
+
+    // Compare exact repository state before and after creation and reload.
+    const process = @import("../../util/git_process.zig");
+    const before = try process.run(allocator, io, &.{ "git", "--no-optional-locks", "-C", repository.root, "status", "--porcelain=v1", "--branch", "--untracked-files=all" }, process.maximum_metadata_size);
+    defer allocator.free(before);
+    const index_before = try repository.temporary.dir.readFileAlloc(io, ".git/index", allocator, .unlimited);
+    defer allocator.free(index_before);
+    const executable = try repository.writeExecutable(".git/selected git",
+        \\#!/bin/sh
+        \\printf '%s\n' "$*" >> "$0.calls"
+        \\exec git "$@"
+        \\
+    );
+    defer allocator.free(executable);
+    var provider = try GitReviewProvider.initComparison(allocator, io, repository.root, .{ .working_tree = .{ .base = base } }, null, executable);
+    defer provider.deinit();
+    const reviews = provider.interface();
+    for (0..2) |_| {
+        const overview = try reviews.getDiffOverview(io);
+        try std.testing.expectEqualStrings(base, overview.source.working_tree.base);
+        const label = try std.fmt.allocPrint(allocator, "{s}..working tree", .{base});
+        defer allocator.free(label);
+        try std.testing.expectEqualStrings(label, overview.sourceLabel);
+        const compact = try std.fmt.allocPrint(allocator, "{s}..working tree", .{base[0..7]});
+        defer allocator.free(compact);
+        try std.testing.expectEqualStrings(compact, overview.compactSourceLabel);
+        try std.testing.expectEqual(@as(usize, 7), overview.files.len);
+        for ([_]struct { path: []const u8, expected: []const u8 }{
+            .{ .path = "committed.txt", .expected = "head\n" },
+            .{ .path = "staged.txt", .expected = "staged\n" },
+            .{ .path = "mixed.txt", .expected = "working\n" },
+        }) |case| {
+            const changed = try reviews.getFileDiff(io, overview.id, case.path);
+            try std.testing.expectEqualStrings("base\n", changed.content.diff.oldFile.?.contents);
+            try std.testing.expectEqualStrings(case.expected, changed.content.diff.newFile.?.contents);
+        }
+        const deleted = try reviews.getFileDiff(io, overview.id, "deleted.txt");
+        try std.testing.expectEqual(model.FileStatus.deleted, deleted.status);
+        try std.testing.expectEqualStrings("removed\n", deleted.content.diff.oldFile.?.contents);
+        try std.testing.expect(deleted.content.diff.newFile == null);
+        const renamed = try reviews.getFileDiff(io, overview.id, "renamed.txt");
+        try std.testing.expectEqual(model.FileStatus.renamed, renamed.status);
+        try std.testing.expectEqualStrings("old.txt", renamed.previousPath.?);
+        try std.testing.expectEqualStrings("rename content\n", renamed.content.diff.oldFile.?.contents);
+        try std.testing.expectEqualStrings("rename content\n", renamed.content.diff.newFile.?.contents);
+        const untracked = try reviews.getFileDiff(io, overview.id, "untracked.txt");
+        try std.testing.expect(untracked.content.diff.oldFile == null);
+        try std.testing.expectEqualStrings("untracked\n", untracked.content.diff.newFile.?.contents);
+        const binary = try reviews.getFileDiff(io, overview.id, "binary.dat");
+        try std.testing.expectEqual(model.UnavailableReason.binary, binary.content.unavailable.reason);
+        try std.testing.expectError(error.UnknownFile, reviews.getFileDiff(io, overview.id, "ignored.txt"));
+        try reviews.reload(io);
+    }
+    const after = try process.run(allocator, io, &.{ "git", "--no-optional-locks", "-C", repository.root, "status", "--porcelain=v1", "--branch", "--untracked-files=all" }, process.maximum_metadata_size);
+    defer allocator.free(after);
+    try std.testing.expectEqualStrings(before, after);
+    const index_after = try repository.temporary.dir.readFileAlloc(io, ".git/index", allocator, .unlimited);
+    defer allocator.free(index_after);
+    try std.testing.expectEqualSlices(u8, index_before, index_after);
+    for (paths, contents_before) |path, contents| {
+        const current = try repository.temporary.dir.readFileAlloc(io, path, allocator, .unlimited);
+        defer allocator.free(current);
+        try std.testing.expectEqualSlices(u8, contents, current);
+    }
+    const calls = try repository.temporary.dir.readFileAlloc(io, ".git/selected git.calls", allocator, .unlimited);
+    defer allocator.free(calls);
+    try std.testing.expect(std.mem.indexOf(u8, calls, base) != null);
+    try std.testing.expect(std.mem.indexOf(u8, calls, "HEAD") == null);
+    try repository.temporary.dir.deleteFile(io, ".git/selected git");
+    try std.testing.expectError(error.GitNotFound, reviews.reload(io));
+    try std.testing.expectEqualStrings(base, (try reviews.getDiffOverview(io)).source.working_tree.base);
+}
+
+test "clean working tree can be compared against an older commit" {
+    const Repository = @import("../../testing/repository.zig").Repository;
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var repository = try Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    const base = try repository.revision("HEAD");
+    defer allocator.free(base);
+    try repository.write("file.txt", "head\n");
+    try repository.commit("head");
+    var provider = try GitReviewProvider.initComparison(allocator, io, repository.root, .{ .working_tree = .{ .base = base } }, null, default_executables.git);
+    defer provider.deinit();
+    const overview = try provider.interface().getDiffOverview(io);
+    try std.testing.expectEqual(@as(usize, 1), overview.files.len);
+    const changed = try provider.interface().getFileDiff(io, overview.id, "file.txt");
+    try std.testing.expectEqualStrings("base\n", changed.content.diff.oldFile.?.contents);
+    try std.testing.expectEqualStrings("head\n", changed.content.diff.newFile.?.contents);
+    try std.testing.expectError(error.InvalidRevision, GitReviewProvider.initComparison(allocator, io, repository.root, .{ .working_tree = .{ .base = "missing-commit" } }, null, default_executables.git));
+}
+
+test "explicit commit endpoints compare file states directly across divergent history" {
+    const Repository = @import("../../testing/repository.zig").Repository;
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    var repository = try Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "ancestor\n");
+    try repository.commit("ancestor");
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    const base = try repository.revision("HEAD");
+    defer allocator.free(base);
+    try repository.git(&.{ "checkout", "--quiet", "--detach", "HEAD~1" });
+    try repository.write("file.txt", "target\n");
+    try repository.commit("target");
+    const head = try repository.revision("HEAD");
+    defer allocator.free(head);
+    try repository.write("file.txt", "working\n");
+    var provider = try GitReviewProvider.initComparison(allocator, io, repository.root, .{ .commit_range = .{ .base = base, .head = head } }, null, default_executables.git);
+    defer provider.deinit();
+    for (0..2) |_| {
+        const overview = try provider.interface().getDiffOverview(io);
+        try std.testing.expectEqualStrings(base, overview.source.commit_range.base);
+        try std.testing.expectEqualStrings(head, overview.source.commit_range.head);
+        const changed = try provider.interface().getFileDiff(io, overview.id, "file.txt");
+        try std.testing.expectEqualStrings("base\n", changed.content.diff.oldFile.?.contents);
+        try std.testing.expectEqualStrings("target\n", changed.content.diff.newFile.?.contents);
+        try provider.interface().reload(io);
+    }
+    try std.testing.expectError(error.InvalidRevision, GitReviewProvider.initComparison(allocator, io, repository.root, .{ .commit_range = .{ .base = base, .head = "missing-commit" } }, null, default_executables.git));
 }

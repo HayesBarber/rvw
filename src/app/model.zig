@@ -208,7 +208,13 @@ pub const SourceLabels = struct {
 
 pub fn formatSourceLabels(allocator: std.mem.Allocator, source: DiffSource) !SourceLabels {
     return switch (source) {
-        .working_tree => .{ .full = "working tree", .compact = "working tree" },
+        .working_tree => |value| if (std.mem.eql(u8, value.base, "HEAD"))
+            .{ .full = "working tree", .compact = "working tree" }
+        else
+            .{
+                .full = try std.fmt.allocPrint(allocator, "{s}..working tree", .{value.base}),
+                .compact = try std.fmt.allocPrint(allocator, "{s}..working tree", .{compactRevision(value.base)}),
+            },
         .pull_request => |value| blk: {
             const label = try std.fmt.allocPrint(allocator, "PR #{d}", .{value.number});
             break :blk .{ .full = label, .compact = label };
