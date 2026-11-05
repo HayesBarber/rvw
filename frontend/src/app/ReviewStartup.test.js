@@ -40,6 +40,15 @@ test('a successful startup supplies the same retry operation to the review works
   assert.doesNotMatch(html, /Loading review|Retry/)
 })
 
+test('startup passes the launch instruction to the ready workspace', () => {
+  for (const openReviewSourcePicker of [false, true]) {
+    renderToStaticMarkup(createElement(Content, {
+      state: { status: 'success', attempt: 1, openReviewSourcePicker },
+      children: (_, openPicker) => { assert.equal(openPicker, openReviewSourcePicker); return null },
+    }))
+  }
+})
+
 test('the review load error offers an accessible retry action', () => {
   let retries = 0
   const element = LoadError({ error: 'Temporary failure', onRetry: () => { retries++ } })

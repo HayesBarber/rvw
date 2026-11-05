@@ -21,6 +21,8 @@ import { copyRequestMessage } from '../review/comment-copy-request.js'
 import { useCopyFilePath } from '../review/file-path-copy-request.js'
 import { RequestStatus } from '../review/request-state.js'
 import { reloadRequestMessage } from '../review/reload-request.js'
+import { reviewLaunchIntent } from '../review/launch-intent.js'
+import { logError } from '../review/log.js'
 import { useReviewSession } from '../review/review-session.js'
 import {
   ActiveSurface,
@@ -33,7 +35,7 @@ import { useVimController, useVimState } from '../vim/index.js'
 import { useApplicationActions } from './use-application-actions.js'
 import { useConfiguration } from './use-configuration.js'
 
-export default function App({ onRetryStartup } = {}) {
+export default function App({ onRetryStartup, openPickerOnLaunch = false } = {}) {
   const [workspace, dispatchWorkspace] = useReducer(
     workspaceReducer,
     initialWorkspaceState,
@@ -165,6 +167,18 @@ export default function App({ onRetryStartup } = {}) {
     openKeymapReference,
     selectFile,
   })
+  const launchPickerRequested = useRef(false)
+  useEffect(() => {
+    if (!openPickerOnLaunch || !overview || launchPickerRequested.current) return
+    launchPickerRequested.current = true
+    // Give the dialog a workspace focus target to restore on dismissal.
+    focusDiffPane()
+    dispatchWorkspace({ type: 'review_source_picker_opened' })
+  }, [focusDiffPane, openPickerOnLaunch, overview])
+  const acknowledgeLaunchPicker = useCallback(() => {
+    if (!openPickerOnLaunch) return
+    reviewLaunchIntent.acknowledge().catch(() => logError('launch instruction acknowledgement failed'))
+  }, [openPickerOnLaunch])
   const renderFilePathCopyControl = useCallback(() => (
     <FilePathCopyControl
       path={activePath}
@@ -414,6 +428,7 @@ export default function App({ onRetryStartup } = {}) {
       )}
       {workspace.reviewSourcePickerOpen && (
         <ReviewSourcePicker
+          onOpened={acknowledgeLaunchPicker}
           onSelectComparison={reloadRequest.reload}
           onSelectPullRequest={(number) => reloadRequest.reload({ kind: 'pull-request', number })}
           reloadRequest={reloadRequest}
