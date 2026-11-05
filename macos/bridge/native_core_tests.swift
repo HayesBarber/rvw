@@ -441,11 +441,53 @@ struct NativeCoreTests {
                 try testNativeExecutableConfiguration()
                 try testNativeSessionIdentity()
                 try testNativeReloadOrdering()
+                try testNativeLaunchIntent()
             }
             print("Native core tests passed")
         } catch {
             FileHandle.standardError.write(Data("Native core test failed: \(error)\n".utf8))
             exit(1)
+        }
+    }
+}
+
+private func testNativeLaunchIntent() throws {
+    try withTemporaryDirectory { directory in
+        try git(directory, ["init", "--quiet"])
+        try "base\n".write(to: directory.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+        try commitRepository(directory, "base")
+        for interactive in [false, true] {
+            let arguments = ["Rvw", "--rvw-cli-launch", "--directory", directory.path]
+                + (interactive ? ["--interactive", "--log-level", "error"] : [])
+            guard case let .configuration(configuration) = LaunchConfiguration.parse(arguments: arguments) else {
+                fatalError("launch configuration should parse")
+            }
+            let core = try NativeCore(launchConfiguration: configuration)
+            let router = routerBlockingTermination(core)
+            for _ in 0..<2 {
+                let intent = try response(router, ["type": "get_launch_intent"])
+                expect(intent["openReviewSourcePicker"] as? Bool == interactive, "reads must retain the initial instruction")
+            }
+            // A failed startup request must not consume the instruction.
+            do {
+                _ = try response(router, ["type": "get_file", "path": "missing.txt"])
+                fatalError("missing file should fail")
+            } catch {}
+            let retained = try response(router, ["type": "get_launch_intent"])
+            expect(retained["openReviewSourcePicker"] as? Bool == interactive, "failed requests must retain the instruction")
+            for _ in 0..<2 {
+                let acknowledged = try response(router, ["type": "acknowledge_launch_intent"])
+                expect(acknowledged["openReviewSourcePicker"] as? Bool == false, "acknowledgement should clear the instruction")
+            }
+            _ = try response(router, ["type": "reload_review"])
+            let reloaded = try response(router, ["type": "get_launch_intent"])
+            expect(reloaded["openReviewSourcePicker"] as? Bool == false, "reload must not renew the instruction")
+        }
+        do {
+            _ = try NativeCore(launchConfiguration: LaunchConfiguration(directory: directory, range: "HEAD..HEAD", interactive: true))
+            fatalError("C interface must reject interactive launch with an explicit source")
+        } catch {
+            expect(error.localizedDescription.contains("interactive launch cannot use an explicit review source"), "C interface should report the conflicting source")
         }
     }
 }
