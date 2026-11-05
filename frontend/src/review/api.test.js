@@ -2,18 +2,49 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  acknowledgeLaunchIntent,
   clearComments,
   closeApplication,
   copyFilePath,
   deleteComment,
   editComment,
   getConfiguration,
+  getLaunchIntent,
   getFilesNotIgnored,
   listCommits,
   listOpenPullRequests,
   reloadReview,
   searchText,
 } from './api.js'
+
+test('launch intent uses the shared read and acknowledgement routes on both transports', async () => {
+  const previousWindow = globalThis.window
+  const previousFetch = globalThis.fetch
+  try {
+    const requests = []
+    globalThis.window = { webkit: { messageHandlers: { native: {
+      postMessage: async (request) => { requests.push(request); return { openReviewSourcePicker: request.type === 'get_launch_intent' } },
+    } } } }
+    assert.deepEqual(await getLaunchIntent(), { openReviewSourcePicker: true })
+    assert.deepEqual(await acknowledgeLaunchIntent(), { openReviewSourcePicker: false })
+    assert.deepEqual(requests, [{ type: 'get_launch_intent' }, { type: 'acknowledge_launch_intent' }])
+    globalThis.window = {}
+    globalThis.fetch = async (url, options) => {
+      const acknowledging = options.method === 'POST'
+      assert.equal(url, acknowledging ? '/api/review/launch-intent/acknowledge' : '/api/review/launch-intent')
+      if (acknowledging) {
+        assert.equal(options.headers['Content-Type'], 'application/json')
+        assert.deepEqual(JSON.parse(options.body), { type: 'acknowledge_launch_intent' })
+      } else assert.equal(options.body, undefined)
+      return { ok: true, json: async () => ({ openReviewSourcePicker: !acknowledging }) }
+    }
+    assert.deepEqual(await getLaunchIntent(), { openReviewSourcePicker: true })
+    assert.deepEqual(await acknowledgeLaunchIntent(), { openReviewSourcePicker: false })
+  } finally {
+    globalThis.window = previousWindow
+    globalThis.fetch = previousFetch
+  }
+})
 
 for (const commits of [[], [
   { sha: 'b'.repeat(40), subject: 'Fix 雪', authorName: 'Test Author', commitDate: '2026-11-03T10:00:00-05:00' },

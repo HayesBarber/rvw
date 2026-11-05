@@ -20,8 +20,29 @@ func testLaunchConfiguration() {
     ) {
     case let .configuration(configuration):
         expect(configuration.range == nil, "working-tree launches should omit the range")
+        expect(!configuration.interactive, "ordinary launches should not request the picker")
     default:
         fatalError("working-tree CLI launch arguments should be accepted")
+    }
+
+    let interactivePrefix = ["Rvw", "--rvw-cli-launch", "--directory", "/tmp/repository with spaces"]
+    for logging in [[], ["--log-level", "debug"]] {
+        switch LaunchConfiguration.parse(arguments: interactivePrefix + ["--interactive"] + logging) {
+        case let .configuration(configuration):
+            expect(configuration.interactive, "interactive launch should request the picker")
+            expect(configuration.directory.path == "/tmp/repository with spaces", "directory should retain spaces")
+            expect(configuration.range == nil && configuration.pr == nil, "interactive launch should use the working tree")
+            expect(configuration.logLevel == logging.last, "interactive launch should retain logging options")
+        default: fatalError("interactive launch arguments should be accepted")
+        }
+    }
+    for source in [["--range", "a..b"], ["--range", "a..b", "--pr", "100"], ["--pr", "100"], ["--interactive"]] {
+        for options in [source + ["--interactive"], ["--interactive"] + source] {
+            switch LaunchConfiguration.parse(arguments: interactivePrefix + options) {
+            case .invalid: break
+            default: fatalError("interactive launch must reject explicit sources and repeated flags")
+            }
+        }
     }
 
     for range in [[], ["--range", "main..HEAD"]] {

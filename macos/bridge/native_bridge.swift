@@ -27,9 +27,9 @@ final class NativeCore {
             func create(_ level: UnsafePointer<CChar>?) -> OpaquePointer? {
                 func createWithPR(_ pr: UnsafePointer<UInt32>?) -> OpaquePointer? {
                     if let range = launchConfiguration.range {
-                        return range.withCString { rvw_core_create(directory, $0, level, pr, &creationError) }
+                        return range.withCString { rvw_core_create(directory, $0, level, pr, launchConfiguration.interactive, &creationError) }
                     }
-                    return rvw_core_create(directory, nil, level, pr, &creationError)
+                    return rvw_core_create(directory, nil, level, pr, launchConfiguration.interactive, &creationError)
                 }
                 if var pr = launchConfiguration.pr {
                     return withUnsafePointer(to: &pr) { createWithPR($0) }

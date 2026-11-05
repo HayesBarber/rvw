@@ -2,6 +2,7 @@
 #define RVW_H
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -24,7 +25,8 @@ typedef struct rvw_buffer {
  * ...).
  */
 /* log_level is an optional raw LOG_LEVEL value; NULL defaults to error. */
-rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, const uint32_t *pr, rvw_buffer *error_out);
+/* interactive sets the initial picker instruction and requires range and pr to be NULL. */
+rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, const uint32_t *pr, bool interactive, rvw_buffer *error_out);
 
 /*
  * Dispatches a length-delimited UTF-8 JSON request. Supported request types are

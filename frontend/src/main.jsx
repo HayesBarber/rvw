@@ -12,9 +12,9 @@ installGlobalLogging()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ReviewStartup>{(onRetryStartup) => (
+    <ReviewStartup>{(onRetryStartup, openPickerOnLaunch) => (
       <VimProvider bindings={defaultApplicationBindings}>
-        <App onRetryStartup={onRetryStartup} />
+        <App onRetryStartup={onRetryStartup} openPickerOnLaunch={openPickerOnLaunch} />
       </VimProvider>
     )}</ReviewStartup>
   </StrictMode>,

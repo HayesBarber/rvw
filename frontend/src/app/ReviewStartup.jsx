@@ -5,7 +5,7 @@ import { RequestStatus } from '../review/request-state.js'
 
 export function ReviewStartupContent({ state, onRetry, children }) {
   if (state.status === RequestStatus.SUCCESS) {
-    return <Fragment key={state.attempt}>{children(onRetry)}</Fragment>
+    return <Fragment key={state.attempt}>{children(onRetry, state.openReviewSourcePicker)}</Fragment>
   }
   return (
     <div className="application-shell">

@@ -78,6 +78,21 @@ fn getReviewSession(handler: *Handler, req: *httpz.Request, res: *httpz.Response
     return handler.dispatchRequest(req, res, .get_review_session);
 }
 
+fn getLaunchIntent(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    return handler.dispatchRequest(req, res, .get_launch_intent);
+}
+
+fn acknowledgeLaunchIntent(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
+    const body = req.body() orelse return handler.failure(res, .bad_request, .malformed_request);
+    var parsed = std.json.parseFromSlice(std.json.Value, res.arena, body, .{}) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    defer parsed.deinit();
+    const request = json_protocol.decodeRequestValue(parsed.value) catch
+        return handler.failure(res, .bad_request, .malformed_request);
+    if (request != .acknowledge_launch_intent) return handler.failure(res, .bad_request, .malformed_request);
+    return handler.dispatchRequest(req, res, request);
+}
+
 fn getConfiguration(handler: *Handler, req: *httpz.Request, res: *httpz.Response) !void {
     return handler.dispatchRequest(req, res, .get_configuration);
 }
@@ -286,6 +301,8 @@ pub fn serve(allocator: Allocator, io: std.Io, dispatcher: dispatcher_module.Dis
     router.post("/api/log", submitLog, .{});
     router.get("/api/configuration", getConfiguration, .{});
     router.get("/api/review/session", getReviewSession, .{});
+    router.get("/api/review/launch-intent", getLaunchIntent, .{});
+    router.post("/api/review/launch-intent/acknowledge", acknowledgeLaunchIntent, .{});
     router.get("/api/diffs/active", getDiffOverview, .{});
     router.get("/api/repository/commits", listCommits, .{});
     router.get("/api/repository/working-tree-changes", listWorkingTreeChanges, .{});
@@ -626,6 +643,82 @@ test "working-tree summaries cross HTTP and native JSON with matching results an
     }
     context.failure = null;
     try context.expectSerializationFailure();
+}
+
+test "HTTP launch intent retains pending instructions until acknowledgement and clears on reload" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const Session = @import("../app/session.zig").Session;
+    const Owner = @import("../app/session_owner.zig").SessionOwner;
+    var repository = try @import("../testing/repository.zig").Repository.init(allocator);
+    defer repository.deinit();
+    try repository.write("file.txt", "base\n");
+    try repository.commit("base");
+    var owner = Owner.init(io, try Session.create(allocator, io, .{
+        .directory = repository.root,
+        .configuration = .{ .configuration = .{ .object = .empty }, .diagnostic = null },
+        .logger = @import("../log/log.zig").stderrLogger(allocator),
+    }));
+    defer owner.deinit();
+    var handler: Handler = .{ .dispatcher = owner.dispatcher() };
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try getLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectHeader("cache-control", "no-store");
+        try ht.expectBody("{\"openReviewSourcePicker\":false}");
+    }
+    owner.active.core.open_review_source_picker = true;
+    for (0..2) |_| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        try getLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectBody("{\"openReviewSourcePicker\":true}");
+    }
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        var failing = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+        ht.res.arena = failing.allocator();
+        try std.testing.expectError(error.OutOfMemory, getLaunchIntent(&handler, ht.req, ht.res));
+        try std.testing.expect(owner.active.core.open_review_source_picker);
+    }
+    for ([_]?[]const u8{ null, "{", "{\"type\":\"get_launch_intent\"}" }) |body| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        if (body) |value| ht.body(value);
+        try acknowledgeLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.bad_request);
+        try std.testing.expect(owner.active.core.open_review_source_picker);
+    }
+    for (0..2) |_| {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.json(.{ .type = "acknowledge_launch_intent" });
+        try acknowledgeLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectBody("{\"openReviewSourcePicker\":false}");
+    }
+    var transport: ReloadTransportTest = .{ .owner = &owner, .transport = .http };
+    try transport.reload(null, null);
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.header("x-rvw-session", "2");
+        try getLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.ok);
+        try ht.expectBody("{\"openReviewSourcePicker\":false}");
+    }
+    {
+        var ht = httpz.testing.init(.{});
+        defer ht.deinit();
+        ht.header("x-rvw-session", "1");
+        ht.json(.{ .type = "acknowledge_launch_intent" });
+        try acknowledgeLaunchIntent(&handler, ht.req, ht.res);
+        try ht.expectStatusCode(.conflict);
+    }
 }
 
 test "HTTP session scopes reject stale mutations and release after serialization failure" {

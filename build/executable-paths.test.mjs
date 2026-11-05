@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { constants } from 'node:fs'
 import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -128,6 +128,32 @@ function runFailure(executable, args, env) {
     return error.stderr
   }
 }
+
+test('CLI interactive errors return status 2 and usage before configuration or GUI launch', () => {
+  const env = { ...process.env, HOME: '/rvw-no-home', PATH: '/rvw-no-tools' }
+  for (const flag of ['-i', '--interactive']) {
+    for (const source of [['-r', 'a..b'], ['--range', 'a..b'], ['-l'], ['--last-commit'], ['--pr', '42']]) {
+      for (const args of [[flag, ...source], [...source, flag]]) {
+        const result = spawnSync(cliExecutable, args, { env, encoding: 'utf8', timeout: 5000 })
+        assert.equal(result.status, 2, JSON.stringify(args))
+        assert.match(result.stderr, /--interactive \(-i\) cannot be combined/)
+        assert.match(result.stderr, /usage: rvw/)
+        assert.doesNotMatch(result.stderr, /unable to launch|unable to load user configuration/)
+      }
+    }
+    for (const repeat of ['-i', '--interactive']) {
+      const result = spawnSync(cliExecutable, [flag, repeat], { env, encoding: 'utf8', timeout: 5000 })
+      assert.equal(result.status, 2)
+      assert.match(result.stderr, /--interactive \(-i\) may only be provided once/)
+      assert.match(result.stderr, /usage: rvw/)
+    }
+    for (const option of ['--help', '--version']) {
+      const result = spawnSync(cliExecutable, [flag, option], { env, encoding: 'utf8', timeout: 5000 })
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, option === '--help' ? /-i \| --interactive/ : /^rvw /)
+    }
+  }
+})
 
 test('configured paths with spaces support HTTP startup, runtime operations, and failures without fallback', async (t) => {
   const f = await fixture(t)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { blockingOverlayActions, OverlayKind } from '../../actions/overlay-actions.js'
 import { createReviewSourcePickerModeActionRegistry } from '../../actions/review-source-picker-mode-actions.js'
 import { createReviewSourcePickerActionAdapter } from '../../actions/review-source-picker-actions.js'
@@ -35,7 +35,7 @@ export function ReviewSourcePickerStatus({ request }) {
   return null
 }
 
-export default function ReviewSourcePicker({ onClose, registerActionAdapter, onSelectPullRequest, onSelectComparison, reloadRequest }) {
+export default function ReviewSourcePicker({ onClose, onOpened, registerActionAdapter, onSelectPullRequest, onSelectComparison, reloadRequest }) {
   const isBlocked = reloadRequest?.isLocked ?? notBlocked
   const disabled = isBlocked()
   const dialogRef = useRef(null)
@@ -45,6 +45,10 @@ export default function ReviewSourcePicker({ onClose, registerActionAdapter, onS
   const [modeActions] = useState(() => createReviewSourcePickerModeActionRegistry(setActions))
   const [commitsRequest] = useState(createCommitsRequest)
   const [pullRequestsRequest] = useState(createPullRequestsRequest)
+
+  // Overlay opens the dialog and installs focus and keyboard actions in its
+  // child layout effects, before this acknowledgement runs.
+  useLayoutEffect(() => { onOpened?.() }, [onOpened])
 
   useEffect(() => {
     commitsRequest.load()

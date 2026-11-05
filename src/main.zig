@@ -6,7 +6,7 @@ const config = @import("config/config.zig");
 const build_options = @import("build_options");
 
 const usage =
-    \\usage: rvw [DIR] [-r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [--log-level LEVEL]
+    \\usage: rvw [DIR] [-i | --interactive | -r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [--log-level LEVEL]
     \\       rvw -h | --help
     \\       rvw -v | --version
     \\
@@ -18,6 +18,7 @@ const Options = struct {
     last_commit: bool = false,
     log_level: ?[]const u8 = null,
     pr: ?u32 = null,
+    interactive: bool = false,
 };
 
 const Command = union(enum) {
@@ -29,6 +30,8 @@ const Command = union(enum) {
 const ParseError = error{
     DuplicateTarget,
     DuplicateLastCommit,
+    DuplicateInteractive,
+    InteractiveSourceConflict,
     MissingPr,
     InvalidPr,
     DuplicateDirectory,
@@ -97,7 +100,7 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("{s}", .{last_commit.errorMessage(err)});
         return 2;
     } else options.range;
-    launch(init.io, allocator, directory, range, options.pr, options.log_level orelse init.environ_map.get("LOG_LEVEL")) catch |err| {
+    launch(init.io, allocator, directory, range, options.pr, options.log_level orelse init.environ_map.get("LOG_LEVEL"), options.interactive) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -128,8 +131,17 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
             continue;
         }
         if (!positional_only and
+            (std.mem.eql(u8, argument, "-i") or std.mem.eql(u8, argument, "--interactive")))
+        {
+            if (options.interactive) return error.DuplicateInteractive;
+            if (has_range or options.last_commit or options.pr != null) return error.InteractiveSourceConflict;
+            options.interactive = true;
+            continue;
+        }
+        if (!positional_only and
             (std.mem.eql(u8, argument, "-r") or std.mem.eql(u8, argument, "--range")))
         {
+            if (options.interactive) return error.InteractiveSourceConflict;
             if (options.pr != null or options.last_commit) return error.DuplicateTarget;
             if (has_range) return error.DuplicateRange;
             index += 1;
@@ -142,12 +154,14 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
         if (!positional_only and
             (std.mem.eql(u8, argument, "-l") or std.mem.eql(u8, argument, "--last-commit")))
         {
+            if (options.interactive) return error.InteractiveSourceConflict;
             if (options.last_commit) return error.DuplicateLastCommit;
             if (has_range or options.pr != null) return error.DuplicateTarget;
             options.last_commit = true;
             continue;
         }
         if (!positional_only and std.mem.eql(u8, argument, "--pr")) {
+            if (options.interactive) return error.InteractiveSourceConflict;
             if (has_range or options.pr != null or options.last_commit) return error.DuplicateTarget;
             index += 1;
             if (index == args.len) return error.MissingPr;
@@ -176,6 +190,8 @@ fn parseErrorMessage(err: ParseError) []const u8 {
     return switch (err) {
         error.DuplicateTarget => "provide only one of --range, --last-commit (-l), or --pr",
         error.DuplicateLastCommit => "--last-commit (-l) may only be provided once",
+        error.DuplicateInteractive => "--interactive (-i) may only be provided once",
+        error.InteractiveSourceConflict => "--interactive (-i) cannot be combined with --range (-r), --last-commit (-l), or --pr",
         error.MissingPr => "missing value for --pr",
         error.InvalidPr => pull_request.errorMessage(error.InvalidPr),
         error.DuplicateDirectory => "only one directory may be provided",
@@ -206,14 +222,15 @@ fn launch(
     range: ?[]const u8,
     pr: ?u32,
     log_level: ?[]const u8,
+    interactive: bool,
 ) !void {
     // Zig resolves the running executable through symlinks here. A CLI invoked
     // as /usr/local/bin/rvw therefore finds rvw-cli inside the installed app.
     const executable_dir = try std.process.executableDirPathAlloc(io, allocator);
     const bundle_path = try appBundlePath(executable_dir);
-    var buffer: [13][]const u8 = undefined;
+    var buffer: [14][]const u8 = undefined;
     const pr_text = if (pr) |number| try std.fmt.allocPrint(allocator, "{d}", .{number}) else null;
-    const argv = launchArguments(&buffer, bundle_path, directory, range, pr_text, log_level);
+    const argv = launchArguments(&buffer, bundle_path, directory, range, pr_text, log_level, interactive);
 
     var child = try std.process.spawn(io, .{ .argv = argv });
     const result = try child.wait(io);
@@ -231,12 +248,13 @@ fn appBundlePath(executable_dir: []const u8) ![]const u8 {
 }
 
 fn launchArguments(
-    buffer: *[13][]const u8,
+    buffer: *[14][]const u8,
     bundle_path: []const u8,
     directory: []const u8,
     range: ?[]const u8,
     pr: ?[]const u8,
     log_level: ?[]const u8,
+    interactive: bool,
 ) []const []const u8 {
     buffer[0..7].* = .{
         "/usr/bin/open",
@@ -257,6 +275,10 @@ fn launchArguments(
         buffer[count] = "--pr";
         buffer[count + 1] = value;
         count += 2;
+    }
+    if (interactive) {
+        buffer[count] = "--interactive";
+        count += 1;
     }
     if (log_level) |value| {
         buffer[count] = "--log-level";
@@ -309,10 +331,74 @@ test "CLI parsing rejects ambiguous and incomplete launch arguments" {
     }
 }
 
+test "interactive forms accept optional paths and logging and forward the native option" {
+    try std.testing.expect(!(try parseArgs(&.{"rvw"})).launch.interactive);
+    for ([_][]const u8{ "-i", "--interactive" }) |flag| {
+        const defaults = (try parseArgs(&.{ "rvw", flag })).launch;
+        try std.testing.expect(defaults.interactive);
+        try std.testing.expectEqualStrings(".", defaults.directory);
+        for ([_][]const []const u8{
+            &.{ "rvw", "/tmp/repository with spaces", flag, "--log-level", "debug" },
+            &.{ "rvw", flag, "--log-level", "debug", "/tmp/repository with spaces" },
+            &.{ "rvw", "--log-level", "debug", flag, "/tmp/repository with spaces" },
+        }) |args| {
+            const options = (try parseArgs(args)).launch;
+            try std.testing.expect(options.interactive);
+            try std.testing.expect(options.range == null and options.pr == null and !options.last_commit);
+            try std.testing.expectEqualStrings("/tmp/repository with spaces", options.directory);
+            var buffer: [14][]const u8 = undefined;
+            try expectArguments(&.{
+                "/usr/bin/open", "-n",              "/Applications/Rvw.app", "--args",      "--rvw-cli-launch",
+                "--directory",   options.directory, "--interactive",         "--log-level", "debug",
+            }, launchArguments(&buffer, "/Applications/Rvw.app", options.directory, null, null, options.log_level, options.interactive));
+        }
+        var buffer: [14][]const u8 = undefined;
+        const forwarded = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", null, null, null, defaults.interactive);
+        try std.testing.expectEqual(@as(usize, 8), forwarded.len);
+        try std.testing.expectEqualStrings("--interactive", forwarded[7]);
+    }
+}
+
+test "interactive forms reject repeated options and explicit sources in either order" {
+    for ([_][]const u8{ "-i", "--interactive" }) |flag| {
+        for ([_][]const u8{ "-i", "--interactive" }) |repeat| {
+            try std.testing.expectError(error.DuplicateInteractive, parseArgs(&.{ "rvw", flag, repeat }));
+        }
+        for ([_][]const u8{ "-r", "--range", "--pr" }) |source| {
+            const value = if (std.mem.eql(u8, source, "--pr")) "100" else "base..head";
+            try std.testing.expectError(error.InteractiveSourceConflict, parseArgs(&.{ "rvw", flag, source, value }));
+            try std.testing.expectError(error.InteractiveSourceConflict, parseArgs(&.{ "rvw", source, value, flag }));
+        }
+        for ([_][]const u8{ "-l", "--last-commit" }) |source| {
+            try std.testing.expectError(error.InteractiveSourceConflict, parseArgs(&.{ "rvw", flag, source }));
+            try std.testing.expectError(error.InteractiveSourceConflict, parseArgs(&.{ "rvw", source, flag }));
+        }
+    }
+}
+
+test "interactive parsing preserves help version and positional-only arguments" {
+    for ([_][]const u8{ "-i", "--interactive" }) |flag| {
+        for ([_][]const u8{ "-h", "--help" }) |help| {
+            try std.testing.expect((try parseArgs(&.{ "rvw", flag, help })) == .help);
+            try std.testing.expect((try parseArgs(&.{ "rvw", help, flag })) == .help);
+        }
+        for ([_][]const u8{ "-v", "--version" }) |version| {
+            try std.testing.expect((try parseArgs(&.{ "rvw", flag, version })) == .version);
+            try std.testing.expect((try parseArgs(&.{ "rvw", version, flag })) == .version);
+        }
+        const positional = (try parseArgs(&.{ "rvw", "--", flag })).launch;
+        try std.testing.expect(!positional.interactive);
+        try std.testing.expectEqualStrings(flag, positional.directory);
+        const interactive = (try parseArgs(&.{ "rvw", flag, "--", "--range" })).launch;
+        try std.testing.expect(interactive.interactive);
+        try std.testing.expectEqualStrings("--range", interactive.directory);
+    }
+}
+
 test "CLI canonicalizes directories and rejects files" {
     var temporary = std.testing.tmpDir(.{});
     defer temporary.cleanup();
-    try temporary.dir.createDirPath(std.testing.io, "repository");
+    try temporary.dir.createDirPath(std.testing.io, "repository with spaces");
     try temporary.dir.writeFile(std.testing.io, .{
         .sub_path = "not-a-directory",
         .data = "file",
@@ -322,7 +408,7 @@ test "CLI canonicalizes directories and rejects files" {
         std.testing.io,
         std.testing.allocator,
         temporary.dir,
-        "repository",
+        "repository with spaces",
     );
     defer std.testing.allocator.free(canonical);
     try std.testing.expect(std.fs.path.isAbsolute(canonical));
@@ -344,7 +430,7 @@ test "CLI launch arguments target the containing app and forward the optional ra
     );
     try std.testing.expectError(error.InvalidBundleLayout, appBundlePath("Rvw"));
 
-    var without_range_buffer: [13][]const u8 = undefined;
+    var without_range_buffer: [14][]const u8 = undefined;
     const without_range = launchArguments(
         &without_range_buffer,
         "/Applications/Rvw.app",
@@ -352,6 +438,7 @@ test "CLI launch arguments target the containing app and forward the optional ra
         null,
         null,
         null,
+        false,
     );
     try expectArguments(&.{
         "/usr/bin/open",
@@ -363,7 +450,7 @@ test "CLI launch arguments target the containing app and forward the optional ra
         "/tmp/repository",
     }, without_range);
 
-    var range_buffer: [13][]const u8 = undefined;
+    var range_buffer: [14][]const u8 = undefined;
     const with_range = launchArguments(
         &range_buffer,
         "/Applications/Rvw.app",
@@ -371,6 +458,7 @@ test "CLI launch arguments target the containing app and forward the optional ra
         "main..feature",
         null,
         null,
+        false,
     );
     try expectArguments(&.{
         "/usr/bin/open",
@@ -395,8 +483,8 @@ fn expectArguments(expected: []const []const u8, actual: []const []const u8) !vo
 test "CLI forwards raw logging configuration with and without range" {
     for ([_]?[]const u8{ null, "main..HEAD" }) |range| {
         for ([_][]const u8{ "debug", "", "invalid-secret" }) |level| {
-            var buffer: [13][]const u8 = undefined;
-            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, null, level);
+            var buffer: [14][]const u8 = undefined;
+            const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", range, null, level, false);
             try std.testing.expectEqualStrings("--log-level", args[args.len - 2]);
             try std.testing.expectEqualStrings(level, args[args.len - 1]);
             if (range) |value| try std.testing.expectEqualStrings(value, args[8]);
@@ -431,8 +519,8 @@ test "CLI accepts PR targets and rejects ambiguous or invalid targets" {
         &.{ "rvw", "--pr", "1", "--pr", "2" },
     }) |args| try std.testing.expectError(error.DuplicateTarget, parseArgs(args));
     for ([_]?[]const u8{ null, "debug" }) |level| {
-        var buffer: [13][]const u8 = undefined;
-        const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", "base..head", "100", level);
+        var buffer: [14][]const u8 = undefined;
+        const args = launchArguments(&buffer, "/Applications/Rvw.app", "/tmp/repo", "base..head", "100", level, false);
         try std.testing.expectEqualStrings("--range", args[7]);
         try std.testing.expectEqualStrings("base..head", args[8]);
         try std.testing.expectEqualStrings("--pr", args[9]);
@@ -470,12 +558,12 @@ test "CLI last-commit forms accept directories and forward the same resolved ran
             try std.testing.expectEqualStrings(repo.root, options.directory);
             const range = try last_commit.resolveRange(std.testing.io, std.testing.allocator, options.directory, default_executables.git);
             defer std.testing.allocator.free(range);
-            var buffer: [13][]const u8 = undefined;
+            var buffer: [14][]const u8 = undefined;
             try expectArguments(&.{
                 "/usr/bin/open",    "-n",          "/Applications/Rvw.app", "--args",
                 "--rvw-cli-launch", "--directory", repo.root,               "--range",
                 expected,
-            }, launchArguments(&buffer, "/Applications/Rvw.app", options.directory, range, null, null));
+            }, launchArguments(&buffer, "/Applications/Rvw.app", options.directory, range, null, null, false));
         }
     }
     const positional = (try parseArgs(&.{ "rvw", "--", "-l" })).launch;

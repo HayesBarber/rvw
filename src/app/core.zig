@@ -22,6 +22,8 @@ pub const Core = struct {
     clipboard: output.Clipboard,
     logger: log.Logger,
     configuration: config.Snapshot,
+    /// Set only for the initial interactive launch. Replacement cores default to false.
+    open_review_source_picker: bool = false,
 
     pub fn init(
         allocator: Allocator,
@@ -78,6 +80,11 @@ pub const Core = struct {
         return switch (request) {
             .log => unreachable,
             .get_configuration => .{ .configuration = self.configuration },
+            .get_launch_intent => .{ .launch_intent = .{ .openReviewSourcePicker = self.open_review_source_picker } },
+            .acknowledge_launch_intent => blk: {
+                self.open_review_source_picker = false;
+                break :blk .{ .launch_intent = .{ .openReviewSourcePicker = false } };
+            },
             .get_review_session, .reload_review => error.SessionOwnerRequired,
             .get_diff_overview => .{ .diff_overview = try self.review_provider.getDiffOverview(self.io) },
             .list_commits => .{ .commit_list = try self.repository_provider.listCommits(self.io, self.review_provider.repositoryRoot()) },
@@ -202,6 +209,8 @@ fn operationName(request: model.Request) []const u8 {
     return switch (request) {
         .log => "log",
         .get_configuration => "get_configuration",
+        .get_launch_intent => "get_launch_intent",
+        .acknowledge_launch_intent => "acknowledge_launch_intent",
         .get_review_session => "get_review_session",
         .reload_review => "reload_review",
         .get_diff_overview => "get_diff_overview",

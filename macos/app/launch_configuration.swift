@@ -13,6 +13,7 @@ struct LaunchConfiguration: Equatable {
     let range: String?
     var pr: UInt32? = nil
     var logLevel: String? = nil
+    var interactive: Bool = false
 
     static func parse(arguments: [String]) -> LaunchConfigurationResult {
         guard let markerIndex = arguments.firstIndex(of: launchMarker) else {
@@ -52,6 +53,12 @@ struct LaunchConfiguration: Equatable {
             pr = number
             index = arguments.index(after: index)
         }
+        var interactive = false
+        if index < arguments.endIndex, arguments[index] == "--interactive" {
+            guard range == nil, pr == nil else { return .invalid }
+            interactive = true
+            index = arguments.index(after: index)
+        }
         var logLevel: String? = nil
         if index < arguments.endIndex, arguments[index] == "--log-level" {
             index = arguments.index(after: index)
@@ -60,6 +67,8 @@ struct LaunchConfiguration: Equatable {
             index = arguments.index(after: index)
         }
         guard index == arguments.endIndex else { return .invalid }
-        return .configuration(LaunchConfiguration(directory: directory, range: range, pr: pr, logLevel: logLevel))
+        return .configuration(LaunchConfiguration(
+            directory: directory, range: range, pr: pr, logLevel: logLevel, interactive: interactive
+        ))
     }
 }

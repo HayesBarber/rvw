@@ -473,6 +473,8 @@ pub fn validTextSearchQuery(query: []const u8) bool {
 pub const Request = union(enum) {
     log: logging.Event,
     get_configuration,
+    get_launch_intent,
+    acknowledge_launch_intent,
     get_review_session,
     reload_review: struct { source: ?DiffSource = null },
     get_diff_overview,
@@ -537,9 +539,14 @@ pub const LogResult = struct {
     accepted: bool,
 };
 
+pub const LaunchIntent = struct {
+    openReviewSourcePicker: bool,
+};
+
 pub const Response = union(enum) {
     log_result: LogResult,
     configuration: config.Snapshot,
+    launch_intent: LaunchIntent,
     review_session: struct { id: u64 },
     reload_review_result: ReloadReviewResult,
     diff_overview: DiffOverview,

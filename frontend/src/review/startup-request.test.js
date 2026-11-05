@@ -8,7 +8,7 @@ const settle = () => Promise.resolve()
 test('startup shares pending work and can retry a failed session load', async () => {
   let calls = 0
   let complete
-  const startup = createStartupRequest({ initialize: () => {
+  const startup = createStartupRequest({ readLaunchIntent: async () => false, initialize: () => {
     calls++
     return new Promise((resolve, reject) => { complete = { resolve, reject } })
   } })
@@ -37,7 +37,7 @@ test('retry after replacement reads the active session without another reset', a
     if (failOverview) throw new Error('Unable to load review')
     return { id: 'same-snapshot', source: { kind: 'working-tree', base: 'base' } }
   } }) })
-  const startup = createStartupRequest({ initialize: async () => {
+  const startup = createStartupRequest({ readLaunchIntent: async () => false, initialize: async () => {
     await transport.initialize()
     await transport.request('/api/diffs/active', { type: 'get_diff_overview' })
   } })

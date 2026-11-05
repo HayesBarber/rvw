@@ -85,6 +85,21 @@ export async function getDiffOverview() {
   return requestJson('/api/diffs/active', { type: 'get_diff_overview' })
 }
 
+/** Reads the pending launch instruction without consuming it. */
+export async function getLaunchIntent() {
+  return requestJson('/api/review/launch-intent', { type: 'get_launch_intent' })
+}
+
+/** Clears the launch instruction after the picker opens. */
+export async function acknowledgeLaunchIntent() {
+  const request = { type: 'acknowledge_launch_intent' }
+  return requestJson('/api/review/launch-intent/acknowledge', request, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
 /** Replaces the review session. The caller reloads the frontend document on success. */
 export async function reloadReview(source) {
   const request = { type: 'reload_review', ...(source === undefined ? {} : { source }) }

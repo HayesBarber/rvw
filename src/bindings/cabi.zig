@@ -21,6 +21,7 @@ pub export fn rvw_core_create(
     range_ptr: ?[*:0]const u8,
     log_level_ptr: ?[*:0]const u8,
     pr_ptr: ?*const u32,
+    interactive: bool,
     error_out: ?*RvwBuffer,
 ) callconv(.c) ?*RvwCore {
     if (error_out) |output| output.* = emptyBuffer();
@@ -29,6 +30,10 @@ pub export fn rvw_core_create(
         return null;
     });
     const range: ?[]const u8 = if (range_ptr) |value| std.mem.span(value) else null;
+    if (interactive and (range != null or pr_ptr != null)) {
+        setCreationError(error_out, "interactive launch cannot use an explicit review source");
+        return null;
+    }
     if (pr_ptr) |pr| {
         if (pr.* == 0 or range == null) {
             setCreationError(error_out, "PR review requires a positive number and resolved range");
@@ -84,6 +89,7 @@ pub export fn rvw_core_create(
         allocator.destroy(handle);
         return null;
     };
+    session.core.open_review_source_picker = interactive;
     handle.owner = .init(handle.threaded.io(), session);
     return handle;
 }
