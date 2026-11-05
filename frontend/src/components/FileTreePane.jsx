@@ -6,9 +6,8 @@ import {
 import {
   createFileTreeActionAdapter,
   fileTreeFocusCSS,
-  focusFileTreePath,
 } from '../actions/file-tree-actions.js'
-import { updateFileTreeData } from './file-tree-data.js'
+import { synchronizeFileTreeSelection } from './file-tree-selection.js'
 
 export default function FileTreePane({
   files,
@@ -59,15 +58,6 @@ export default function FileTreePane({
     unsafeCSS: fileTreeFocusCSS,
   })
 
-  useEffect(() => {
-    synchronizingSelectionRef.current = true
-    try {
-      updateFileTreeData(model, [...filePaths], gitStatus)
-    } finally {
-      synchronizingSelectionRef.current = false
-    }
-  }, [filePaths, gitStatus, model])
-
   useEffect(
     () => registerActionAdapter(createFileTreeActionAdapter(
       model,
@@ -91,24 +81,11 @@ export default function FileTreePane({
   )
 
   useEffect(() => {
-    const selectedPaths = model.getSelectedPaths()
-    const selectionMatches =
-      selectedPaths.length === (selectedPath ? 1 : 0) &&
-      selectedPaths[0] === selectedPath
-    if (!selectionMatches) {
-      synchronizingSelectionRef.current = true
-      try {
-        for (const path of selectedPaths) model.getItem(path)?.deselect()
-        if (selectedPath && filePaths.has(selectedPath)) {
-          model.getItem(selectedPath)?.select()
-        }
-      } finally {
-        synchronizingSelectionRef.current = false
-      }
-    }
-
-    if (selectedPath && filePaths.has(selectedPath)) {
-      focusFileTreePath(model, selectedPath)
+    synchronizingSelectionRef.current = true
+    try {
+      synchronizeFileTreeSelection(model, filePaths, selectedPath)
+    } finally {
+      synchronizingSelectionRef.current = false
     }
   }, [filePaths, model, selectedPath])
 
