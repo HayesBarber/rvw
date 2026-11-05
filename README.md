@@ -48,24 +48,6 @@ See [executable configuration](./docs/configuration.md#executable-paths) for Git
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
 
-Use `-i` or `--interactive` to open the review-source picker after the working-tree
-review against HEAD loads. The picker starts in Commits mode with no endpoints selected.
-
-```sh
-rvw -i
-rvw --interactive "/path/to/repository with spaces"
-rvw /path/to/repository -i --log-level debug
-```
-
-The repository path can precede or follow the option. If you omit it, Rvw uses
-the current directory. Use either interactive flag once. Do not combine it with
-`-r` / `--range`, `-l` / `--last-commit`, or `--pr`.
-
-Press Escape or select Close to dismiss the picker and return to the working-tree
-review. Selecting a comparison or PR loads that source. The picker opens
-automatically only once per interactive process launch. Dismissal, source selection,
-and reload do not open it again. A new `rvw -i` or `rvw --interactive` launch opens it again.
-
 Rvw is built with Vim in mind. See the docs for [configuring the keybindings and user settings](./docs/configuration.md).
 
 > Rvw stores comments in memory. Review sessions are not saved. Copy your comments before you close the app window.

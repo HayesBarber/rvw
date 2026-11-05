@@ -150,7 +150,7 @@ test('CLI interactive errors return status 2 and usage before configuration or G
     for (const option of ['--help', '--version']) {
       const result = spawnSync(cliExecutable, [flag, option], { env, encoding: 'utf8', timeout: 5000 })
       assert.equal(result.status, 0)
-      assert.match(result.stdout, option === '--help' ? /-i, --interactive/ : /^rvw /)
+      assert.match(result.stdout, option === '--help' ? /-i \| --interactive/ : /^rvw /)
     }
   }
 })

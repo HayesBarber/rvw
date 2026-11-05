@@ -10,11 +10,6 @@ const usage =
     \\       rvw -h | --help
     \\       rvw -v | --version
     \\
-    \\-i, --interactive opens the review-source picker after the working-tree review loads.
-    \\Use either form once. Do not combine it with --range (-r), --last-commit (-l), or --pr.
-    \\DIR can precede or follow the option. If omitted, use the current directory.
-    \\Escape or Close returns to the working-tree review. Reload does not open the picker again.
-    \\
 ;
 
 const Options = struct {
