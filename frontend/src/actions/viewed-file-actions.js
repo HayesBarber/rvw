@@ -1,5 +1,30 @@
 import { orderedFilePaths } from './file-navigation-actions.js'
 
+/** Gives the checked state time to appear before selecting the next file. */
+export function createViewedFileChange() {
+  let timeout = null
+  const cancel = () => {
+    clearTimeout(timeout)
+    timeout = null
+  }
+
+  return Object.freeze({
+    cancel,
+    set(options) {
+      cancel()
+      return setFileViewed({
+        ...options,
+        navigateFile: (...args) => {
+          timeout = setTimeout(() => {
+            timeout = null
+            options.navigateFile(...args)
+          }, 150)
+        },
+      })
+    },
+  })
+}
+
 /** Sets viewed status and uses the next-file action to advance after marking. */
 export function setFileViewed({
   path,

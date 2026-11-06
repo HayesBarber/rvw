@@ -5,13 +5,71 @@ import { initialWorkspaceState, TreeMode, workspaceReducer } from '../app/worksp
 import { synchronizeFileTreeSelection } from '../components/file-tree-selection.js'
 import { createFilesModeEntries, selectVisibleFiles } from '../review/review-session.js'
 import { relativeFilePath } from './file-navigation-actions.js'
-import { setFileViewed } from './viewed-file-actions.js'
+import { createViewedFileChange, setFileViewed } from './viewed-file-actions.js'
 import { ActiveSurface } from '../app/workspace.js'
 import { resolveConfiguration } from '../app/configuration.js'
 import { VimController } from '../vim/machine.js'
 import { ApplicationAction } from './application-actions.js'
 import { createApplicationDispatcher } from './application-dispatch.js'
 import { resolveCommand } from './command-line.js'
+
+function delayedViewedFixture(t) {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const change = createViewedFileChange()
+  t.after(change.cancel)
+  let state = { ...initialWorkspaceState, selectedPath: 'a.js' }
+  const navigations = []
+  const set = (viewed) => change.set({
+    path: state.selectedPath,
+    viewed,
+    changedFiles: [{ path: 'a.js' }, { path: 'b.js' }],
+    viewedPaths: state.viewedPaths,
+    dispatchWorkspace: (action) => { state = workspaceReducer(state, action) },
+    navigateFile: (direction, count, options) => {
+      navigations.push(options.paths)
+      const path = relativeFilePath(options.paths, state.selectedPath, direction, count, options)
+      if (path) state = workspaceReducer(state, { type: 'file_selected', path })
+    },
+  })
+  return { change, set, navigations, getState: () => state }
+}
+
+test('viewed status updates before automatic navigation and advances once after feedback', (t) => {
+  const { set, getState, navigations } = delayedViewedFixture(t)
+  assert.equal(set(true), true)
+  assert.deepEqual(getState().viewedPaths, ['a.js'])
+  assert.equal(getState().selectedPath, 'a.js')
+  t.mock.timers.tick(149)
+  assert.equal(getState().selectedPath, 'a.js')
+  assert.deepEqual(navigations, [])
+  t.mock.timers.tick(1)
+  assert.equal(getState().selectedPath, 'b.js')
+  assert.deepEqual(navigations, [['a.js', 'b.js']])
+  t.mock.timers.tick(1000)
+  assert.equal(navigations.length, 1)
+})
+
+test('clearing viewed status cancels the pending automatic navigation', (t) => {
+  const { set, getState, navigations } = delayedViewedFixture(t)
+  set(true)
+  t.mock.timers.tick(50)
+  set(false)
+  t.mock.timers.tick(1000)
+  assert.deepEqual(getState().viewedPaths, [])
+  assert.equal(getState().selectedPath, 'a.js')
+  assert.deepEqual(navigations, [])
+})
+
+test('leaving a file or disposing the review can cancel its pending navigation', (t) => {
+  const { change, set, getState, navigations } = delayedViewedFixture(t)
+  set(true)
+  change.cancel()
+  change.cancel()
+  t.mock.timers.tick(1000)
+  assert.deepEqual(getState().viewedPaths, ['a.js'])
+  assert.equal(getState().selectedPath, 'a.js')
+  assert.deepEqual(navigations, [])
+})
 
 for (const mode of [TreeMode.CHANGES, TreeMode.FILES]) {
   test(`marking files in ${mode} skips viewed and unchanged files, reveals parents, and wraps`, (t) => {

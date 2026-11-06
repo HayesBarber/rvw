@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fileHistoryTarget, FinderMode, TreeMode } from '../app/workspace.js'
 import { selectActivePath } from '../app/file-selection.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
-import { setFileViewed } from '../actions/viewed-file-actions.js'
+import { createViewedFileChange } from '../actions/viewed-file-actions.js'
 import {
   orderedFilePaths,
   relativeFilePath,
@@ -71,6 +71,7 @@ export function selectDefaultReviewPath(overview, treeMode) {
 
 export function useReviewSession({ workspace, dispatchWorkspace }) {
   const [fileCache] = useState(createReviewFileCache)
+  const [viewedFileChange] = useState(createViewedFileChange)
   const overviewRequest = useReviewOverview()
   const allFilesRequest = useRepositoryFiles()
   const notIgnoredFilesRequest = useNotIgnoredFiles()
@@ -218,14 +219,16 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     workspace.treeMode,
   ])
 
-  const changeFileViewed = useCallback((viewed) => setFileViewed({
+  useEffect(() => () => viewedFileChange.cancel(), [activePath, viewedFileChange])
+
+  const changeFileViewed = useCallback((viewed) => viewedFileChange.set({
     path: activePath,
     viewed,
     changedFiles: overview?.files ?? [],
     viewedPaths: workspace.viewedPaths,
     dispatchWorkspace,
     navigateFile,
-  }), [activePath, dispatchWorkspace, navigateFile, overview, workspace.viewedPaths])
+  }), [activePath, dispatchWorkspace, navigateFile, overview, viewedFileChange, workspace.viewedPaths])
 
   const toggleFileViewed = useCallback(() => (
     changeFileViewed(!workspace.viewedPaths.includes(activePath))
