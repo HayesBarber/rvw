@@ -1,3 +1,4 @@
+import { normalizedCount } from '../utils/normalized-count.js'
 import { ApplicationAction } from './application-actions.js'
 import { blockingOverlayActions } from './overlay-actions.js'
 
@@ -12,7 +13,7 @@ export function createReviewSourcePickerActionAdapter({ mode, modeActions = bloc
     if (isBlocked()) return false
     const index = reviewSourceModes.findIndex(({ value }) => value === mode)
     if (index < 0) return false
-    const steps = Number.isSafeInteger(count) && count > 0 ? count : 1
+    const steps = normalizedCount(count)
     const length = reviewSourceModes.length
     const nextIndex = (index + direction * (steps % length) + length) % length
     if (nextIndex !== index) onChange(reviewSourceModes[nextIndex].value)

@@ -1,3 +1,4 @@
+import { normalizedCount } from '../utils/normalized-count.js'
 import { ApplicationAction } from './application-actions.js'
 
 // Adapts file tree operations to the application action vocabulary.
@@ -37,7 +38,7 @@ export function focusFileTreePath(model, path) {
 }
 
 function repeat(count, operation) {
-  const repetitions = Number.isSafeInteger(count) && count > 0 ? count : 1
+  const repetitions = normalizedCount(count)
   for (let index = 0; index < repetitions; index += 1) operation()
 }
 
@@ -62,9 +63,7 @@ function halfPageItemCount(model) {
 function moveFocusByPage(model, operation, count = 1) {
   const pageItems = halfPageItemCount(model)
   if (pageItems === 0) return false
-  return moveFocus(model, operation, pageItems * (
-    Number.isSafeInteger(count) && count > 0 ? count : 1
-  ))
+  return moveFocus(model, operation, pageItems * normalizedCount(count))
 }
 
 /** Adapts semantic application actions to the file-tree surface. */

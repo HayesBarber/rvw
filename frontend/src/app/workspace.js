@@ -1,5 +1,6 @@
 // Owns state and transitions for the application workspace shell.
 import { selectActivePath } from './file-selection.js'
+import { normalizedCount } from '../utils/normalized-count.js'
 
 export const ActiveSurface = Object.freeze({
   FILE_TREE: 'file_tree',
@@ -211,7 +212,7 @@ function reduceWorkspace(state, action) {
 /** Find a reachable entry without changing history or stopping at missing files. */
 export function fileHistoryTarget(state, direction, count = 1, availablePaths = null) {
   if (direction !== -1 && direction !== 1) return null
-  let remaining = Number.isSafeInteger(count) && count > 0 ? count : 1
+  let remaining = normalizedCount(count)
   let target = null
   for (let index = state.fileHistoryIndex + direction;
     index >= 0 && index < state.fileHistory.length; index += direction) {
