@@ -117,6 +117,7 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
     selectFile,
     changeTreeMode: handleTreeModeChange,
     changeFileViewed,
+    toggleFileViewed,
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace })
   const clearSessionComments = useCallback(() => (
@@ -167,6 +168,7 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
     openFileFinderAll,
     openKeymapReference,
     selectFile,
+    toggleFileViewed,
   })
   const launchPickerRequested = useRef(false)
   useEffect(() => {

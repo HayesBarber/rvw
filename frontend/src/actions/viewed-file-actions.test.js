@@ -6,6 +6,12 @@ import { synchronizeFileTreeSelection } from '../components/file-tree-selection.
 import { createFilesModeEntries, selectVisibleFiles } from '../review/review-session.js'
 import { relativeFilePath } from './file-navigation-actions.js'
 import { setFileViewed } from './viewed-file-actions.js'
+import { ActiveSurface } from '../app/workspace.js'
+import { resolveConfiguration } from '../app/configuration.js'
+import { VimController } from '../vim/machine.js'
+import { ApplicationAction } from './application-actions.js'
+import { createApplicationDispatcher } from './application-dispatch.js'
+import { resolveCommand } from './command-line.js'
 
 for (const mode of [TreeMode.CHANGES, TreeMode.FILES]) {
   test(`marking files in ${mode} skips viewed and unchanged files, reveals parents, and wraps`, (t) => {
@@ -88,3 +94,62 @@ test('unchanged files and invalid viewed values cannot set status or navigate', 
     assert.equal(setFileViewed({ ...options, path: 'changed.js', viewed }), false)
   }
 })
+
+for (const surface of [ActiveSurface.FILE_TREE, ActiveSurface.DIFF_PANE]) {
+  for (const custom of [false, true]) {
+    test(`${custom ? 'configured' : 'default r'} viewed action marks, advances, and clears from ${surface}`, () => {
+      const action = ApplicationAction.TOGGLE_FILE_VIEWED
+      const configuration = resolveConfiguration({ configuration: custom
+        ? { keybindings: { normal: { [action]: [['x']] } } }
+        : {} })
+      assert.equal(configuration.diagnostic, null)
+      let state = { ...initialWorkspaceState, selectedPath: 'a.js' }
+      let overlay = null
+      const dispatchWorkspace = (action) => { state = workspaceReducer(state, action) }
+      const toggleViewed = () => setFileViewed({
+        path: state.selectedPath,
+        viewed: !state.viewedPaths.includes(state.selectedPath),
+        changedFiles: [{ path: 'a.js' }, { path: 'b.js' }],
+        viewedPaths: state.viewedPaths,
+        dispatchWorkspace,
+        navigateFile: (direction, count, options) => {
+          const path = relativeFilePath(options.paths, state.selectedPath, direction, count, options)
+          if (!path) return false
+          dispatchWorkspace({ type: 'file_selected', path })
+          return true
+        },
+      })
+      const dispatch = createApplicationDispatcher({
+        getActiveSurface: () => surface,
+        getSurfaceActions: () => ({}),
+        getOverlayActions: () => overlay,
+        globalActions: { [action]: toggleViewed },
+      })
+      const controller = new VimController({ bindings: configuration.bindings })
+      controller.subscribeCommands((command) => dispatch(command.args.actions, command.count))
+      const press = (key) => controller.dispatch({ type: 'key', key })
+      if (custom) assert.equal(press('r').handled, false)
+      const key = custom ? 'x' : 'r'
+      press(key)
+      assert.deepEqual(state.viewedPaths, ['a.js'])
+      assert.equal(state.selectedPath, 'b.js')
+      press(key)
+      assert.deepEqual(state.viewedPaths, ['a.js', 'b.js'])
+      assert.equal(state.selectedPath, 'b.js')
+      press(key)
+      assert.deepEqual(state.viewedPaths, ['a.js'])
+      assert.equal(state.selectedPath, 'b.js')
+
+      overlay = {}
+      const before = state
+      press(key)
+      assert.equal(state, before)
+      overlay = null
+      dispatchWorkspace({ type: 'file_selected', path: 'unchanged.js' })
+      press(key)
+      assert.deepEqual(state.viewedPaths, ['a.js'])
+      assert.equal(state.selectedPath, 'unchanged.js')
+      assert.deepEqual(resolveCommand('file.viewed.toggle'), { kind: 'action', action })
+    })
+  }
+}

@@ -227,6 +227,10 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     navigateFile,
   }), [activePath, dispatchWorkspace, navigateFile, overview, workspace.viewedPaths])
 
+  const toggleFileViewed = useCallback(() => (
+    changeFileViewed(!workspace.viewedPaths.includes(activePath))
+  ), [activePath, changeFileViewed, workspace.viewedPaths])
+
   const availableHistoryPaths = allFilesRequest.status === RequestStatus.SUCCESS
     ? [...changedPaths, ...allFilesRequest.data]
     : null
@@ -400,6 +404,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     selectFile,
     changeTreeMode,
     changeFileViewed,
+    toggleFileViewed,
     visibleFiles,
   }
 }

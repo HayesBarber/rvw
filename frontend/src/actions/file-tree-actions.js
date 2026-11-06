@@ -3,6 +3,12 @@ import { ApplicationAction } from './application-actions.js'
 // Adapts file tree operations to the application action vocabulary.
 
 export const fileTreeFocusCSS = `
+  [data-item-section='decoration']:has([title='Viewed']) {
+    flex: 0 0 auto;
+    min-width: 1em;
+    margin-inline-start: auto;
+  }
+
   :host([data-cursor-visible='true']) [data-type='item'][tabindex='0'] {
     box-shadow: inset 0 0 0 var(--trees-focus-ring-width)
       var(--trees-focus-ring-color);

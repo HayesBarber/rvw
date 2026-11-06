@@ -222,6 +222,12 @@
     "description": "Toggle text wrapping in the diff view."
   },
   {
+    "name": "TOGGLE_FILE_VIEWED",
+    "id": "file.viewed.toggle",
+    "group": "file",
+    "description": "Toggle viewed status for the open changed file."
+  },
+  {
     "name": "COPY_FILE_PATH_RELATIVE",
     "id": "file.path.copy_relative",
     "group": "file",

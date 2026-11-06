@@ -48,16 +48,6 @@ See [executable configuration](./docs/configuration.md#executable-paths) for Git
 
 Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
 
-Select **Viewed** in a changed file's header to mark it as viewed. A check mark
-appears beside the file in the tree. Rvw selects the next unviewed changed file
-in tree order and expands its parent directories. This works in Changes and
-Files modes. Viewed and unchanged files are skipped. At the end, selection wraps
-to the first unviewed changed file. When all changed files are viewed, selection
-stays on the current file.
-
-Clear **Viewed** to remove the status without changing selection. Viewed status
-is kept in memory. Reloading starts a new review with no viewed files.
-
 Rvw is built with Vim in mind. See the docs for [configuring the keybindings and user settings](./docs/configuration.md).
 
 > Rvw stores comments in memory. Review sessions are not saved. Copy your comments before you close the app window.
