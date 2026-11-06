@@ -45,3 +45,15 @@ test('relative file navigation safely rejects unavailable movement', () => {
   assert.equal(relativeFilePath(null, 'a.js', 1), null)
   assert.equal(relativeFilePath(paths, 'a.js', 0), null)
 })
+
+test('file navigation wraps only when requested and applies counts', () => {
+  const paths = ['a.js', 'b.js', 'c.js']
+  const options = { wrap: true }
+  assert.equal(relativeFilePath(paths, 'c.js', 1, 1, options), 'a.js')
+  assert.equal(relativeFilePath(paths, 'a.js', -1, 1, options), 'c.js')
+  assert.equal(relativeFilePath(paths, 'b.js', 1, 4, options), 'c.js')
+  assert.equal(relativeFilePath(paths, 'a.js', 1, 3, options), null)
+  assert.equal(relativeFilePath(['a.js'], 'a.js', 1, 1, options), null)
+  assert.equal(relativeFilePath([], 'a.js', 1, 1, options), null)
+  assert.equal(relativeFilePath(paths, 'missing.js', 1, 1, options), null)
+})

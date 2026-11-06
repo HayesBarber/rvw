@@ -8,9 +8,11 @@ import {
   fileTreeFocusCSS,
 } from '../actions/file-tree-actions.js'
 import { synchronizeFileTreeSelection } from './file-tree-selection.js'
+import { fileViewedDecoration } from './file-viewed-decoration.js'
 
 export default function FileTreePane({
   files,
+  viewedPaths,
   isCursorVisible,
   mode,
   onFocusDiffPane,
@@ -35,6 +37,7 @@ export default function FileTreePane({
   const filePathsRef = useRef(filePaths)
   const onSelectFileRef = useRef(onSelectFile)
   const synchronizingSelectionRef = useRef(false)
+  const viewedPathsRef = useRef(new Set(viewedPaths))
 
   useEffect(() => {
     filePathsRef.current = filePaths
@@ -56,7 +59,14 @@ export default function FileTreePane({
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
     onSelectionChange: handleSelectionChange,
     unsafeCSS: fileTreeFocusCSS,
+    renderRowDecoration: ({ item }) => fileViewedDecoration(item, viewedPathsRef.current),
   })
+
+  useEffect(() => {
+    viewedPathsRef.current = new Set(viewedPaths)
+    // Refresh decorations through the public rendering API without resetting tree state.
+    model.setComposition(model.getComposition())
+  }, [model, viewedPaths])
 
   useEffect(
     () => registerActionAdapter(createFileTreeActionAdapter(

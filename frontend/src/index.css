@@ -402,6 +402,21 @@ textarea {
   cursor: pointer;
 }
 
+.file-viewed-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  color: #fafafa;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.file-viewed-control input {
+  margin: 0;
+  accent-color: #63d488;
+}
+
 .file-comment-button:hover:not(:disabled) {
   background: #303033;
 }

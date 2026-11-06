@@ -11,22 +11,25 @@ export function orderedFilePaths(files) {
 }
 
 /**
- * Finds a file relative to the currently open path without wrapping. Counts
- * that cross a boundary stop at the first or last file.
+ * Finds a file relative to the currently open path. Counts stop at the first
+ * or last file unless wrapping is enabled.
  */
-export function relativeFilePath(paths, currentPath, direction, count = 1) {
+export function relativeFilePath(paths, currentPath, direction, count = 1, { wrap = false } = {}) {
   if (!Array.isArray(paths) || paths.length === 0 || !currentPath) return null
   if (direction !== -1 && direction !== 1) return null
 
   const currentIndex = paths.indexOf(currentPath)
   if (currentIndex < 0) return null
 
-  const nextIndex = Math.max(
-    0,
-    Math.min(
-      paths.length - 1,
-      currentIndex + direction * normalizedCount(count),
-    ),
-  )
+  const offset = direction * normalizedCount(count)
+  const nextIndex = wrap
+    ? ((currentIndex + offset) % paths.length + paths.length) % paths.length
+    : Math.max(
+      0,
+      Math.min(
+        paths.length - 1,
+        currentIndex + offset,
+      ),
+    )
   return nextIndex === currentIndex ? null : paths[nextIndex]
 }

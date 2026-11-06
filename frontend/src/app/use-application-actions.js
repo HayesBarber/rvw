@@ -28,6 +28,7 @@ export function useApplicationActions({
   copyComments,
   clearComments,
   navigateFile,
+  toggleFileViewed,
   navigateHistory,
   openFileFinder,
   openFileFinderAll,
@@ -113,6 +114,7 @@ export function useApplicationActions({
       return true
     },
     [ApplicationAction.ITEM_NEXT]: (count) => navigateFile(1, count),
+    [ApplicationAction.TOGGLE_FILE_VIEWED]: toggleFileViewed,
     [ApplicationAction.ITEM_PREVIOUS]: (count) => navigateFile(-1, count),
     [ApplicationAction.FILE_HISTORY_BACK]: (count) => navigateHistory(-1, count),
     [ApplicationAction.FILE_HISTORY_FORWARD]: (count) => navigateHistory(1, count),
@@ -152,6 +154,7 @@ export function useApplicationActions({
     copyComments,
     dispatchWorkspace,
     navigateFile,
+    toggleFileViewed,
     navigateHistory,
     openFileFinder,
     openFileFinderAll,

@@ -42,6 +42,7 @@ Rvw uses a Vim-style keymap for navigation and actions.
 | `diff.relative_line_numbers.toggle` | `<leader> n` | Toggle relative line numbers in the active diff or full-file text view. |
 | `diff.wrap.toggle` | `<leader> w` | Toggle text wrapping in the active diff or full-file text view. |
 | `file.path.copy_relative` | `<leader> y` | Copy the active file's canonical repository-relative path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
+| `file.viewed.toggle` | `r` | Toggle viewed status for the open changed file. Auto-advances to the next unviewed changed file when marking as viewed. |
 | `file.path.copy_absolute` | `<leader> Y` | Copy the active file's absolute filesystem path. In the file tree this uses the highlighted file; in the diff pane it uses the open file. |
 | `comments.open` | `<leader> c` | Open the list of saved comments for the current review. |
 | `comments.add_review` | `c` | Add a review-level comment from the comments list. |

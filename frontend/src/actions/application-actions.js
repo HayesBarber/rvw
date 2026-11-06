@@ -113,6 +113,7 @@ export const defaultNormalKeymap = Object.freeze({
   [ApplicationAction.DIFF_EXPAND_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'e')),
   [ApplicationAction.DIFF_RELATIVE_LINE_NUMBERS_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'n')),
   [ApplicationAction.DIFF_WRAP_TOGGLE]: actionBindings(keySequence(LEADER_KEY, 'w')),
+  [ApplicationAction.TOGGLE_FILE_VIEWED]: actionBindings(keySequence('r')),
   [ApplicationAction.COPY_FILE_PATH_RELATIVE]: actionBindings(keySequence(LEADER_KEY, 'y')),
   [ApplicationAction.COPY_FILE_PATH_ABSOLUTE]: actionBindings(keySequence(LEADER_KEY, 'Y')),
   [ApplicationAction.OPEN_COMMENTS]: actionBindings(keySequence(LEADER_KEY, 'c')),
