@@ -1,8 +1,5 @@
+import { normalizedCount } from '../utils/normalized-count.js'
 import { ApplicationAction } from './application-actions.js'
-
-function normalizedCount(count) {
-  return Number.isSafeInteger(count) && count > 0 ? count : 1
-}
 
 export function moveFileFinderSelection(
   resultCount,

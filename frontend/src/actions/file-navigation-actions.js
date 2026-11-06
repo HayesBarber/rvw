@@ -1,8 +1,5 @@
 import { prepareFileTreeInput } from '@pierre/trees'
-
-function normalizedCount(count) {
-  return Number.isSafeInteger(count) && count > 0 ? count : 1
-}
+import { normalizedCount } from '../utils/normalized-count.js'
 
 /** Returns file paths in the same leaf order produced by the file tree. */
 export function orderedFilePaths(files) {

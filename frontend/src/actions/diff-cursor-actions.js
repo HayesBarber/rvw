@@ -1,3 +1,4 @@
+import { normalizedCount } from '../utils/normalized-count.js'
 import { ApplicationAction } from './application-actions.js'
 import { scrollCommentIntoView } from '../components/diff-pane/scroll-comment-into-view.js'
 
@@ -69,10 +70,6 @@ export function syncRelativeLineNumbers(node, rows, cursor, enabled) {
     if (content.textContent !== displayText) content.textContent = displayText
   }
   return true
-}
-
-function normalizedCount(count) {
-  return Number.isSafeInteger(count) && count > 0 ? count : 1
 }
 
 function hunkSideStart(start, count) {
