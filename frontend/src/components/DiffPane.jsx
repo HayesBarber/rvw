@@ -140,16 +140,29 @@ export default function DiffPane({
     toggleExpandUnchanged,
   ])
 
-  if (loading) return <PaneStatus>Loading file…</PaneStatus>
-  if (error) return <PaneStatus>{error}</PaneStatus>
+  const renderStatus = (message) => (
+    <>
+      {filePath && renderHeaderMetadata && (
+        <header className="file-status-header">
+          <span className="file-status-path" title={filePath}>{filePath}</span>
+          {renderHeaderFilenameSuffix?.()}
+          {renderHeaderMetadata()}
+        </header>
+      )}
+      <PaneStatus>{message}</PaneStatus>
+    </>
+  )
+
+  if (loading) return renderStatus('Loading file…')
+  if (error) return renderStatus(error)
   if (!fileDiff) return <PaneStatus>Select a file to view it.</PaneStatus>
 
   if (fileDiff.content.kind === 'unavailable') {
-    return <PaneStatus>{unavailableDescriptions[fileDiff.content.reason]}</PaneStatus>
+    return renderStatus(unavailableDescriptions[fileDiff.content.reason])
   }
 
   if (fileDiff.content.kind === 'diff' && fileDiff.parsedDiff.type === 'rename-pure') {
-    return <PaneStatus>No changes</PaneStatus>
+    return renderStatus('No changes')
   }
 
   return (

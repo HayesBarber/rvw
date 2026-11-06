@@ -116,6 +116,7 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
     reloadRequest,
     selectFile,
     changeTreeMode: handleTreeModeChange,
+    changeFileViewed,
     visibleFiles,
   } = useReviewSession({ workspace, dispatchWorkspace })
   const clearSessionComments = useCallback(() => (
@@ -190,8 +191,11 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
     <FileHeaderActions
       canCommentOnFile={canCommentOnFile}
       onCommentOnFile={handleAddFileComment}
+      changed={overview?.files.some((file) => file.path === activePath)}
+      viewed={workspace.viewedPaths.includes(activePath)}
+      onChangeViewed={changeFileViewed}
     />
-  ), [canCommentOnFile, handleAddFileComment])
+  ), [activePath, canCommentOnFile, changeFileViewed, handleAddFileComment, overview, workspace.viewedPaths])
 
   if (overviewRequest.status === RequestStatus.ERROR && !overview) {
     return (
@@ -296,6 +300,7 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
           <FileTreePane
             key={`${workspace.treeMode}:${workspace.treeMode === TreeMode.FILES ? allFilesRequest.status : 'ready'}`}
             files={visibleFiles}
+            viewedPaths={workspace.viewedPaths}
             isCursorVisible={workspace.activeSurface === ActiveSurface.FILE_TREE}
             mode={workspace.treeMode}
             onFocusDiffPane={focusDiffPane}

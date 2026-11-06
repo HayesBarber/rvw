@@ -80,3 +80,22 @@ test('loading and errors take priority over the no-changes message', () => {
   assert.equal(render(file, { loading: true }), '<p class="pane-status">Loading file…</p>')
   assert.equal(render(file, { error: 'Request failed.' }), '<p class="pane-status">Request failed.</p>')
 })
+
+test('status-only file views retain header actions for marking files as viewed', () => {
+  const files = [
+    textDiff('same\n', 'same\n'),
+    ...['binary', 'invalid-utf8', 'too-large', 'symlink', 'submodule'].map((reason) => ({
+      path: 'changed.bin', status: 'modified', content: { kind: 'unavailable', reason },
+    })),
+  ]
+  for (const file of files) {
+    const html = render(file, {
+      filePath: file.path,
+      renderHeaderMetadata: () => createElement('label', null,
+        createElement('input', { type: 'checkbox' }), 'Viewed'),
+    })
+    assert.match(html, /class="file-status-header"/)
+    assert.match(html, /<input type="checkbox"\/>Viewed/)
+    assert.match(html, /class="pane-status"/)
+  }
+})

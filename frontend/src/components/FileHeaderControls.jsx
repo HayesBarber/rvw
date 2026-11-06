@@ -48,9 +48,19 @@ export function FilePathCopyControl({ path, request, onCopy }) {
   )
 }
 
-export function FileHeaderActions({ canCommentOnFile, onCommentOnFile }) {
+export function FileHeaderActions({ canCommentOnFile, onCommentOnFile, changed, viewed, onChangeViewed }) {
   return (
     <span className="file-header-actions">
+      {changed && (
+        <label className="file-viewed-control">
+          <input
+            type="checkbox"
+            checked={viewed}
+            onChange={(event) => onChangeViewed(event.target.checked)}
+          />
+          Viewed
+        </label>
+      )}
       <button
         className="file-comment-button"
         type="button"
