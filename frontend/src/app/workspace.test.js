@@ -13,6 +13,67 @@ test('initial active surface is the diff pane', () => {
   assert.equal(initialWorkspaceState.activeSurface, ActiveSurface.DIFF_PANE)
 })
 
+test('viewed status starts empty in each new workspace', () => {
+  const first = workspaceReducer(initialWorkspaceState, {
+    type: 'file_viewed_set', path: 'src/a.js', viewed: true,
+  })
+  const second = workspaceReducer(initialWorkspaceState, {
+    type: 'review_loaded', defaultPath: 'src/a.js',
+  })
+
+  assert.deepEqual(first.viewedPaths, ['src/a.js'])
+  assert.deepEqual(initialWorkspaceState.viewedPaths, [])
+  assert.deepEqual(second.viewedPaths, [])
+})
+
+test('marking and clearing viewed status preserves selection and history', () => {
+  const selected = workspaceReducer(initialWorkspaceState, {
+    type: 'review_loaded', defaultPath: 'src/a.js',
+  })
+  const first = workspaceReducer(selected, {
+    type: 'file_viewed_set', path: 'src/a.js', viewed: true,
+  })
+  const both = workspaceReducer(first, {
+    type: 'file_viewed_set', path: 'src/b.js', viewed: true,
+  })
+  const cleared = workspaceReducer(both, {
+    type: 'file_viewed_set', path: 'src/a.js', viewed: false,
+  })
+
+  assert.deepEqual(first.viewedPaths, ['src/a.js'])
+  assert.deepEqual(both.viewedPaths, ['src/a.js', 'src/b.js'])
+  assert.deepEqual(cleared.viewedPaths, ['src/b.js'])
+  for (const state of [first, both, cleared]) {
+    assert.equal(state.selectedPath, selected.selectedPath)
+    assert.equal(state.fileHistory, selected.fileHistory)
+    assert.equal(state.fileHistoryIndex, selected.fileHistoryIndex)
+  }
+})
+
+test('setting the same viewed status again does not change workspace state', () => {
+  const action = { type: 'file_viewed_set', path: 'src/a.js', viewed: true }
+  const marked = workspaceReducer(initialWorkspaceState, action)
+  assert.equal(workspaceReducer(marked, action), marked)
+
+  const clear = { ...action, viewed: false }
+  const cleared = workspaceReducer(marked, clear)
+  assert.deepEqual(cleared.viewedPaths, [])
+  assert.equal(workspaceReducer(cleared, clear), cleared)
+})
+
+test('invalid viewed status requests do not change workspace state', () => {
+  for (const path of [undefined, null, '', 42]) {
+    assert.equal(workspaceReducer(initialWorkspaceState, {
+      type: 'file_viewed_set', path, viewed: true,
+    }), initialWorkspaceState)
+  }
+  for (const viewed of [undefined, null, 0, 'true']) {
+    assert.equal(workspaceReducer(initialWorkspaceState, {
+      type: 'file_viewed_set', path: 'src/a.js', viewed,
+    }), initialWorkspaceState)
+  }
+})
+
 test('returning from empty Changes uses the root default in Files', () => {
   const visiblePaths = ['assets/a.txt', 'README.md', 'z.txt']
   for (const selectedPath of ['README.md', 'assets/a.txt']) {

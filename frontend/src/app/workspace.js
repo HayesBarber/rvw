@@ -27,6 +27,7 @@ export const initialWorkspaceState = Object.freeze({
   fileHistory: [],
   fileHistoryIndex: -1,
   unavailablePaths: [],
+  viewedPaths: [],
   lineNavigation: null,
   treeMode: TreeMode.CHANGES,
   fileTreeWidth: FILE_TREE_WIDTH.INITIAL,
@@ -58,6 +59,17 @@ function reduceWorkspace(state, action) {
         : { ...state, unavailablePaths: [...state.unavailablePaths, action.path] }
     case 'file_availability_reset':
       return { ...state, unavailablePaths: [] }
+    case 'file_viewed_set': {
+      if (typeof action.path !== 'string' || action.path.length === 0 ||
+          typeof action.viewed !== 'boolean') return state
+      if (state.viewedPaths.includes(action.path) === action.viewed) return state
+      return {
+        ...state,
+        viewedPaths: action.viewed
+          ? [...state.viewedPaths, action.path]
+          : state.viewedPaths.filter((path) => path !== action.path),
+      }
+    }
     case 'file_history_moved': {
       const index = fileHistoryTarget(state, action.direction, action.count, action.availablePaths)
       if (index === null) return state
