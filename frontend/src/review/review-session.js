@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fileHistoryTarget, FinderMode, TreeMode } from '../app/workspace.js'
 import { selectActivePath } from '../app/file-selection.js'
 import { openFileCommentTarget } from '../actions/comment-actions.js'
+import { setFileViewed } from '../actions/viewed-file-actions.js'
 import {
   orderedFilePaths,
   relativeFilePath,
@@ -190,17 +191,19 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     dispatchWorkspace({ type: 'file_selected', path })
   }, [dispatchWorkspace])
 
-  const navigateFile = useCallback((direction, count) => {
-    const listAvailable = workspace.treeMode === TreeMode.CHANGES
-      ? Boolean(overview)
-      : allFilesRequest.status === RequestStatus.SUCCESS
+  const navigateFile = useCallback((direction, count, options = {}) => {
+    const listAvailable = Boolean(overview) && (
+      options.paths !== undefined || workspace.treeMode === TreeMode.CHANGES ||
+      allFilesRequest.status === RequestStatus.SUCCESS
+    )
     if (!listAvailable) return false
 
     const path = relativeFilePath(
-      visibleFilePaths,
+      options.paths ?? visibleFilePaths,
       activePath,
       direction,
       count,
+      options,
     )
     if (!path) return false
 
@@ -214,6 +217,15 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     visibleFilePaths,
     workspace.treeMode,
   ])
+
+  const changeFileViewed = useCallback((viewed) => setFileViewed({
+    path: activePath,
+    viewed,
+    changedFiles: overview?.files ?? [],
+    viewedPaths: workspace.viewedPaths,
+    dispatchWorkspace,
+    navigateFile,
+  }), [activePath, dispatchWorkspace, navigateFile, overview, workspace.viewedPaths])
 
   const availableHistoryPaths = allFilesRequest.status === RequestStatus.SUCCESS
     ? [...changedPaths, ...allFilesRequest.data]
@@ -387,6 +399,7 @@ export function useReviewSession({ workspace, dispatchWorkspace }) {
     reloadRequest,
     selectFile,
     changeTreeMode,
+    changeFileViewed,
     visibleFiles,
   }
 }
