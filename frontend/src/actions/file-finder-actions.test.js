@@ -1,18 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ApplicationAction } from './application-actions.js'
-import {
-  createFileFinderActionAdapter,
-  moveFileFinderSelection,
-} from './file-finder-actions.js'
-
-test('result movement wraps and applies Vim counts', () => {
-  assert.equal(moveFileFinderSelection(5, 0, 1), 1)
-  assert.equal(moveFileFinderSelection(5, 0, -1), 4)
-  assert.equal(moveFileFinderSelection(5, 1, 1, 8), 4)
-  assert.equal(moveFileFinderSelection(5, 3, -1, 9), 4)
-  assert.equal(moveFileFinderSelection(0, -1, 1, 2), 0)
-})
+import { createFileFinderActionAdapter } from './file-finder-actions.js'
 
 test('finder actions navigate and activate the current filtered result', () => {
   let results = ['README.md', 'src/main.zig', 'src/rvw.zig']
@@ -27,14 +16,19 @@ test('finder actions navigate and activate the current filtered result', () => {
     onOpen: (path) => opened.push(path),
   })
 
-  assert.equal(adapter[ApplicationAction.CURSOR_DOWN](2), true)
+  assert.equal(adapter[ApplicationAction.CURSOR_UP](), true)
+  assert.equal(activeIndex, 0)
+  assert.equal(adapter[ApplicationAction.CURSOR_DOWN](4), true)
+  assert.equal(activeIndex, 2)
+  assert.equal(adapter[ApplicationAction.CURSOR_DOWN](), true)
   assert.equal(activeIndex, 2)
   assert.equal(adapter[ApplicationAction.CURSOR_UP](4), true)
-  assert.equal(activeIndex, 1)
+  assert.equal(activeIndex, 0)
   assert.equal(adapter[ApplicationAction.CURSOR_LAST](), true)
   assert.equal(activeIndex, 2)
   assert.equal(adapter[ApplicationAction.CURSOR_FIRST](), true)
   assert.equal(activeIndex, 0)
+  assert.deepEqual(opened, [])
 
   results = ['src/main.zig']
   assert.equal(adapter[ApplicationAction.ITEM_ACTIVATE](), true)

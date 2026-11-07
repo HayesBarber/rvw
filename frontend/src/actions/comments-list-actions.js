@@ -1,11 +1,6 @@
+import { moveListSelection } from '../utils/list-selection.js'
 import { normalizedCount } from '../utils/normalized-count.js'
 import { ApplicationAction } from './application-actions.js'
-
-export function moveCommentSelection(length, index, direction, count = 1) {
-  if (length === 0) return -1
-  const current = Math.max(0, Math.min(index, length - 1))
-  return Math.max(0, Math.min(current + direction * normalizedCount(count), length - 1))
-}
 
 /** Move by half a viewport, using the heights of the rendered comments. */
 export function pageCommentSelection(centers, index, direction, viewportHeight, count = 1) {
@@ -70,8 +65,8 @@ export function createCommentsListActionAdapter({ getComments, getSelectedId, se
       const location = commentLocation(selected)
       return location !== null && openLocation(location) === true
     },
-    [ApplicationAction.CURSOR_UP]: select((length, index, count) => moveCommentSelection(length, index, -1, count)),
-    [ApplicationAction.CURSOR_DOWN]: select((length, index, count) => moveCommentSelection(length, index, 1, count)),
+    [ApplicationAction.CURSOR_UP]: select((length, index, count) => moveListSelection(length, index, -1, count)),
+    [ApplicationAction.CURSOR_DOWN]: select((length, index, count) => moveListSelection(length, index, 1, count)),
     [ApplicationAction.CURSOR_FIRST]: select(() => 0),
     [ApplicationAction.CURSOR_LAST]: select((length) => length - 1),
     [ApplicationAction.CURSOR_PAGE_UP]: select((length, index, count) => getPageIndex(index, -1, count)),

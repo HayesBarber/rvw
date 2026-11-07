@@ -8,7 +8,6 @@ import { VimController } from '../vim/machine.js'
 import {
   createCommentsListActionAdapter,
   commentLocation,
-  moveCommentSelection,
   pageCommentSelection,
   revealSelectedComment,
 } from './comments-list-actions.js'
@@ -44,12 +43,7 @@ test('up, down, first, and last actions navigate comments and stop at boundaries
   assert.equal(model.selected(), 'comment-4')
 })
 
-test('movement uses one step for invalid counts and safely handles a stale selection', () => {
-  for (const count of [0, -1, 1.5, NaN, Infinity, '3']) {
-    assert.equal(moveCommentSelection(5, 2, 1, count), 3)
-  }
-  assert.equal(moveCommentSelection(5, 99, -1), 3)
-  assert.equal(moveCommentSelection(0, 0, 1), -1)
+test('movement safely handles a removed comment', () => {
   const model = listModel()
   model.comments.shift()
   model.actions[ApplicationAction.CURSOR_DOWN]()

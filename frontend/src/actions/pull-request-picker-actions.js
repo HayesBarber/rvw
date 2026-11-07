@@ -1,6 +1,6 @@
 import { RequestStatus } from '../review/request-state.js'
+import { moveListSelection } from '../utils/list-selection.js'
 import { ApplicationAction } from './application-actions.js'
-import { moveFileFinderSelection } from './file-finder-actions.js'
 
 /** Check the current request when a tile submits, including after a reload. */
 export function createPullRequestSubmitHandler({ getRequest, onSelect, isBlocked = () => false }) {
@@ -40,7 +40,7 @@ export function createPullRequestPickerActionAdapter({ getRequest, getFocusedNum
     const results = getResults()
     if (results.length === 0) return false
     const index = results.findIndex(({ number }) => number === getFocusedNumber())
-    return focus(results[moveFileFinderSelection(results.length, index, offset, count)].number)
+    return focus(results[moveListSelection(results.length, index, offset, count)].number)
   }
   const edge = (last) => {
     const results = getResults()

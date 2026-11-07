@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { createFileFinderActionAdapter, moveFileFinderSelection } from '../actions/file-finder-actions.js'
+import { ApplicationAction } from '../actions/application-actions.js'
+import { createFileFinderActionAdapter } from '../actions/file-finder-actions.js'
 import { OverlayKind } from '../actions/overlay-actions.js'
 import { searchText } from '../review/api.js'
 import { createTextSearchRequest } from '../review/text-search-request.js'
@@ -36,10 +37,10 @@ export default function CodebaseSearch({ initialMode, onOpen, onClose, registerA
     if (event.nativeEvent.isComposing) return
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      request.select(moveFileFinderSelection(results.length, selectedIndex, 1))
+      actionAdapter[ApplicationAction.CURSOR_DOWN]()
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      request.select(moveFileFinderSelection(results.length, selectedIndex, -1))
+      actionAdapter[ApplicationAction.CURSOR_UP]()
     } else if (event.key === 'Enter' && selectedIndex >= 0) {
       event.preventDefault()
       onOpen(results[selectedIndex])
