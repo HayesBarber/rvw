@@ -120,7 +120,7 @@ pub const Core = struct {
                     configuredCommentText(self.configuration, "intro"),
                     configuredCommentText(self.configuration, "outro"),
                     if (overview) |value| value.repository.name else "",
-                    if (overview) |value| value.sourceLabel else "",
+                    if (overview) |value| value.compactSourceLabel else "",
                 );
                 defer self.allocator.free(markdown);
                 try self.clipboard.copy(self.io, markdown);
@@ -971,17 +971,19 @@ test "core copies validated file paths exactly without accessing the file" {
     } }));
 }
 
-test "core copies configured comment text and still rejects an empty comment list" {
+test "core copies comments with an abbreviated commit range and configured text" {
     const TestDependencies = struct {
         copied: ?[]u8 = null,
 
         fn getDiffOverview(_: *anyopaque, _: Io) !model.DiffOverview {
+            const base = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            const head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
             return .{
                 .id = "review",
                 .repository = .{ .name = "rvw" },
-                .source = .{ .working_tree = .{ .base = "HEAD" } },
-                .sourceLabel = "working tree",
-                .compactSourceLabel = "working tree",
+                .source = .{ .commit_range = .{ .base = base, .head = head } },
+                .sourceLabel = base ++ ".." ++ head,
+                .compactSourceLabel = "aaaaaaa..bbbbbbb",
                 .files = &.{},
             };
         }
@@ -1057,7 +1059,7 @@ test "core copies configured comment text and still rejects an empty comment lis
     defer std.testing.allocator.free(dependencies.copied.?);
     try std.testing.expectEqual(@as(usize, 2), result.commentCount);
     try std.testing.expectEqualStrings(
-        "Review first\nThen fix\n\nrvw: working tree\n\nReview comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
+        "Review first\nThen fix\n\nrvw: aaaaaaa..bbbbbbb\n\nReview comments:\n\n- [CUSTOM] Summary\n\nFile and line comments:\n\n- src/auth.zig:42 - [ISSUE] Handle expiry\n\nSummarize\n",
         dependencies.copied.?,
     );
 
