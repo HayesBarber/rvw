@@ -48,9 +48,20 @@ function render(fileDiff, extra = {}) {
   ))
 }
 
-test('pure text renames replace the diff surface with the existing status display', () => {
-  for (const contents of ['unchanged\n', '']) {
-    assert.equal(render(textDiff(contents, contents)), '<p class="pane-status">No changes</p>')
+test('pure text renames show the complete file and keep both paths and header controls', () => {
+  for (const contents of ['first line\nlast line', '']) {
+    const html = render(textDiff(contents, contents), {
+      renderHeaderFilenameSuffix: (file) => {
+        assert.equal(file.name, 'new.txt')
+        assert.equal(file.contents, contents)
+        return 'Copy path control'
+      },
+      renderHeaderMetadata: () => 'File actions',
+    })
+    assert.match(html, /class="diff-scroll"/)
+    assert.match(html, /title="old\.txt">Renamed from <bdi>old\.txt<\/bdi>/)
+    assert.match(html, /Copy path control/)
+    assert.match(html, /File actions/)
   }
 })
 
@@ -59,9 +70,14 @@ test('renames with content changes and normal text diffs keep the diff surface',
     textDiff('before\n', 'after\n'),
     textDiff('before\n', 'after\n', 'same.txt', 'same.txt'),
   ]) {
-    const html = render(file)
+    const html = render(file, {
+      renderHeaderFilenameSuffix: (diff) => {
+        assert.equal(diff, file.parsedDiff)
+        return null
+      },
+    })
     assert.match(html, /class="diff-scroll"/)
-    assert.doesNotMatch(html, /No changes/)
+    assert.doesNotMatch(html, /Renamed from/)
   }
 })
 
@@ -75,7 +91,7 @@ test('binary renames retain the unavailable-content message', () => {
   assert.equal(html, '<p class="pane-status">Binary file contents cannot be displayed.</p>')
 })
 
-test('loading and errors take priority over the no-changes message', () => {
+test('loading and errors take priority over the file view', () => {
   const file = textDiff('same\n', 'same\n')
   assert.equal(render(file, { loading: true }), '<p class="pane-status">Loading file…</p>')
   assert.equal(render(file, { error: 'Request failed.' }), '<p class="pane-status">Request failed.</p>')

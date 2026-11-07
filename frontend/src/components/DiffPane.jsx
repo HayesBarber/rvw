@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import useVisualSelection from './diff-pane/useVisualSelection.js'
 import { currentFileLineTarget } from '../actions/line-navigation.js'
@@ -23,7 +23,7 @@ const unavailableDescriptions = {
 }
 
 export default function DiffPane({
-  fileDiff,
+  fileDiff: loadedFile,
   lineNavigation,
   isCursorVisible,
   visualSelectionEnabled,
@@ -47,6 +47,12 @@ export default function DiffPane({
   wrapLines,
   filePath,
 }) {
+  const fileDiff = useMemo(() => {
+    if (loadedFile?.content.kind !== 'diff' || loadedFile.parsedDiff.type !== 'rename-pure') {
+      return loadedFile
+    }
+    return { ...loadedFile, content: { kind: 'file', file: loadedFile.content.newFile } }
+  }, [loadedFile])
   const [expandUnchanged, setExpandUnchanged] = useState(false)
   const cursor = useDiffCursor({
     comments,
@@ -146,10 +152,6 @@ export default function DiffPane({
 
   if (fileDiff.content.kind === 'unavailable') {
     return <PaneStatus>{unavailableDescriptions[fileDiff.content.reason]}</PaneStatus>
-  }
-
-  if (fileDiff.content.kind === 'diff' && fileDiff.parsedDiff.type === 'rename-pure') {
-    return <PaneStatus>No changes</PaneStatus>
   }
 
   return (

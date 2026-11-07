@@ -57,6 +57,9 @@ export default function DiffSurface({
   onSelectLines,
   wrapLines = true,
 }) {
+  const previousPath = fileDiff.content.kind === 'file' && fileDiff.status === 'renamed'
+    ? fileDiff.previousPath
+    : null
   const options = useMemo(() => ({
     ...baseOptions,
     expandUnchanged,
@@ -91,7 +94,14 @@ export default function DiffSurface({
           metrics={metrics}
           selectedLines={selectedLines}
           renderAnnotation={renderAnnotation}
-          renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
+          renderHeaderFilenameSuffix={previousPath ? (file) => (
+            <span className="rename-header-suffix">
+              {renderHeaderFilenameSuffix?.(file)}
+              <span className="rename-previous-path" title={previousPath}>
+                Renamed from <bdi>{previousPath}</bdi>
+              </span>
+            </span>
+          ) : renderHeaderFilenameSuffix}
           renderHeaderMetadata={renderHeaderMetadata}
           options={options}
         />
