@@ -708,6 +708,7 @@ textarea {
   gap: 8px;
   width: 100%;
   padding: 12px;
+  scroll-margin-block: 4px;
   border: 1px solid #414145;
   border-radius: 8px;
   background: #202022;
@@ -826,6 +827,7 @@ textarea {
   gap: 12px;
   width: 100%;
   padding: 10px;
+  scroll-margin-block: 4px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
