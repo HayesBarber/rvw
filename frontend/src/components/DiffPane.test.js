@@ -48,9 +48,19 @@ function render(fileDiff, extra = {}) {
   ))
 }
 
-test('pure text renames replace the diff surface with the existing status display', () => {
+test('pure text renames keep the diff header and its controls', () => {
   for (const contents of ['unchanged\n', '']) {
-    assert.equal(render(textDiff(contents, contents)), '<p class="pane-status">No changes</p>')
+    const html = render(textDiff(contents, contents), {
+      renderHeaderFilenameSuffix: (diff) => {
+        assert.equal(diff.prevName, 'old.txt')
+        assert.equal(diff.name, 'new.txt')
+        return 'Copy path control'
+      },
+      renderHeaderMetadata: () => 'File actions',
+    })
+    assert.match(html, /class="diff-scroll"/)
+    assert.match(html, /Copy path control/)
+    assert.match(html, /File actions/)
   }
 })
 
@@ -75,7 +85,7 @@ test('binary renames retain the unavailable-content message', () => {
   assert.equal(html, '<p class="pane-status">Binary file contents cannot be displayed.</p>')
 })
 
-test('loading and errors take priority over the no-changes message', () => {
+test('loading and errors take priority over the rename diff', () => {
   const file = textDiff('same\n', 'same\n')
   assert.equal(render(file, { loading: true }), '<p class="pane-status">Loading file…</p>')
   assert.equal(render(file, { error: 'Request failed.' }), '<p class="pane-status">Request failed.</p>')

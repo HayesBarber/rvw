@@ -148,10 +148,6 @@ export default function DiffPane({
     return <PaneStatus>{unavailableDescriptions[fileDiff.content.reason]}</PaneStatus>
   }
 
-  if (fileDiff.content.kind === 'diff' && fileDiff.parsedDiff.type === 'rename-pure') {
-    return <PaneStatus>No changes</PaneStatus>
-  }
-
   return (
     <DiffSurface
       expandUnchanged={expandUnchanged}
