@@ -57,11 +57,12 @@ function fixture(normal = {}) {
   }
 }
 
-test('cursor actions move focus through Working tree and API order without checking endpoints', () => {
+test('cursor actions follow API order and stop at the ends without checking endpoints', () => {
   const f = fixture()
   for (const [keys, index] of [
-    [['j'], 1], [['j'], 2], [['j'], 3], [['j'], 0], [['k'], 3],
-    [['2', 'j'], 1], [['g', 'g'], 0], [['G'], 3], [['<Up>'], 2], [['<Down>'], 3],
+    [['k'], 0], [['j'], 1], [['j'], 2], [['j'], 3], [['j'], 3],
+    [['k'], 2], [['5', 'k'], 0], [['5', 'j'], 3],
+    [['g', 'g'], 0], [['G'], 3], [['<Up>'], 2], [['<Down>'], 3],
   ]) {
     f.press(keys)
     assert.deepEqual(f.getFocus(), endpoints[index])

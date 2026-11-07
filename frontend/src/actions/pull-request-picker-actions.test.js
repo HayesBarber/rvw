@@ -46,11 +46,12 @@ function fixture(normal = {}) {
   }
 }
 
-test('cursor bindings move focus, preserve counts and API order, and never submit', () => {
+test('cursor bindings follow API order and stop at the ends without submitting', () => {
   const { press, getFocus, selected } = fixture()
   for (const [keys, expected] of [
-    [['j'], 7], [['j'], 18], [['j'], 42], [['k'], 18],
-    [['2', 'j'], 7], [['g', 'g'], 42], [['G'], 18], [['<Up>'], 7], [['<Down>'], 18],
+    [['k'], 42], [['j'], 7], [['j'], 18], [['j'], 18],
+    [['k'], 7], [['5', 'k'], 42], [['5', 'j'], 18],
+    [['g', 'g'], 42], [['G'], 18], [['<Up>'], 7], [['<Down>'], 18],
   ]) {
     press(keys)
     assert.equal(getFocus(), expected)

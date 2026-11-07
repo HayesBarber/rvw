@@ -1,18 +1,5 @@
-import { normalizedCount } from '../utils/normalized-count.js'
+import { moveListSelection } from '../utils/list-selection.js'
 import { ApplicationAction } from './application-actions.js'
-
-export function moveFileFinderSelection(
-  resultCount,
-  activeIndex,
-  offset,
-  count = 1,
-) {
-  if (resultCount <= 0) return 0
-
-  const selectedIndex = Math.max(0, Math.min(activeIndex, resultCount - 1))
-  const nextIndex = selectedIndex + offset * normalizedCount(count)
-  return ((nextIndex % resultCount) + resultCount) % resultCount
-}
 
 /** Adapts file-finder result operations to the application action vocabulary. */
 export function createFileFinderActionAdapter({
@@ -25,7 +12,7 @@ export function createFileFinderActionAdapter({
     const results = getResults()
     if (results.length === 0) return false
 
-    setActiveIndex(moveFileFinderSelection(
+    setActiveIndex(moveListSelection(
       results.length,
       getActiveIndex(),
       offset,

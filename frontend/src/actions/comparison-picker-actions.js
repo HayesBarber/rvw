@@ -1,7 +1,7 @@
 import { comparisonEndpoints } from '../review/comparison-selection.js'
 import { RequestStatus } from '../review/request-state.js'
+import { moveListSelection } from '../utils/list-selection.js'
 import { ApplicationAction } from './application-actions.js'
-import { moveFileFinderSelection } from './file-finder-actions.js'
 
 function sameEndpoint(left, right) {
   return left?.kind === right?.kind && left?.sha === right?.sha
@@ -40,7 +40,7 @@ export function createComparisonPickerActionAdapter({ getRequest, getFocusedEndp
     const endpoints = getEndpoints()
     if (endpoints.length === 0) return false
     const index = endpoints.findIndex((endpoint) => sameEndpoint(endpoint, getFocusedEndpoint()))
-    return focus(endpoints[moveFileFinderSelection(endpoints.length, index, offset, count)])
+    return focus(endpoints[moveListSelection(endpoints.length, index, offset, count)])
   }
   const edge = (last) => {
     const endpoints = getEndpoints()

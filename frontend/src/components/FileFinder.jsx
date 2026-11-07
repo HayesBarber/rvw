@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createFileFinderActionAdapter, moveFileFinderSelection } from '../actions/file-finder-actions.js'
+import { ApplicationAction } from '../actions/application-actions.js'
+import { createFileFinderActionAdapter } from '../actions/file-finder-actions.js'
 import { OverlayKind } from '../actions/overlay-actions.js'
 import { fuzzyFind } from '../utils/fuzzy.js'
 import Overlay from './Overlay.jsx'
@@ -56,10 +57,10 @@ export default function FileFinder({
   function handleInputKeyDown(event) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setActiveIndex(moveFileFinderSelection(results.length, selectedIndex, 1))
+      actionAdapter[ApplicationAction.CURSOR_DOWN]()
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setActiveIndex(moveFileFinderSelection(results.length, selectedIndex, -1))
+      actionAdapter[ApplicationAction.CURSOR_UP]()
     } else if (event.key === 'Enter' && selectedIndex >= 0) {
       event.preventDefault()
       onOpen(results[selectedIndex])
