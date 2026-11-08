@@ -215,6 +215,25 @@ textarea {
   padding-left: 76px;
 }
 
+.tree-review-progress {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid #303033;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tree-review-progress progress {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 8px;
+  accent-color: #63d488;
+}
+
 .tree-navigation-actions {
   display: flex;
   width: 100%;

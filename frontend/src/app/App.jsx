@@ -219,6 +219,10 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
     )
   }
 
+  const changedFileCount = overview.files.length
+  const viewedPaths = new Set(workspace.viewedPaths)
+  const viewedFileCount = overview.files.filter((file) => viewedPaths.has(file.path)).length
+
   return (
     <div className="application-shell">
       <main
@@ -314,6 +318,14 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
             registerActionAdapter={registerFileTreeActions}
           />
         </div>
+        {workspace.treeMode === TreeMode.CHANGES && changedFileCount > 0 && (
+          <p className="tree-review-progress" role="status">
+            <progress value={viewedFileCount} max={changedFileCount} aria-hidden="true" />
+            <span>
+              {viewedFileCount} of {changedFileCount} {changedFileCount === 1 ? 'file' : 'files'} viewed
+            </span>
+          </p>
+        )}
       </section>
 
       <FileTreeDivider
