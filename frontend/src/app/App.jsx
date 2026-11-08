@@ -13,6 +13,7 @@ import {
 } from '../components/FileHeaderControls.jsx'
 import FileTreeDivider from '../components/FileTreeDivider.jsx'
 import FileTreePane from '../components/FileTreePane.jsx'
+import FileTreeReviewProgress from '../components/FileTreeReviewProgress.jsx'
 import KeymapReference from '../components/KeymapReference.jsx'
 import ReviewSourcePicker from '../components/review-source-picker/ReviewSourcePicker.jsx'
 import ReviewLoadError from '../components/ReviewLoadError.jsx'
@@ -314,6 +315,9 @@ export default function App({ onRetryStartup, openPickerOnLaunch = false } = {})
             registerActionAdapter={registerFileTreeActions}
           />
         </div>
+        {workspace.treeMode === TreeMode.CHANGES && (
+          <FileTreeReviewProgress changedFiles={overview.files} viewedPaths={workspace.viewedPaths} />
+        )}
       </section>
 
       <FileTreeDivider
