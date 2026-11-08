@@ -29,6 +29,7 @@ export default function useDiffComments({
   const [deleteError, setDeleteError] = useState(null)
   const commentReturnFocusRef = useRef(null)
   const deletingCommentIdRef = useRef(null)
+  const { activateRangeCommentContext, guardNextAnnotationRender } = cursor
 
   const hasUnsavedDraft = Boolean(draft || editingCommentId)
   useEffect(() => {
@@ -36,10 +37,11 @@ export default function useDiffComments({
     return () => onDraftStateChange?.(false)
   }, [hasUnsavedDraft, onDraftStateChange])
 
+  // Keep the diff renderer's event callbacks stable when the active comment changes.
   const selectLines = useCallback((range) => {
     setSelectedLines(range)
-    cursor.activateRangeCommentContext(range)
-  }, [cursor])
+    activateRangeCommentContext(range)
+  }, [activateRangeCommentContext])
 
   const beginRangeComment = useCallback((range) => {
     if (!fileDiff || !range) return
@@ -51,11 +53,11 @@ export default function useDiffComments({
       range,
       fileDiff.content.kind === 'diff',
     )
-    cursor.guardNextAnnotationRender()
-    cursor.activateRangeCommentContext(range)
+    guardNextAnnotationRender()
+    activateRangeCommentContext(range)
     setSelectedLines(nextDraft.selection)
     setDraft(nextDraft)
-  }, [cursor, fileDiff, vimController])
+  }, [activateRangeCommentContext, fileDiff, guardNextAnnotationRender, vimController])
 
   const beginCursorComment = useCallback((target) => {
     if (selectedLines) {
