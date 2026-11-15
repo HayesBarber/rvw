@@ -22,7 +22,6 @@ pub fn addApp(context: Context) void {
     addSwiftTests(context);
     addNativeCoreTests(context, artifacts.aligned_library);
     addBundleInstallation(context, artifacts);
-    addRunStep(context.b);
 }
 
 fn addAppArtifacts(context: Context) AppArtifacts {
@@ -227,14 +226,6 @@ fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
     } else {
         b.getInstallStep().dependOn(assembled);
     }
-}
-
-fn addRunStep(b: *std.Build) void {
-    const run = b.addSystemCommand(&.{"/usr/bin/env"});
-    run.addFileArg2(installPath("Rvw.app/Contents/MacOS/rvw-cli"), .{ .make_absolute = true });
-    run.addPassthruArgs();
-    run.step.dependOn(b.getInstallStep());
-    b.step("run", "Build and launch the macOS app").dependOn(&run.step);
 }
 
 fn installPath(sub_path: []const u8) std.Build.LazyPath {
