@@ -1,6 +1,6 @@
 # macOS releases
 
-Release preparation requires macOS, Xcode command-line tools, Node.js, Zig 0.16,
+Release preparation requires macOS, Xcode command-line tools, Node.js, Zig 0.17.1,
 an active Apple Developer Program account, and network access to Apple. Ordinary
 `zig build` remains credential-free.
 

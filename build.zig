@@ -36,7 +36,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const serve = b.addRunArtifact(server);
-    if (b.args) |args| serve.addArgs(args);
+    serve.addPassthruArgs();
     b.step("serve", "Run the HTTP service").dependOn(&serve.step);
 
     const tests = b.addTest(.{
@@ -84,7 +84,7 @@ pub fn build(b: *std.Build) void {
     const dev = b.addSystemCommand(&.{"node"});
     dev.addFileArg(b.path("scripts/dev.mjs"));
     dev.addArtifactArg(server);
-    if (b.args) |args| dev.addArgs(args);
+    dev.addPassthruArgs();
     dev.setCwd(b.path("."));
     b.step("dev", "Run the HTTP service and frontend development server").dependOn(&dev.step);
 

@@ -348,7 +348,9 @@ test "pull request parser rejects invalid metadata" {
 test "pull request parser accepts the list length from gh without a separate number policy" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const output = "[" ++ (sample_request ++ ",") ** 30 ++ sample_request ++ "]";
+    const entry = sample_request ++ ",";
+    const entries: [30][entry.len]u8 = @splat(entry.*);
+    const output = "[" ++ std.mem.asBytes(&entries).* ++ sample_request ++ "]";
     try std.testing.expectEqual(@as(usize, 31), (try parsePullRequests(arena.allocator(), output)).len);
     const zero = try std.mem.replaceOwned(u8, arena.allocator(), "[" ++ sample_request ++ "]", "\"number\":42", "\"number\":0");
     try std.testing.expectEqual(@as(u32, 0), (try parsePullRequests(arena.allocator(), zero))[0].number);

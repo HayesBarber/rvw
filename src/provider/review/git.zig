@@ -191,11 +191,12 @@ test "selected Git handles every review stage and remains selected on reload" {
     }
     try repository.write("file.txt", "reloaded\n");
     try reviews.reload(io);
-    const reloaded = try reviews.getFileDiff(io, overview.id, "file.txt");
+    const refreshed = try reviews.getDiffOverview(io);
+    const reloaded = try reviews.getFileDiff(io, refreshed.id, "file.txt");
     try std.testing.expectEqualStrings("reloaded\n", reloaded.content.diff.newFile.?.contents);
     try repository.temporary.dir.deleteFile(io, ".git/tools with spaces/custom git");
     try std.testing.expectError(error.GitNotFound, reviews.reload(io));
-    const retained = try reviews.getFileDiff(io, overview.id, "file.txt");
+    const retained = try reviews.getFileDiff(io, refreshed.id, "file.txt");
     try std.testing.expectEqualStrings("reloaded\n", retained.content.diff.newFile.?.contents);
 
     const replacement = try repository.writeExecutable(".git/tools with spaces/custom git",
@@ -344,7 +345,9 @@ test "reload re-resolves symbolic ranges while explicit commit ranges stay fixed
         default_executables.git,
     );
     defer explicit.deinit();
-    const explicit_id = (try explicit.interface().getDiffOverview(std.testing.io)).id;
+    const explicit_overview = try explicit.interface().getDiffOverview(std.testing.io);
+    const explicit_id = try std.testing.allocator.dupe(u8, explicit_overview.id);
+    defer std.testing.allocator.free(explicit_id);
 
     try repository.write("file.txt", "three\n");
     try repository.commit("three");
