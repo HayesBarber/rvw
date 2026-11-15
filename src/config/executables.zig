@@ -13,8 +13,8 @@ pub const Executables = struct {
         // Invalid configuration uses the same defaults as an absent file.
         if (snapshot.diagnostic != null) return selected;
         const configured = snapshot.configuration.object.get("executables") orelse return selected;
-        inline for (std.meta.fields(Executables)) |field| {
-            if (configured.object.get(field.name)) |value| @field(selected, field.name) = value.string;
+        inline for (@typeInfo(Executables).@"struct".field_names) |field_name| {
+            if (configured.object.get(field_name)) |value| @field(selected, field_name) = value.string;
         }
         return selected;
     }
@@ -29,10 +29,10 @@ test "executable selection keeps each omitted tool on process PATH" {
         const input = try std.fmt.allocPrint(arena.allocator(), "{{\"executables\":{{\"{s}\":\"/tools with spaces/custom\"}}}}", .{tool});
         const value = try std.json.parseFromSliceLeaky(std.json.Value, arena.allocator(), input, .{});
         const selected = Executables.fromSnapshot(.{ .configuration = value, .diagnostic = null });
-        inline for (std.meta.fields(Executables)) |field| {
+        inline for (@typeInfo(Executables).@"struct".field_names) |field_name| {
             try std.testing.expectEqualStrings(
-                if (std.mem.eql(u8, field.name, tool)) "/tools with spaces/custom" else @field(defaults, field.name),
-                @field(selected, field.name),
+                if (std.mem.eql(u8, field_name, tool)) "/tools with spaces/custom" else @field(defaults, field_name),
+                @field(selected, field_name),
             );
         }
     }

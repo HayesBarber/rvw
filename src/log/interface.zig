@@ -59,7 +59,7 @@ pub const Logger = struct {
     /// Logging is intentionally non-fatal. A sink failure is reported to
     /// stderr, along with the original event when it can be encoded.
     pub fn log(self: Logger, io: Io, event: Event) void {
-        if (@intFromEnum(event.level) < @intFromEnum(self.minimum_level)) return;
+        if (@backingInt(event.level) < @backingInt(self.minimum_level)) return;
         self.vtable.write(self.context, io, event) catch |err| {
             writeFallback(self.allocator, io, event, err);
         };
@@ -122,6 +122,6 @@ test "severity aliases and authoritative threshold cover every event level" {
         var counter: Counter = .{};
         const logger: Logger = .{ .allocator = std.testing.allocator, .context = &counter, .vtable = &.{ .write = Counter.write }, .minimum_level = threshold };
         for (std.enums.values(Level)) |level| logger.log(std.testing.io, .{ .level = level, .source = .frontend, .message = "test" });
-        try std.testing.expectEqual(4 - @as(usize, @intFromEnum(threshold)), counter.count);
+        try std.testing.expectEqual(4 - @as(usize, @backingInt(threshold)), counter.count);
     }
 }

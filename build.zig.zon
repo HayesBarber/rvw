@@ -2,11 +2,11 @@
     .name = .rvw,
     .version = "0.0.0",
     .fingerprint = 0x1f305fc3a094ab6a,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.1",
     .dependencies = .{
         .httpz = .{
-            .url = "git+https://github.com/karlseguin/http.zig#9b14af98fde5e98abb9a8376fe02b42003e835bf",
-            .hash = "httpz-0.0.0-PNVzrMgTCQDhzfBLRRebTx9LU056Ph2erdN9-42rFbhj",
+            .url = "git+https://github.com/karlseguin/http.zig#1bb71ff128a044b1645df91046473c38abbf965c",
+            .hash = "httpz-0.0.0-PNVzrFNMCQBySpfunggKlQQoD_FvF3yADlqg3xfbdX8p",
         },
     },
     .paths = .{

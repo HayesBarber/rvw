@@ -199,7 +199,8 @@ test "ripgrep modes search unchanged files and include ignored and hidden files 
 test "ripgrep limits report partial results and release storage between searches" {
     var repository = try @import("../../testing/repository.zig").Repository.init(std.testing.allocator);
     defer repository.deinit();
-    const contents = "needle\n" ** 5000;
+    const lines: [5000][7]u8 = @splat("needle\n".*);
+    const contents = std.mem.asBytes(&lines);
     try repository.write("many.txt", contents);
     var provider: RipgrepProvider = .{ .allocator = std.testing.allocator, .mode = .@"ignore-aware", .match_limit = 2 };
     const limited = try provider.interface().search(std.testing.io, repository.root, "needle");

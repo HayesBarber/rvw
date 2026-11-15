@@ -282,7 +282,8 @@ test "Git history parser rejects incomplete records, invalid UTF-8, and excess r
         try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, invalid));
     }
     const valid = sha ++ "\x00\x00author\x00" ++ date ++ "\x00";
-    try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, valid ** 31));
+    const history: [31][valid.len]u8 = @splat(valid.*);
+    try std.testing.expectError(error.InvalidCommitHistory, parseHistory(allocator, std.mem.asBytes(&history)));
 }
 
 test "working-tree summaries match ordinary reviews for all change types without writes" {

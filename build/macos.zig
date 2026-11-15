@@ -22,7 +22,6 @@ pub fn addApp(context: Context) void {
     addSwiftTests(context);
     addNativeCoreTests(context, artifacts.aligned_library);
     addBundleInstallation(context, artifacts);
-    addRunStep(context.b);
 }
 
 fn addAppArtifacts(context: Context) AppArtifacts {
@@ -154,9 +153,10 @@ fn addSwiftTests(context: Context) void {
 
 fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
     const b = context.b;
-    const staged_app = b.getInstallPath(.prefix, "Rvw.app");
+    const staged_app = installPath("Rvw.app");
     const prepare_bundle = b.addSystemCommand(&.{ "node", "build/prepare-bundle.mjs" });
-    prepare_bundle.addArg(staged_app);
+    prepare_bundle.addDirectoryArg2(staged_app, .{ .make_absolute = true });
+    prepare_bundle.has_side_effects = true;
 
     const install_executable = b.addInstallFileWithDir(
         artifacts.executable,
@@ -203,8 +203,12 @@ fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
     assembled.dependOn(&install_frontend.step);
 
     if (context.release) {
-        const output = b.getInstallPath(.prefix, "release");
-        const preflight = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs", staged_app, output, context.version, "--check" });
+        const output = installPath("release");
+        const preflight = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs" });
+        preflight.addDirectoryArg2(staged_app, .{ .make_absolute = true });
+        preflight.addDirectoryArg2(output, .{ .make_absolute = true });
+        preflight.addArg(context.version);
+        preflight.addArg("--check");
         preflight.has_side_effects = true;
         // Invalidate old artifacts and check configuration before any build
         // work can fail. Never accept a cached notarization result.
@@ -212,7 +216,10 @@ fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
         artifacts.frontend.step.dependOn(&preflight.step);
         artifacts.library.step.dependOn(&preflight.step);
         artifacts.cli.step.dependOn(&preflight.step);
-        const release = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs", staged_app, output, context.version });
+        const release = b.addSystemCommand(&.{ "node", "build/prepare-release.mjs" });
+        release.addDirectoryArg2(staged_app, .{ .make_absolute = true });
+        release.addDirectoryArg2(output, .{ .make_absolute = true });
+        release.addArg(context.version);
         release.has_side_effects = true;
         release.step.dependOn(assembled);
         b.getInstallStep().dependOn(&release.step);
@@ -221,12 +228,6 @@ fn addBundleInstallation(context: Context, artifacts: AppArtifacts) void {
     }
 }
 
-fn addRunStep(b: *std.Build) void {
-    const run = b.addSystemCommand(&.{b.getInstallPath(
-        .prefix,
-        "Rvw.app/Contents/MacOS/rvw-cli",
-    )});
-    if (b.args) |args| run.addArgs(args);
-    run.step.dependOn(b.getInstallStep());
-    b.step("run", "Build and launch the macOS app").dependOn(&run.step);
+fn installPath(sub_path: []const u8) std.Build.LazyPath {
+    return .{ .relative = .{ .base = .install_prefix, .sub_path = sub_path } };
 }

@@ -24,7 +24,7 @@ const Handler = struct {
     pub fn uncaughtError(_: *Handler, _: *httpz.Request, res: *httpz.Response, err: anyerror) void {
         std.log.warn("unexpected HTTP request failure: {t}", .{err});
         setJsonHeaders(res);
-        res.status = @intFromEnum(std.http.Status.internal_server_error);
+        res.status = @backingInt(std.http.Status.internal_server_error);
         res.body = json_protocol.encodeError(res.arena, .internal_error) catch
             "{\"error\":{\"code\":\"internal_error\",\"message\":\"Internal error\"}}";
     }
@@ -46,12 +46,12 @@ const Handler = struct {
 
     fn dispatchCreated(self: *Handler, req: *httpz.Request, res: *httpz.Response, request: model.Request) !void {
         try self.dispatchRequest(req, res, request);
-        if (res.status < 400) res.status = @intFromEnum(std.http.Status.created);
+        if (res.status < 400) res.status = @backingInt(std.http.Status.created);
     }
 
     fn failure(_: *Handler, res: *httpz.Response, status: std.http.Status, code: model.ErrorCode) !void {
         setJsonHeaders(res);
-        res.status = @intFromEnum(status);
+        res.status = @backingInt(status);
         res.body = try json_protocol.encodeError(res.arena, code);
     }
 };

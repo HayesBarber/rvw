@@ -621,9 +621,9 @@ const error_definitions = .{
 pub const ErrorCode = std.meta.FieldEnum(@TypeOf(error_definitions));
 
 pub fn errorCode(err: anyerror) ErrorCode {
-    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
-        inline for (@field(error_definitions, field.name).errors) |source| {
-            if (err == source) return @field(ErrorCode, field.name);
+    inline for (@typeInfo(@TypeOf(error_definitions)).@"struct".field_names) |field_name| {
+        inline for (@field(error_definitions, field_name).errors) |source| {
+            if (err == source) return @field(ErrorCode, field_name);
         }
     }
     return .internal_error;
@@ -636,15 +636,15 @@ pub fn errorMessage(code: ErrorCode) []const u8 {
 }
 
 test "application error definitions map source errors and preserve wire codes" {
-    inline for (std.meta.fields(@TypeOf(error_definitions))) |field| {
-        const code = @field(ErrorCode, field.name);
-        const definition = @field(error_definitions, field.name);
+    inline for (@typeInfo(@TypeOf(error_definitions)).@"struct".field_names) |field_name| {
+        const code = @field(ErrorCode, field_name);
+        const definition = @field(error_definitions, field_name);
         try std.testing.expect(errorMessage(code).len > 0);
         const encoded = try std.json.Stringify.valueAlloc(std.testing.allocator, code, .{});
         defer std.testing.allocator.free(encoded);
         const decoded = try std.json.parseFromSlice([]const u8, std.testing.allocator, encoded, .{});
         defer decoded.deinit();
-        try std.testing.expectEqualStrings(field.name, decoded.value);
+        try std.testing.expectEqualStrings(field_name, decoded.value);
         for (definition.errors) |source| {
             try std.testing.expectEqual(code, errorCode(source));
         }

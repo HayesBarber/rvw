@@ -7,7 +7,7 @@ This helps avoid wasted effort on changes that may not align with the project's 
 
 ## Prerequisites
 
-- Zig 0.16
+- Zig 0.17.1
 - Node.js and npm
 - ripgrep (`rg` on `PATH`) for text-search integration tests
 - Xcode command-line tools (`xcrun swiftc`) for the macOS app

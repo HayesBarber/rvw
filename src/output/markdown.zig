@@ -120,8 +120,8 @@ fn compareTargets(lhs: model.CommentTarget, rhs: model.CommentTarget) std.math.O
                 if (left.endLine != right.endLine) {
                     break :blk if (left.endLine < right.endLine) .lt else .gt;
                 }
-                const left_side: u1 = @intFromEnum(left.side);
-                const right_side: u1 = @intFromEnum(right.side);
+                const left_side: u1 = @backingInt(left.side);
+                const right_side: u1 = @backingInt(right.side);
                 if (left_side != right_side) {
                     break :blk if (left_side < right_side) .lt else .gt;
                 }
