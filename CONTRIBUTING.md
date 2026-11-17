@@ -9,14 +9,26 @@ This helps avoid wasted effort on changes that may not align with the project's 
 
 - Zig 0.17.1
 - Node.js and npm
-- ripgrep (`rg` on `PATH`) for text-search integration tests
 - Xcode command-line tools (`xcrun swiftc`) for the macOS app
 
-Install frontend dependencies before building the app:
+Make `git` available on `PATH` for development scripts and tests. Make `rg`
+available on `PATH` for the text-search tests. The tests use stand-ins for
+`gh`. For app use, see [executable paths](docs/configuration.md#executable-paths)
+to set paths for Git, GitHub CLI, and ripgrep.
+
+## Build from source
+
+Run these commands from the repository root.
 
 ```bash
 npm ci --prefix frontend
+zig build
 ```
+
+`npm ci` installs the frontend dependencies. `zig build` uses them to build
+the frontend and puts it in `zig-out/Rvw.app`.
+
+The build puts the CLI at `zig-out/Rvw.app/Contents/MacOS/rvw-cli`.
 
 ## Development commands
 
@@ -55,31 +67,31 @@ requires the explicit `-Drelease=true` option.
 
 ## Architecture
 
-The native application starts a local review session and hosts the bundled
-frontend. The frontend sends JSON requests through its review API; the HTTP or
-native transport decodes them and forwards them to `src/app/core.zig` through a
-dispatcher. `Core` coordinates providers for Git diffs, repository files, and 
-comments, then returns typed responses to the frontend.
-
-Key areas of the repository:
+The macOS app starts a review session and loads the bundled frontend. The
+frontend sends JSON requests through the native bridge or, in development,
+through the HTTP service. The dispatcher sends the requests to
+`src/app/core.zig`. The core uses providers to read repository data and
+manage comments.
 
 - `src/app/` contains the request/response model, dispatcher, startup, and
   application core.
-- `src/provider/` isolates Git diff, filesystem, and comment storage behind
-  interfaces. Add integrations here rather than coupling them to the app core.
-- `src/transport/` exposes the core through HTTP and Unix sockets.
+- `src/provider/` defines interfaces and implementations for repository data,
+  text search, pull requests, and comments.
+- `src/transport/http.zig` handles HTTP requests. `src/bindings/cabi.zig`
+  exposes the core to the macOS app.
 - `src/config/`, `src/log/`, and `src/output/` handle user configuration,
   structured logging, and clipboard/Markdown output.
-- `frontend/src/review/` owns request helpers and review-session state;
-  `frontend/src/actions/` and `frontend/src/components/` implement UI behavior
-  and presentation.
+- `frontend/src/review/` contains request helpers and review-session state.
+  `frontend/src/actions/` handles UI actions. `frontend/src/components/`
+  contains UI components.
 - `macos/app/` contains application startup, menus, and window lifecycle code.
 - `macos/bridge/` connects native requests to the Zig core.
 - `macos/web/` handles bundled web assets and navigation.
 - `macos/resources/` contains the application plist and icon.
 - macOS tests are beside their source files. `macos/testing/` contains shared
   test helpers.
-- `build/` assembles the macOS bundle and installation artifacts.
+- `build/` contains the build scripts for the frontend, macOS bundle, and
+  release artifacts.
 
 Keep changes at the appropriate boundary: define new user operations in
 `src/app/model.zig` and handle them in the core, keep provider-specific behavior

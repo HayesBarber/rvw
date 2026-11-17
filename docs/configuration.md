@@ -168,4 +168,5 @@ and ripgrep:
 Use an absolute path. The selected file must be executable.
 If a setting is absent, Rvw finds the corresponding
 command (`git`, `gh`, or `rg`) on its process `PATH`.
-Omit the `executables` object to use this default for all three tools.
+If you omit the `executables` object, Rvw looks up all three commands on its
+process `PATH`.
