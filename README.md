@@ -16,25 +16,18 @@
 
 ## Installation
 
-Via Homebrew:
+Install Rvw with Homebrew.
 
 ```bash
 brew install --cask HayesBarber/tap/rvw
 ```
 
-Or build from source (see [CONTRIBUTING.md](./CONTRIBUTING.md) for prerequisites):
+For a source build, see the [contributor guide](./CONTRIBUTING.md#build-from-source).
 
-```bash
-npm ci --prefix frontend
-zig build
-```
+## Usage
 
-Rvw uses a CLI to launch the GUI. After building the app, the CLI binary is located at
-`zig-out/Rvw.app/Contents/MacOS/rvw-cli`, and the installed cask exposes it as the `rvw` command.
-
-> Note that the CLI resolves the GUI path via relative locations, so don't relocate it
-
-CLI usage is as follows:
+Run `rvw` to review the working tree in the current directory. Use `DIR` to open
+a different repository.
 
 ```bash
 usage: rvw [DIR] [-i | --interactive | -r RANGE | --range RANGE | -l | --last-commit | --pr NUMBER] [--log-level LEVEL]
@@ -42,15 +35,28 @@ usage: rvw [DIR] [-i | --interactive | -r RANGE | --range RANGE | -l | --last-co
        rvw -v | --version
 ```
 
-See [executable configuration](./docs/configuration.md#executable-paths) for Git, GitHub CLI, and ripgrep.
+| Option | Purpose |
+| --- | --- |
+| `-i`, `--interactive` | Open the review source picker at startup. |
+| `-r RANGE`, `--range RANGE` | Review a commit range, for example `main..HEAD`. |
+| `-l`, `--last-commit` | Compare `HEAD` with its first parent. |
+| `--pr NUMBER` | Review a GitHub pull request by number. |
+| `--log-level LEVEL` | Set the log level. |
+| `-h`, `--help` | Show CLI usage. |
+| `-v`, `--version` | Show the Rvw version. |
 
-## Usage
+Browse the files and diffs, then add review comments. Copy the comments to the
+clipboard and paste them into your AI tool.
 
-Open a Git repository with Rvw. Navigate the diff/files. Leave PR style comments. Export those comments to your clipboard. Paste to your preferred AI tool.
+> Rvw stores comments in memory. Copy your comments before you close the app window.
 
-Rvw is built with Vim in mind. See the docs for [configuring the keybindings and user settings](./docs/configuration.md).
+## Configuration
 
-> Rvw stores comments in memory. Review sessions are not saved. Copy your comments before you close the app window.
+See the [Vim-style keybindings](./docs/configuration.md#built-in-bindings).
+Use the [configuration file](./docs/configuration.md#user-configuration) to
+change bindings and review settings. You can also set the
+[executable paths](./docs/configuration.md#executable-paths) for Git, GitHub CLI,
+and ripgrep.
 
 ## Acknowledgements
 
