@@ -71,10 +71,13 @@ from the table above. Each value must be an array of key sequences.
 A sequence is a non-empty array of key strings. Set `keybindings.leader` to change
 the `<leader>` key. The default is `<Space>`.
 
-Set `diff.wrapLines` to `false` to turn off line wrapping. Set
-`diff.relativeLineNumbers` to `true` to show relative line numbers.
-The toggle actions apply for the session. The `diff.expand.toggle` action
-applies to the open diff only.
+Use `diff.wrapLines` and `diff.relativeLineNumbers` to set the initial display.
+Both values must be booleans. Text wraps by default, and line numbers are absolute.
+Set `"wrapLines": false` to scroll long lines horizontally.
+Set `"relativeLineNumbers": true` to show each code row's distance from the cursor.
+The cursor row shows its source line number.
+The toggle actions change these settings for the current session, including files opened later.
+The `diff.expand.toggle` action changes only the open diff. Each new file starts with collapsed context.
 
 Use `comments.types` to set an ordered list of comment types.
 The default types are `ISSUE`, `QUESTION`, and `NITPICK`. An empty list disables comment types.

@@ -28,9 +28,9 @@ zig build
 `npm ci` installs the frontend dependencies. `zig build` uses them to build
 the frontend and puts it in `zig-out/Rvw.app`.
 
-To launch the app, run `zig-out/Rvw.app/Contents/MacOS/rvw-cli` from your
-checkout or pass a repository path. Keep the CLI inside the app bundle so it
-can find the GUI.
+From the checkout, run `zig-out/Rvw.app/Contents/MacOS/rvw-cli` to review this
+repository. To review a different repository, add its path as the first
+argument. Keep the CLI inside the app bundle so it can find the GUI.
 
 ## Development commands
 

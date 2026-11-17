@@ -22,8 +22,6 @@ Install Rvw with Homebrew.
 brew install --cask HayesBarber/tap/rvw
 ```
 
-For a source build, see the [contributor guide](./CONTRIBUTING.md#build-from-source).
-
 ## Usage
 
 Run `rvw` to review the working tree in the current directory. Use `DIR` to open
@@ -45,7 +43,7 @@ usage: rvw [DIR] [-i | --interactive | -r RANGE | --range RANGE | -l | --last-co
 | `-h`, `--help` | Show CLI usage. |
 | `-v`, `--version` | Show the Rvw version. |
 
-Browse the files and diffs, then add review comments. Copy the comments to the
+Browse the files and diffs. Add review comments. Copy the comments to the
 clipboard and paste them into your AI tool.
 
 > Rvw stores comments in memory. Copy your comments before you close the app window.
