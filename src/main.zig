@@ -102,12 +102,7 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("{s}", .{last_commit.errorMessage(err)});
         return 2;
     } else options.range;
-    const log_level = resolveLogLevel(options.log_level, init.environ_map.get("LOG_LEVEL")) catch |err| {
-        std.log.err("{s}", .{parseErrorMessage(err)});
-        std.Io.File.stderr().writeStreamingAll(init.io, usage) catch {};
-        return 2;
-    };
-    launch(init.io, allocator, directory, range, options.pr, log_level, options.interactive) catch |err| {
+    launch(init.io, allocator, directory, range, options.pr, options.log_level, options.interactive) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -211,12 +206,6 @@ fn parseErrorMessage(err: ParseError) []const u8 {
         error.InvalidLogLevel => log.invalid_level_message,
         error.UnknownArgument => "unknown command-line argument",
     };
-}
-
-fn resolveLogLevel(flag: ?[]const u8, environment_value: ?[]const u8) ParseError!?[]const u8 {
-    const value = flag orelse environment_value orelse return null;
-    if (log.Level.parse(value) == null) return error.InvalidLogLevel;
-    return value;
 }
 
 fn canonicalizeDirectory(
@@ -523,15 +512,6 @@ test "public log-level option validates values and rejects missing or duplicate 
     try std.testing.expectError(error.DuplicateLogLevel, parseArgs(&.{ "rvw", "--log-level", "info", "--log-level", "debug" }));
     const positional = (try parseArgs(&.{ "rvw", "--", "--log-level" })).launch;
     try std.testing.expect(positional.log_level == null);
-}
-
-test "log-level resolution prefers the flag, rejects invalid environment values, and defaults when unset" {
-    try std.testing.expect((try resolveLogLevel(null, null)) == null);
-    for ([_][]const u8{ "debug", "err", "warn" }) |value| {
-        try std.testing.expectEqualStrings(value, (try resolveLogLevel(null, value)).?);
-        try std.testing.expectEqualStrings(value, (try resolveLogLevel(value, "bogus")).?);
-    }
-    try std.testing.expectError(error.InvalidLogLevel, resolveLogLevel(null, "bogus"));
 }
 
 test "CLI accepts PR targets and rejects ambiguous or invalid targets" {

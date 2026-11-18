@@ -34,21 +34,13 @@ pub fn main(init: std.process.Init) !void {
         return error.InvalidHost;
     };
 
-    const log_level = options.log_level orelse init.environ_map.get("LOG_LEVEL");
-    if (log_level) |value| {
-        if (rvw.log.Level.parse(value) == null) {
-            std.log.err("{s}", .{rvw.log.invalid_level_message});
-            usage();
-            return error.InvalidLogLevel;
-        }
-    }
     var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
         .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
         .temporary_directory = init.environ_map.get("TMPDIR"),
     });
     defer default_logger.deinit();
-    default_logger.minimum_level = if (log_level) |value| rvw.log.Level.parse(value).? else .err;
+    default_logger.minimum_level = if (options.log_level) |value| rvw.log.Level.parse(value).? else .err;
     const logger = default_logger.interface();
     var configuration = try rvw.config.load(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),

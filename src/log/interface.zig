@@ -20,7 +20,7 @@ pub const Level = enum {
 
     pub fn resolve(io: Io, value: ?[]const u8) Level {
         return parse(value orelse return .err) orelse blk: {
-            Io.File.stderr().writeStreamingAll(io, "invalid LOG_LEVEL; using error\n") catch {};
+            Io.File.stderr().writeStreamingAll(io, "invalid log level; using error\n") catch {};
             break :blk .err;
         };
     }

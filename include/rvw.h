@@ -24,7 +24,7 @@ typedef struct rvw_buffer {
  * `error_out` receives UTF-8 text that may be freed with rvw_buffer_free(NULL,
  * ...).
  */
-/* log_level is an optional raw LOG_LEVEL value; NULL defaults to error. */
+/* log_level is an optional raw log level value; NULL defaults to error. */
 /* interactive sets the initial picker instruction and requires range and pr to be NULL. */
 rvw_core *rvw_core_create(const char *directory, const char *range, const char *log_level, const uint32_t *pr, bool interactive, rvw_buffer *error_out);
 
