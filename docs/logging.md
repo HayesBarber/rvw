@@ -16,6 +16,5 @@ messages and selected diagnostic fields, never user content or raw exceptions.
 Delivery is fire-and-forget; failures are ignored and there are no retries.
 
 Application errors use error severity. Set the threshold with `--log-level`;
-without the flag it defaults to `error`, and the `LOG_LEVEL` environment
-variable is not read. Supported values are `error`/`err`, `warning`/`warn`,
-`info`, and `debug`. Invalid values are rejected.
+without the flag it defaults to `error`. Supported values are `error`/`err`,
+`warning`/`warn`, `info`, and `debug`. Invalid values are rejected.
