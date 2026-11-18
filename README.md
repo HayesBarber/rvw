@@ -39,7 +39,7 @@ usage: rvw [DIR] [-i | --interactive | -r RANGE | --range RANGE | -l | --last-co
 | `-r RANGE`, `--range RANGE` | Review a commit range, for example `main..HEAD`. |
 | `-l`, `--last-commit` | Compare `HEAD` with its first parent. |
 | `--pr NUMBER` | Review a GitHub pull request by number. |
-| `--log-level LEVEL` | Set the log level. |
+| `--log-level LEVEL` | Set the log level: `debug`, `info`, `warning`/`warn`, or `error`/`err` (default). See [Logging](./docs/logging.md). |
 | `-h`, `--help` | Show CLI usage. |
 | `-v`, `--version` | Show the Rvw version. |
 

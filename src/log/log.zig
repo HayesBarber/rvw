@@ -11,6 +11,7 @@ pub const Logger = interface.Logger;
 pub const Environment = file.Environment;
 pub const FileLogger = file.FileLogger;
 pub const maximum_file_count = file.maximum_file_count;
+pub const invalid_level_message = interface.invalid_level_message;
 pub const encodeEvent = interface.encodeEvent;
 pub const stderrLogger = stderr.logger;
 

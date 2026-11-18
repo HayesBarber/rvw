@@ -17,4 +17,4 @@ Delivery is fire-and-forget; failures are ignored and there are no retries.
 
 Application errors use error severity. `--log-level` overrides `LOG_LEVEL`,
 defaulting to `error`; supported values are `error`/`err`, `warning`/`warn`,
-`info`, and `debug`.
+`info`, and `debug`. Invalid CLI or `LOG_LEVEL` values are rejected.

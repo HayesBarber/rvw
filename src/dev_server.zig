@@ -21,6 +21,7 @@ pub fn main(init: std.process.Init) !void {
             error.MissingDirectory => "missing required --directory DIR",
             error.DuplicateDirectory => "--directory may only be provided once",
             error.DuplicateLogLevel => "--log-level may only be provided once",
+            error.InvalidLogLevel => rvw.log.invalid_level_message,
             error.InvalidPr => "PR number must be a positive integer",
             error.DuplicateTarget => "provide only one of --range or --pr",
             error.DuplicateRange => "--range may only be provided once",
@@ -33,13 +34,21 @@ pub fn main(init: std.process.Init) !void {
         return error.InvalidHost;
     };
 
+    const log_level = options.log_level orelse init.environ_map.get("LOG_LEVEL");
+    if (log_level) |value| {
+        if (rvw.log.Level.parse(value) == null) {
+            std.log.err("{s}", .{rvw.log.invalid_level_message});
+            usage();
+            return error.InvalidLogLevel;
+        }
+    }
     var default_logger = rvw.log.DefaultLogger.init(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
         .xdg_state_home = init.environ_map.get("XDG_STATE_HOME"),
         .temporary_directory = init.environ_map.get("TMPDIR"),
     });
     defer default_logger.deinit();
-    default_logger.minimum_level = rvw.log.Level.resolve(init.io, options.log_level orelse init.environ_map.get("LOG_LEVEL"));
+    default_logger.minimum_level = if (log_level) |value| rvw.log.Level.parse(value).? else .err;
     const logger = default_logger.interface();
     var configuration = try rvw.config.load(init.gpa, init.io, .{
         .home = init.environ_map.get("HOME"),
@@ -112,6 +121,7 @@ fn parseArgs(args: []const []const u8, defaults: Options) !Options {
         } else if (std.mem.eql(u8, argument, "--log-level")) {
             if (index == args.len) return error.MissingValue;
             if (options.log_level != null) return error.DuplicateLogLevel;
+            if (rvw.log.Level.parse(args[index]) == null) return error.InvalidLogLevel;
             options.log_level = args[index];
             index += 1;
         } else {
