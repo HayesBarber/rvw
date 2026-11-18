@@ -3,6 +3,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
+pub const invalid_level_message = "invalid log level; expected one of debug, info, warning (warn), error (err)";
+
 pub const Level = enum {
     debug,
     info,
@@ -18,7 +20,7 @@ pub const Level = enum {
 
     pub fn resolve(io: Io, value: ?[]const u8) Level {
         return parse(value orelse return .err) orelse blk: {
-            Io.File.stderr().writeStreamingAll(io, "invalid LOG_LEVEL; using error\n") catch {};
+            Io.File.stderr().writeStreamingAll(io, "invalid log level; using error\n") catch {};
             break :blk .err;
         };
     }

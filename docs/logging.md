@@ -15,6 +15,6 @@ Frontend code uses `logError(message, context?, traceId?)`; the shared
 messages and selected diagnostic fields, never user content or raw exceptions.
 Delivery is fire-and-forget; failures are ignored and there are no retries.
 
-Application errors use error severity. `--log-level` overrides `LOG_LEVEL`,
-defaulting to `error`; supported values are `error`/`err`, `warning`/`warn`,
-`info`, and `debug`.
+Application errors use error severity. Set the threshold with `--log-level`;
+without the flag it defaults to `error`. Supported values are `error`/`err`,
+`warning`/`warn`, `info`, and `debug`. Invalid values are rejected.

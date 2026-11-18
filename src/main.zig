@@ -3,6 +3,7 @@ const default_executables = @import("config/executables.zig").defaults;
 const last_commit = @import("util/last_commit.zig");
 const pull_request = @import("util/pull_request.zig");
 const config = @import("config/config.zig");
+const log = @import("log/log.zig");
 const build_options = @import("build_options");
 
 const usage =
@@ -38,6 +39,7 @@ const ParseError = error{
     DuplicateRange,
     DuplicateLogLevel,
     MissingLogLevel,
+    InvalidLogLevel,
     EmptyRange,
     MissingRange,
     UnknownArgument,
@@ -100,7 +102,7 @@ pub fn main(init: std.process.Init) u8 {
         std.log.err("{s}", .{last_commit.errorMessage(err)});
         return 2;
     } else options.range;
-    launch(init.io, allocator, directory, range, options.pr, options.log_level orelse init.environ_map.get("LOG_LEVEL"), options.interactive) catch |err| {
+    launch(init.io, allocator, directory, range, options.pr, options.log_level, options.interactive) catch |err| {
         std.log.err("unable to launch rvw: {t}", .{err});
         return 1;
     };
@@ -172,6 +174,7 @@ fn parseArgs(args: []const []const u8) ParseError!Command {
             if (options.log_level != null) return error.DuplicateLogLevel;
             index += 1;
             if (index == args.len) return error.MissingLogLevel;
+            if (log.Level.parse(args[index]) == null) return error.InvalidLogLevel;
             options.log_level = args[index];
             continue;
         }
@@ -200,6 +203,7 @@ fn parseErrorMessage(err: ParseError) []const u8 {
         error.MissingRange => "missing value for commit range",
         error.DuplicateLogLevel => "--log-level may only be provided once",
         error.MissingLogLevel => "missing value for --log-level",
+        error.InvalidLogLevel => log.invalid_level_message,
         error.UnknownArgument => "unknown command-line argument",
     };
 }
@@ -323,12 +327,14 @@ test "CLI parsing rejects ambiguous and incomplete launch arguments" {
         .{ .arguments = &.{ "rvw", "-r", "a..b", "--range", "b..c" }, .expected = error.DuplicateRange },
         .{ .arguments = &.{ "rvw", "--range" }, .expected = error.MissingRange },
         .{ .arguments = &.{ "rvw", "--range", "" }, .expected = error.EmptyRange },
+        .{ .arguments = &.{ "rvw", "--log-level", "bogus" }, .expected = error.InvalidLogLevel },
         .{ .arguments = &.{ "rvw", "--unknown" }, .expected = error.UnknownArgument },
     };
     for (cases) |case| {
         try std.testing.expectError(case.expected, parseArgs(case.arguments));
         try std.testing.expect(parseErrorMessage(case.expected).len > 0);
     }
+    try std.testing.expect(std.mem.indexOf(u8, parseErrorMessage(error.InvalidLogLevel), "warn") != null);
 }
 
 test "interactive forms accept optional paths and logging and forward the native option" {
@@ -480,7 +486,7 @@ fn expectArguments(expected: []const []const u8, actual: []const []const u8) !vo
     }
 }
 
-test "CLI forwards raw logging configuration with and without range" {
+test "native launch arguments forward logging configuration with and without range" {
     for ([_]?[]const u8{ null, "main..HEAD" }) |range| {
         for ([_][]const u8{ "debug", "", "invalid-secret" }) |level| {
             var buffer: [14][]const u8 = undefined;
@@ -492,12 +498,15 @@ test "CLI forwards raw logging configuration with and without range" {
     }
 }
 
-test "public log-level option preserves raw values and rejects missing or duplicate options" {
-    for ([_][]const u8{ "debug", "", "invalid" }) |value| {
+test "public log-level option validates values and rejects missing or duplicate options" {
+    for ([_][]const u8{ "debug", "info", "warning", "warn", "error", "err" }) |value| {
         const options = (try parseArgs(&.{ "rvw", "--log-level", value, "/tmp/repo", "--range", "main..HEAD" })).launch;
         try std.testing.expectEqualStrings(value, options.log_level.?);
         try std.testing.expectEqualStrings("main..HEAD", options.range.?);
         try std.testing.expectEqualStrings("/tmp/repo", options.directory);
+    }
+    for ([_][]const u8{ "", "invalid", "ERROR", " info" }) |value| {
+        try std.testing.expectError(error.InvalidLogLevel, parseArgs(&.{ "rvw", "--log-level", value }));
     }
     try std.testing.expectError(error.MissingLogLevel, parseArgs(&.{ "rvw", "--log-level" }));
     try std.testing.expectError(error.DuplicateLogLevel, parseArgs(&.{ "rvw", "--log-level", "info", "--log-level", "debug" }));
